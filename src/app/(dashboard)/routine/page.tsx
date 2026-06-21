@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, MapPin, Loader2, BookOpen, User, Filter, CheckSquare, FileText } from 'lucide-react';
 import AttendanceModal from '@/components/AttendanceModal';
 import HomeworkModal from '@/components/HomeworkModal';
+import CreateRoutineModal from '@/components/CreateRoutineModal';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjA0MzA3NiwiZXhwIjoxNzgyMTI5NDc2fQ.AaOYBh65Rkp88CvK1S2_1uRNfk2NSM1wEi8xKtedw48';
@@ -56,6 +57,7 @@ export default function RoutinePage() {
   
   const [activeAttendanceRoutine, setActiveAttendanceRoutine] = useState<Routine | null>(null);
   const [activeHomeworkRoutine, setActiveHomeworkRoutine] = useState<Routine | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const getUserSchoolId = () => {
     try {
@@ -188,11 +190,21 @@ export default function RoutinePage() {
 
   return (
     <div className="page-container animate-fade-in" style={{ padding: '2rem' }}>
-      <div className="page-header" style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
-          Class Routine
-        </h1>
-        <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>Manage and view weekly schedules for classes and teachers</p>
+      <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
+            Class Routine
+          </h1>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>Manage and view weekly schedules for classes and teachers</p>
+        </div>
+        <button 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="btn btn-primary" 
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: 'fit-content' }}
+        >
+          <Calendar size={18} />
+          Create Routine
+        </button>
       </div>
 
       <div className="widget glass-card" style={{ overflow: 'visible', border: '1px solid var(--border)', borderRadius: '1rem', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)' }}>
@@ -408,6 +420,16 @@ export default function RoutinePage() {
         <HomeworkModal 
           routine={activeHomeworkRoutine} 
           onClose={() => setActiveHomeworkRoutine(null)} 
+        />
+      )}
+
+      {isCreateModalOpen && (
+        <CreateRoutineModal 
+          onClose={() => setIsCreateModalOpen(false)} 
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+            fetchRoutines();
+          }} 
         />
       )}
     </div>

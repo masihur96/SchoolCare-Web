@@ -179,8 +179,8 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" style={{ padding: '1rem' }}>
-      <div className="bg-background w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="modal-overlay animate-fade-in">
+      <div className="modal-content">
         
         {/* Header */}
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
