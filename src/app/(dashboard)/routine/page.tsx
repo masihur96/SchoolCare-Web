@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, MapPin, Loader2, BookOpen, User, Filter, CheckSquare, FileText } from 'lucide-react';
 import AttendanceModal from '@/components/AttendanceModal';
+import HomeworkModal from '@/components/HomeworkModal';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjA0MzA3NiwiZXhwIjoxNzgyMTI5NDc2fQ.AaOYBh65Rkp88CvK1S2_1uRNfk2NSM1wEi8xKtedw48';
@@ -54,6 +55,7 @@ export default function RoutinePage() {
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   
   const [activeAttendanceRoutine, setActiveAttendanceRoutine] = useState<Routine | null>(null);
+  const [activeHomeworkRoutine, setActiveHomeworkRoutine] = useState<Routine | null>(null);
 
   const getUserSchoolId = () => {
     try {
@@ -374,7 +376,7 @@ export default function RoutinePage() {
                                 Attendance
                               </button>
                               <button 
-                                onClick={() => alert('Homework module coming soon!')}
+                                onClick={() => setActiveHomeworkRoutine(routine)}
                                 style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', transition: 'background 0.2s' }}
                                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
                                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
@@ -399,6 +401,13 @@ export default function RoutinePage() {
         <AttendanceModal 
           routine={activeAttendanceRoutine} 
           onClose={() => setActiveAttendanceRoutine(null)} 
+        />
+      )}
+      
+      {activeHomeworkRoutine && (
+        <HomeworkModal 
+          routine={activeHomeworkRoutine} 
+          onClose={() => setActiveHomeworkRoutine(null)} 
         />
       )}
     </div>
