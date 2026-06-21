@@ -14,7 +14,8 @@ import {
   Settings,
   Menu,
   X,
-  GraduationCap
+  GraduationCap,
+  LogOut
 } from 'lucide-react';
 
 const navItems = [
@@ -68,6 +69,16 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        <div className="sidebar-footer">
+          <Link
+            href="/login"
+            className="nav-item logout-item"
+          >
+            <LogOut size={20} className="nav-icon" />
+            <span>Log Out</span>
+          </Link>
+        </div>
       </aside>
 
       {isOpen && (

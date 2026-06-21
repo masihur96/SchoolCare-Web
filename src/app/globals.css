@@ -254,6 +254,21 @@ body {
   transform: scale(1.1);
 }
 
+.sidebar-footer {
+  padding: 1rem 1.5rem;
+  margin-top: auto;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.logout-item {
+  color: var(--destructive);
+}
+
+.logout-item:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--destructive);
+}
+
 .main-content {
   flex: 1;
   margin-left: 280px;
