@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Layers, BookOpen, Loader2, Eye, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Layers, BookOpen, Loader2, Eye, X, UserPlus, UserCog, Users } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjAxOTkxMSwiZXhwIjoxNzgyMTA2MzExfQ.Q6MlzH1TyhbM2HurOeEqvCvOUZfOKIQ8DPCL50E42Z8';
@@ -70,6 +70,16 @@ export default function ClassesPage() {
   const [editingSubject, setEditingSubject] = useState<Partial<SubjectEntity> | null>(null);
   const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
   const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null);
+
+  // Modals state for Assign User
+  const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [isAssignUserModalOpen, setIsAssignUserModalOpen] = useState(false);
+  const [assignUserForm, setAssignUserForm] = useState({ userId: '', rollNumber: '', classId: '', sectionId: '' });
+  const [assignActionLoading, setAssignActionLoading] = useState(false);
+
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [isAssignTeacherModalOpen, setIsAssignTeacherModalOpen] = useState(false);
+  const [assignTeacherForm, setAssignTeacherForm] = useState({ userId: '', classId: '', sectionId: '' });
 
   // Decode user school ID from token
   const getUserSchoolId = () => {
@@ -140,9 +150,33 @@ export default function ClassesPage() {
     }
   };
 
+  const fetchStudentsList = async () => {
+    if (!userSchoolId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/users?role=student&limit=1000&schoolId=${userSchoolId}`, { 
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` } 
+      });
+      const json = await res.json();
+      if (json.statusCode === 200) {
+        setStudentsList(json.data.data || []);
+      }
+
+      const resT = await fetch(`${API_BASE_URL}/admin/users?role=teacher&limit=1000&schoolId=${userSchoolId}`, { 
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` } 
+      });
+      const jsonT = await resT.json();
+      if (jsonT.statusCode === 200) {
+        setTeachersList(jsonT.data.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchData();
-  }, []);
+    fetchStudentsList();
+  }, [userSchoolId]);
 
   // Update viewing class when classesData updates
   useEffect(() => {
@@ -360,9 +394,103 @@ export default function ClassesPage() {
     }
   };
 
+  const handleAssignStudentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignUserForm.userId) return;
+    setAssignActionLoading(true);
+
+    try {
+      const student = studentsList.find(s => s.id === assignUserForm.userId);
+      if (!student) throw new Error("Student not found");
+
+      const classIds = Array.from(new Set([...(student.classes?.map((c: any) => c.id) || []), assignUserForm.classId]));
+      const sectionIds = Array.from(new Set([...(student.sections?.map((s: any) => s.id) || []), assignUserForm.sectionId]));
+
+      const payload = {
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        designation: student.designation,
+        avatar: student.avatar,
+        rollNumber: assignUserForm.rollNumber,
+        classIds: classIds,
+        sectionIds: sectionIds,
+        role: 'student',
+        schoolId: userSchoolId
+      };
+
+      const response = await fetch(`${API_BASE_URL}/admin/users/${assignUserForm.userId}`, {
+        method: 'PUT',
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        setIsAssignUserModalOpen(false);
+        fetchStudentsList(); 
+        alert("Student successfully assigned!");
+      } else {
+        const err = await response.json();
+        alert(`Failed to assign student: ${err.message || 'Unknown'}`);
+      }
+    } catch (e: any) {
+      alert(`Error assigning student: ${e.message}`);
+    } finally {
+      setAssignActionLoading(false);
+    }
+  };
+
+  const handleAssignTeacherSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignTeacherForm.userId) return;
+    setAssignActionLoading(true);
+
+    try {
+      const teacher = teachersList.find(t => t.id === assignTeacherForm.userId);
+      if (!teacher) throw new Error("Teacher not found");
+
+      const classIds = Array.from(new Set([...(teacher.classes?.map((c: any) => c.id) || []), assignTeacherForm.classId]));
+      const sectionIds = Array.from(new Set([...(teacher.sections?.map((s: any) => s.id) || []), assignTeacherForm.sectionId]));
+
+      const payload = {
+        name: teacher.name,
+        email: teacher.email,
+        phone: teacher.phone,
+        designation: teacher.designation,
+        avatar: teacher.avatar,
+        classIds: classIds,
+        sectionIds: sectionIds,
+        role: 'teacher',
+        schoolId: userSchoolId
+      };
+
+      const response = await fetch(`${API_BASE_URL}/admin/users/${assignTeacherForm.userId}`, {
+        method: 'PUT',
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        setIsAssignTeacherModalOpen(false);
+        fetchStudentsList(); // This also fetches teachers
+        alert("Teacher successfully assigned!");
+      } else {
+        const err = await response.json();
+        alert(`Failed to assign teacher: ${err.message || 'Unknown'}`);
+      }
+    } catch (e: any) {
+      alert(`Error assigning teacher: ${e.message}`);
+    } finally {
+      setAssignActionLoading(false);
+    }
+  };
+
   const filteredClasses = classesData.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).map(c => {
+    const studentCount = studentsList.filter(st => st.classes?.some((cls: any) => cls.id === c.id)).length;
+    return { ...c, students: studentCount };
+  });
 
   return (
     <div className="page-container animate-fade-in" style={{ padding: '2rem' }}>
@@ -453,7 +581,7 @@ export default function ClassesPage() {
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted-foreground)' }}>
-                        <Layers size={18} style={{ color: 'var(--primary)' }} />
+                        <Users size={18} style={{ color: 'var(--primary)' }} />
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{c.students}</span>
                       </div>
                     </td>
@@ -530,15 +658,39 @@ export default function ClassesPage() {
                     </button>
                   </div>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto' }}>
-                    {viewingClass.sections.length > 0 ? viewingClass.sections.map(s => (
-                      <li key={s.id} style={{ padding: '0.5rem 0.75rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '0.25rem', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>{s.name}</span>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => { setEditingSection(s); setIsEditSectionModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }} title="Edit"><Edit size={14} /></button>
-                          <button onClick={() => { setDeletingSectionId(s.id); setIsDeleteSectionModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--destructive)' }} title="Delete"><Trash2 size={14} /></button>
-                        </div>
-                      </li>
-                    )) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>No sections assigned</p>}
+                    {viewingClass.sections.length > 0 ? viewingClass.sections.map(s => {
+                      const assignedTeachers = teachersList.filter(t => t.sections?.some((sec: any) => sec.id === s.id));
+                      const assignedStudents = studentsList.filter(st => st.sections?.some((sec: any) => sec.id === s.id));
+
+                      return (
+                        <li key={s.id} style={{ padding: '0.75rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '0.25rem', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600 }}>{s.name}</span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button onClick={() => { setAssignUserForm({ userId: '', rollNumber: '', classId: viewingClass.id, sectionId: s.id }); setIsAssignUserModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }} title="Assign Student"><UserPlus size={14} /></button>
+                              <button onClick={() => { setAssignTeacherForm({ userId: '', classId: viewingClass.id, sectionId: s.id }); setIsAssignTeacherModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }} title="Assign Teacher"><UserCog size={14} /></button>
+                              <button onClick={() => { setEditingSection(s); setIsEditSectionModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }} title="Edit"><Edit size={14} /></button>
+                              <button onClick={() => { setDeletingSectionId(s.id); setIsDeleteSectionModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--destructive)' }} title="Delete"><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                          
+                          {(assignedTeachers.length > 0 || assignedStudents.length > 0) && (
+                            <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              {assignedTeachers.length > 0 && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                                  <span style={{ fontWeight: 600 }}>Teachers:</span> {assignedTeachers.map(t => t.name).join(', ')}
+                                </div>
+                              )}
+                              {assignedStudents.length > 0 && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                                  <span style={{ fontWeight: 600 }}>Students:</span> {assignedStudents.map(st => `${st.name} (Roll: ${st.rollNumber || 'N/A'})`).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    }) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>No sections assigned</p>}
                   </ul>
                 </div>
 
@@ -811,6 +963,68 @@ export default function ClassesPage() {
               <button className="btn" style={{ flex: 1, border: '1px solid var(--border)' }} onClick={() => setIsDeleteSubjectModalOpen(false)} disabled={actionLoading}>Cancel</button>
               <button className="btn" style={{ flex: 1, background: 'var(--destructive)', color: 'white' }} onClick={handleDeleteSubjectConfirm} disabled={actionLoading}>{actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} Confirm Delete</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign User Modal */}
+      {isAssignUserModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
+          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '400px', borderRadius: '1rem', overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Assign Student</h2>
+              <button className="action-btn" onClick={() => setIsAssignUserModalOpen(false)} disabled={assignActionLoading}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAssignStudentSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Select Student</label>
+                <select className="input" value={assignUserForm.userId} onChange={(e) => setAssignUserForm({...assignUserForm, userId: e.target.value})} required disabled={assignActionLoading}>
+                  <option value="">-- Choose Student --</option>
+                  {studentsList.map((st: any) => (
+                    <option key={st.id} value={st.id}>{st.name} ({st.email})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Roll Number</label>
+                <input type="text" className="input" value={assignUserForm.rollNumber} onChange={(e) => setAssignUserForm({...assignUserForm, rollNumber: e.target.value})} required disabled={assignActionLoading} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAssignUserModalOpen(false)} disabled={assignActionLoading}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={assignActionLoading}>{assignActionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} Assign</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Teacher Modal */}
+      {isAssignTeacherModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
+          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '400px', borderRadius: '1rem', overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Assign Teacher</h2>
+              <button className="action-btn" onClick={() => setIsAssignTeacherModalOpen(false)} disabled={assignActionLoading}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAssignTeacherSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Select Teacher</label>
+                <select className="input" value={assignTeacherForm.userId} onChange={(e) => setAssignTeacherForm({...assignTeacherForm, userId: e.target.value})} required disabled={assignActionLoading}>
+                  <option value="">-- Choose Teacher --</option>
+                  {teachersList.map((st: any) => (
+                    <option key={st.id} value={st.id}>{st.name} ({st.email})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAssignTeacherModalOpen(false)} disabled={assignActionLoading}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={assignActionLoading}>{assignActionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} Assign</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
