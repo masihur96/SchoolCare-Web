@@ -34,7 +34,7 @@ interface TeacherEntity {
   sections: SectionEntity[];
 }
 
-const LocationCell = ({ lat, lon, radius }: { lat?: number, lon?: number, radius?: number }) => {
+const LocationCell = ({ lat, lon, radius, hideRadius }: { lat?: number, lon?: number, radius?: number, hideRadius?: boolean }) => {
   const [placeName, setPlaceName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,9 +83,11 @@ const LocationCell = ({ lat, lon, radius }: { lat?: number, lon?: number, radius
       <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--foreground)' }} title={`Lat: ${lat}, Lon: ${lon}`}>
         {placeName ? placeName : `Lat: ${lat}, Lon: ${lon}`}
       </span>
-      <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-        Radius: {radius ?? 'N/A'}m
-      </span>
+      {!hideRadius && (
+        <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
+          Radius: {radius ?? 'N/A'}m
+        </span>
+      )}
     </div>
   );
 };
@@ -622,46 +624,62 @@ export default function TeachersPage() {
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Password {modalMode === 'add' && '*'}</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input type={showPassword ? "text" : "password"} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} required={modalMode === 'add'} disabled={actionLoading || modalMode === 'view'} placeholder={modalMode === 'edit' ? "Leave blank to keep current" : ""} />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }} disabled={modalMode === 'view'}>
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                  {modalMode !== 'view' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Password {modalMode === 'add' && '*'}</label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input type={showPassword ? "text" : "password"} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} required={modalMode === 'add'} disabled={actionLoading} placeholder={modalMode === 'edit' ? "Leave blank to keep current" : ""} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Phone</label>
                     <input type="text" className="input" value={newTeacher.phone} onChange={(e) => setNewTeacher({...newTeacher, phone: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
                   </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Designation</label>
                     <input type="text" className="input" value={newTeacher.designation} onChange={(e) => setNewTeacher({...newTeacher, designation: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Roll Number</label>
-                    <input type="text" className="input" value={newTeacher.rollNumber} onChange={(e) => setNewTeacher({...newTeacher, rollNumber: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
-                  </div>
+                  {modalMode !== 'view' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Roll Number</label>
+                      <input type="text" className="input" value={newTeacher.rollNumber} onChange={(e) => setNewTeacher({...newTeacher, rollNumber: e.target.value})} disabled={actionLoading} />
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Latitude</label>
-                    <input type="number" step="any" className="input" value={newTeacher.lat} onChange={(e) => setNewTeacher({...newTeacher, lat: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                {modalMode === 'view' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Attendance Location Point</label>
+                      <div className="input" style={{ padding: '0.75rem', minHeight: '42px', display: 'flex', alignItems: 'center', backgroundColor: 'var(--background)' }}>
+                        <LocationCell lat={newTeacher.lat ? Number(newTeacher.lat) : undefined} lon={newTeacher.lon ? Number(newTeacher.lon) : undefined} hideRadius={true} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Radius (m)</label>
+                      <input type="number" className="input" value={newTeacher.radius} onChange={(e) => setNewTeacher({...newTeacher, radius: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Longitude</label>
-                    <input type="number" step="any" className="input" value={newTeacher.lon} onChange={(e) => setNewTeacher({...newTeacher, lon: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Latitude</label>
+                      <input type="number" step="any" className="input" value={newTeacher.lat} onChange={(e) => setNewTeacher({...newTeacher, lat: e.target.value})} disabled={actionLoading} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Longitude</label>
+                      <input type="number" step="any" className="input" value={newTeacher.lon} onChange={(e) => setNewTeacher({...newTeacher, lon: e.target.value})} disabled={actionLoading} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Radius (m)</label>
+                      <input type="number" className="input" value={newTeacher.radius} onChange={(e) => setNewTeacher({...newTeacher, radius: e.target.value})} disabled={actionLoading} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Radius (m)</label>
-                    <input type="number" className="input" value={newTeacher.radius} onChange={(e) => setNewTeacher({...newTeacher, radius: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
-                  </div>
-                </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
