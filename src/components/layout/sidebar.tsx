@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   GraduationCap,
-  LogOut
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { name: 'Teachers', href: '/teachers', icon: GraduationCap },
   { name: 'Classes & Subjects', href: '/classes', icon: BookOpen },
   { name: 'Attendance', href: '/attendance', icon: CheckCircle },
+  { name: 'Teacher Attendance', href: '/teacher-attendance', icon: UserCheck },
   { name: 'Routine', href: '/routine', icon: Calendar },
   { name: 'Exams', href: '/exams', icon: FileText },
   { name: 'Notices', href: '/notices', icon: BellRing },
