@@ -65,7 +65,6 @@ const LocationCell = ({ lat, lon, radius }: { lat?: number, lon?: number, radius
         }
       };
 
-      // Slight delay to stagger requests and avoid rate limits
       const timer = setTimeout(fetchPlace, Math.random() * 1000 + 500);
       return () => clearTimeout(timer);
     }
@@ -108,22 +107,32 @@ export default function TeachersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
-  const [filterIsActive, setFilterIsActive] = useState(''); // 'true', 'false', ''
+  const [filterIsActive, setFilterIsActive] = useState('');
   
   // Toggle filters visibility
   const [showFilters, setShowFilters] = useState(false);
 
-  // Add Teacher Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit' | 'view'>('add');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  
   const [newTeacher, setNewTeacher] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
     designation: '',
-    avatar: ''
+    avatar: '',
+    rollNumber: '',
+    lat: '',
+    lon: '',
+    radius: '',
+    classIds: [] as string[],
+    sectionIds: [] as string[]
   });
+  
   const [showPassword, setShowPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -142,7 +151,7 @@ export default function TeachersPage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setPage(1); // Reset page on search change
+      setPage(1);
     }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
@@ -161,10 +170,10 @@ export default function TeachersPage() {
       const classesJson = await classesRes.json();
       const sectionsJson = await sectionsRes.json();
 
-      const classes: ClassEntity[] = Array.isArray(classesJson) ? classesJson : classesJson.data || [];
-      const sections: SectionEntity[] = Array.isArray(sectionsJson) ? sectionsJson : sectionsJson.data || [];
+      const classes = Array.isArray(classesJson) ? classesJson : classesJson.data || [];
+      const sections = Array.isArray(sectionsJson) ? sectionsJson : sectionsJson.data || [];
 
-      setClassesData(classes.filter(c => c.schoolId === userSchoolId));
+      setClassesData(classes.filter((c: any) => c.schoolId === userSchoolId));
       setSectionsData(sections);
     } catch (error) {
       console.error("Failed to fetch filters data:", error);
@@ -215,7 +224,82 @@ export default function TeachersPage() {
     fetchTeachers();
   }, [fetchTeachers]);
 
+  const resetForm = () => {
+    setNewTeacher({
+      name: '', email: '', password: '', phone: '', designation: '', 
+      avatar: '', rollNumber: '', lat: '', lon: '', radius: '',
+      classIds: [], sectionIds: []
+    });
+    setSelectedTeacherId(null);
+  };
+
+  const openAddModal = () => {
+    resetForm();
+    setModalMode('add');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (teacher: TeacherEntity) => {
+    setNewTeacher({
+      name: teacher.name,
+      email: teacher.email,
+      password: '', // blank password for edit unless they type a new one
+      phone: teacher.phone || '',
+      designation: teacher.designation || '',
+      avatar: teacher.avatar || '',
+      rollNumber: teacher.rollNumber || '',
+      lat: teacher.lat !== undefined ? String(teacher.lat) : '',
+      lon: teacher.lon !== undefined ? String(teacher.lon) : '',
+      radius: teacher.radius !== undefined ? String(teacher.radius) : '',
+      classIds: teacher.classes?.map(c => c.id) || [],
+      sectionIds: teacher.sections?.map(s => s.id) || []
+    });
+    setSelectedTeacherId(teacher.id);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const openViewModal = (teacher: TeacherEntity) => {
+    setNewTeacher({
+      name: teacher.name,
+      email: teacher.email,
+      password: '', 
+      phone: teacher.phone || '',
+      designation: teacher.designation || '',
+      avatar: teacher.avatar || '',
+      rollNumber: teacher.rollNumber || '',
+      lat: teacher.lat !== undefined ? String(teacher.lat) : '',
+      lon: teacher.lon !== undefined ? String(teacher.lon) : '',
+      radius: teacher.radius !== undefined ? String(teacher.radius) : '',
+      classIds: teacher.classes?.map(c => c.id) || [],
+      sectionIds: teacher.sections?.map(s => s.id) || []
+    });
+    setSelectedTeacherId(teacher.id);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this teacher?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`
+        }
+      });
+      if (res.ok) {
+        fetchTeachers();
+      } else {
+        alert('Failed to delete teacher.');
+      }
+    } catch (e) {
+      alert('Error deleting teacher.');
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (modalMode === 'view') return;
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -244,40 +328,54 @@ export default function TeachersPage() {
     }
   };
 
-  const handleAddTeacher = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userSchoolId) return;
+    if (!userSchoolId || modalMode === 'view') return;
     setActionLoading(true);
+    
+    const payload: any = {
+      ...newTeacher,
+      role: 'teacher',
+      schoolId: userSchoolId,
+      lat: newTeacher.lat ? parseFloat(newTeacher.lat) : undefined,
+      lon: newTeacher.lon ? parseFloat(newTeacher.lon) : undefined,
+      radius: newTeacher.radius ? parseInt(newTeacher.radius) : undefined,
+    };
+
+    if (modalMode === 'edit' && !payload.password) {
+      delete payload.password;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users`, {
-        method: 'POST',
+      const url = modalMode === 'edit' && selectedTeacherId 
+        ? `${API_BASE_URL}/admin/users/${selectedTeacherId}`
+        : `${API_BASE_URL}/admin/users`;
+        
+      const response = await fetch(url, {
+        method: modalMode === 'edit' ? 'PUT' : 'POST',
         headers: {
           'accept': '*/*',
           'Authorization': `Bearer ${API_TOKEN}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...newTeacher,
-          role: 'teacher',
-          schoolId: userSchoolId,
-        })
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
-        setIsAddModalOpen(false);
-        setNewTeacher({ name: '', email: '', password: '', phone: '', designation: '', avatar: '' });
-        fetchTeachers(); // Refresh the list
+        setIsModalOpen(false);
+        resetForm();
+        fetchTeachers();
       } else {
         const errorData = await response.json();
-        alert(`Failed to add teacher: ${errorData.message || 'Unknown error'}`);
+        alert(`Failed to save: ${errorData.message || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("Error adding teacher.");
+      alert("Error saving.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Derived sections based on selected class
+  // Derived sections based on selected class (for filters)
   const availableSections = filterClass 
     ? sectionsData.filter(s => s.classId === filterClass)
     : sectionsData;
@@ -293,7 +391,7 @@ export default function TeachersPage() {
           </h1>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>Manage and view teacher records</p>
         </div>
-        <button className="btn btn-primary gap-2" onClick={() => setIsAddModalOpen(true)} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
+        <button className="btn btn-primary gap-2" onClick={openAddModal} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
           <Plus size={18} /> Add Teacher
         </button>
       </div>
@@ -446,9 +544,9 @@ export default function TeachersPage() {
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
                       <div className="action-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        <button className="action-btn" title="View"><Eye size={16} /></button>
-                        <button className="action-btn" title="Edit"><Edit size={16} /></button>
-                        <button className="action-btn" style={{ color: 'var(--destructive)' }} title="Delete">
+                        <button className="action-btn" title="View" onClick={() => openViewModal(teacher)}><Eye size={16} /></button>
+                        <button className="action-btn" title="Edit" onClick={() => openEditModal(teacher)}><Edit size={16} /></button>
+                        <button className="action-btn" style={{ color: 'var(--destructive)' }} title="Delete" onClick={() => handleDelete(teacher.id)}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -498,58 +596,136 @@ export default function TeachersPage() {
         )}
       </div>
 
-      {/* Add Teacher Modal */}
-      {isAddModalOpen && (
+      {/* Add/Edit/View Teacher Modal */}
+      {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '500px', borderRadius: '1rem', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '700px', borderRadius: '1rem', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Add New Teacher</h2>
-              <button className="action-btn" onClick={() => setIsAddModalOpen(false)} disabled={actionLoading}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>
+                {modalMode === 'add' ? 'Add New Teacher' : modalMode === 'edit' ? 'Edit Teacher' : 'View Teacher'}
+              </h2>
+              <button className="action-btn" onClick={() => setIsModalOpen(false)} disabled={actionLoading}>
                 <X size={20} />
               </button>
             </div>
             <div style={{ overflowY: 'auto' }}>
-              <form onSubmit={handleAddTeacher} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
-                    <input type="text" className="input" value={newTeacher.name} onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})} required disabled={actionLoading} />
+                    <input type="text" className="input" value={newTeacher.name} onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})} required disabled={actionLoading || modalMode === 'view'} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Email *</label>
-                    <input type="email" className="input" value={newTeacher.email} onChange={(e) => setNewTeacher({...newTeacher, email: e.target.value})} required disabled={actionLoading} />
+                    <input type="email" className="input" value={newTeacher.email} onChange={(e) => setNewTeacher({...newTeacher, email: e.target.value})} required disabled={actionLoading || modalMode === 'view'} />
                   </div>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Password *</label>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Password {modalMode === 'add' && '*'}</label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input type={showPassword ? "text" : "password"} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} required disabled={actionLoading} />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
+                      <input type={showPassword ? "text" : "password"} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} required={modalMode === 'add'} disabled={actionLoading || modalMode === 'view'} placeholder={modalMode === 'edit' ? "Leave blank to keep current" : ""} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }} disabled={modalMode === 'view'}>
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Phone</label>
-                    <input type="text" className="input" value={newTeacher.phone} onChange={(e) => setNewTeacher({...newTeacher, phone: e.target.value})} disabled={actionLoading} />
+                    <input type="text" className="input" value={newTeacher.phone} onChange={(e) => setNewTeacher({...newTeacher, phone: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Designation</label>
-                    <input type="text" className="input" value={newTeacher.designation} onChange={(e) => setNewTeacher({...newTeacher, designation: e.target.value})} disabled={actionLoading} />
+                    <input type="text" className="input" value={newTeacher.designation} onChange={(e) => setNewTeacher({...newTeacher, designation: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
                   </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Roll Number</label>
+                    <input type="text" className="input" value={newTeacher.rollNumber} onChange={(e) => setNewTeacher({...newTeacher, rollNumber: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Latitude</label>
+                    <input type="number" step="any" className="input" value={newTeacher.lat} onChange={(e) => setNewTeacher({...newTeacher, lat: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Longitude</label>
+                    <input type="number" step="any" className="input" value={newTeacher.lon} onChange={(e) => setNewTeacher({...newTeacher, lon: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Radius (m)</label>
+                    <input type="number" className="input" value={newTeacher.radius} onChange={(e) => setNewTeacher({...newTeacher, radius: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Classes</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.5rem', minHeight: '60px' }}>
+                      {classesData.map(c => (
+                        <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={newTeacher.classIds.includes(c.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setNewTeacher(prev => ({
+                                ...prev,
+                                classIds: checked 
+                                  ? [...prev.classIds, c.id] 
+                                  : prev.classIds.filter(id => id !== c.id)
+                              }));
+                            }}
+                            disabled={actionLoading || modalMode === 'view'}
+                          />
+                          {c.name}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Sections</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.5rem', minHeight: '60px' }}>
+                      {sectionsData.filter(s => newTeacher.classIds.includes(s.classId)).map(s => (
+                        <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={newTeacher.sectionIds.includes(s.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setNewTeacher(prev => ({
+                                ...prev,
+                                sectionIds: checked 
+                                  ? [...prev.sectionIds, s.id] 
+                                  : prev.sectionIds.filter(id => id !== s.id)
+                              }));
+                            }}
+                            disabled={actionLoading || modalMode === 'view'}
+                          />
+                          {s.name}
+                        </label>
+                      ))}
+                      {newTeacher.classIds.length === 0 && <span style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Select a class first</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Avatar Image</label>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <label className="btn" style={{ border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
-                        {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                        {uploadingAvatar ? 'Uploading...' : 'Upload Image'}
-                        <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar} />
-                      </label>
+                      {modalMode !== 'view' && (
+                        <label className="btn" style={{ border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+                          {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                          {uploadingAvatar ? 'Uploading...' : 'Upload Image'}
+                          <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar} />
+                        </label>
+                      )}
                       {newTeacher.avatar && (
                         <div style={{ width: '40px', height: '40px', borderRadius: '0.25rem', overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
                           <img src={newTeacher.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -560,11 +736,15 @@ export default function TeachersPage() {
                 </div>
                 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                  <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAddModalOpen(false)} disabled={actionLoading}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={actionLoading}>
-                    {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} 
-                    Add Teacher
+                  <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsModalOpen(false)} disabled={actionLoading}>
+                    {modalMode === 'view' ? 'Close' : 'Cancel'}
                   </button>
+                  {modalMode !== 'view' && (
+                    <button type="submit" className="btn btn-primary" disabled={actionLoading}>
+                      {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} 
+                      {modalMode === 'edit' ? 'Save Changes' : 'Add Teacher'}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
