@@ -4,7 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { X, Loader2, Check, AlertCircle, Info } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjA0MzA3NiwiZXhwIjoxNzgyMTI5NDc2fQ.AaOYBh65Rkp88CvK1S2_1uRNfk2NSM1wEi8xKtedw48';
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  }
+  return '';
+};
 
 interface Student {
   id: string;
@@ -47,7 +52,7 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
       try {
         const headers = {
           'accept': '*/*',
-          'Authorization': `Bearer ${API_TOKEN}`
+          'Authorization': `Bearer ${getApiToken()}`
         };
         const res = await fetch(`${API_BASE_URL}/admin/users?role=student&limit=1000&classId=${routine.classEntity.id}&sectionId=${routine.sectionEntity.id}`, { headers });
         const json = await res.json();
@@ -87,7 +92,7 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
       setLoadingAttendance(true);
       setIsAttendanceTaken(false);
       try {
-        const headers = { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` };
+        const headers = { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` };
         const res = await fetch(`${API_BASE_URL}/admin/attendance/period?routineId=${routine.id}&date=${date}&limit=1000`, { headers });
         const json = await res.json();
         
@@ -156,7 +161,7 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
         method: 'POST',
         headers: {
           'accept': '*/*',
-          'Authorization': `Bearer ${API_TOKEN}`,
+          'Authorization': `Bearer ${getApiToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)

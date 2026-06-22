@@ -4,7 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Layers, BookOpen, Loader2, Eye, X, UserPlus, UserCog, Users } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjAxOTkxMSwiZXhwIjoxNzgyMTA2MzExfQ.Q6MlzH1TyhbM2HurOeEqvCvOUZfOKIQ8DPCL50E42Z8';
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  }
+  return '';
+};
 
 interface ClassEntity {
   id: string;
@@ -84,7 +89,7 @@ export default function ClassesPage() {
   // Decode user school ID from token
   const getUserSchoolId = () => {
     try {
-      const payload = JSON.parse(atob(API_TOKEN.split('.')[1]));
+      const payload = JSON.parse(atob(getApiToken().split('.')[1]));
       return payload.schoolId;
     } catch (e) {
       console.error("Failed to decode token", e);
@@ -104,7 +109,7 @@ export default function ClassesPage() {
       setLoading(true);
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
 
       const [classesRes, sectionsRes, subjectsRes] = await Promise.all([
@@ -154,7 +159,7 @@ export default function ClassesPage() {
     if (!userSchoolId) return;
     try {
       const res = await fetch(`${API_BASE_URL}/admin/users?role=student&limit=1000&schoolId=${userSchoolId}`, { 
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` } 
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` } 
       });
       const json = await res.json();
       if (json.statusCode === 200) {
@@ -162,7 +167,7 @@ export default function ClassesPage() {
       }
 
       const resT = await fetch(`${API_BASE_URL}/admin/users?role=teacher&limit=1000&schoolId=${userSchoolId}`, { 
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` } 
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` } 
       });
       const jsonT = await resT.json();
       if (jsonT.statusCode === 200) {
@@ -197,7 +202,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/classes`, {
         method: 'POST',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newClass, schoolId: userSchoolId })
       });
       if (response.ok) {
@@ -221,7 +226,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/classes/${editingClass.id}`, {
         method: 'PUT',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editingClass.name, description: editingClass.description })
       });
       if (response.ok) {
@@ -243,7 +248,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/classes/${deletingClassId}`, {
         method: 'DELETE',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` }
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` }
       });
       if (response.ok) {
         setIsDeleteModalOpen(false);
@@ -265,7 +270,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/sections`, {
         method: 'POST',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newSection, schoolId: userSchoolId })
       });
       if (response.ok) {
@@ -289,7 +294,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/sections/${editingSection.id}`, {
         method: 'PUT',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editingSection.name, classId: editingSection.classId })
       });
       if (response.ok) {
@@ -311,7 +316,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/sections/${deletingSectionId}`, {
         method: 'DELETE',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` }
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` }
       });
       if (response.ok) {
         setIsDeleteSectionModalOpen(false);
@@ -333,7 +338,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/subjects`, {
         method: 'POST',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newSubject, schoolId: userSchoolId })
       });
       if (response.ok) {
@@ -357,7 +362,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/subjects/${editingSubject.id}`, {
         method: 'PUT',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editingSubject.name, code: editingSubject.code, classId: editingSubject.classId })
       });
       if (response.ok) {
@@ -379,7 +384,7 @@ export default function ClassesPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/subjects/${deletingSubjectId}`, {
         method: 'DELETE',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}` }
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` }
       });
       if (response.ok) {
         setIsDeleteSubjectModalOpen(false);
@@ -421,7 +426,7 @@ export default function ClassesPage() {
 
       const response = await fetch(`${API_BASE_URL}/admin/users/${assignUserForm.userId}`, {
         method: 'PUT',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
@@ -466,7 +471,7 @@ export default function ClassesPage() {
 
       const response = await fetch(`${API_BASE_URL}/admin/users/${assignTeacherForm.userId}`, {
         method: 'PUT',
-        headers: { 'accept': '*/*', 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 

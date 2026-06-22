@@ -6,7 +6,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjA0MzA3NiwiZXhwIjoxNzgyMTI5NDc2fQ.AaOYBh65Rkp88CvK1S2_1uRNfk2NSM1wEi8xKtedw48';
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  }
+  return '';
+};
 
 interface ClassEntity {
   id: string;
@@ -78,7 +83,7 @@ export default function AttendancePage() {
 
   const getUserSchoolId = () => {
     try {
-      const payload = JSON.parse(atob(API_TOKEN.split('.')[1]));
+      const payload = JSON.parse(atob(getApiToken().split('.')[1]));
       return payload.schoolId;
     } catch (e) {
       return null;
@@ -100,7 +105,7 @@ export default function AttendancePage() {
     try {
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
       const [classesRes, sectionsRes, subjectsRes, schoolsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/admin/classes`, { headers }),
@@ -136,7 +141,7 @@ export default function AttendancePage() {
     try {
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
       
       const queryParams = new URLSearchParams({
@@ -243,7 +248,7 @@ export default function AttendancePage() {
     currentY += 8;
     
     const tableColumn = ["Date", "Student Name", "Roll No", "Class", "Section", "Subject", "Teacher", "Time", "Status"];
-    const tableRows = [];
+    const tableRows: any[][] = [];
     
     records.forEach(record => {
       const recordData = [
@@ -269,7 +274,7 @@ export default function AttendancePage() {
       alternateRowStyles: { fillColor: [245, 245, 245] },
       didDrawPage: function (data) {
         // Footer
-        const str = 'Page ' + doc.internal.getNumberOfPages();
+        const str = 'Page ' + (doc.internal as any).getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(

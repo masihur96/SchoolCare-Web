@@ -7,7 +7,12 @@ import HomeworkModal from '@/components/HomeworkModal';
 import CreateRoutineModal from '@/components/CreateRoutineModal';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjA0MzA3NiwiZXhwIjoxNzgyMTI5NDc2fQ.AaOYBh65Rkp88CvK1S2_1uRNfk2NSM1wEi8xKtedw48';
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  }
+  return '';
+};
 
 interface ClassEntity {
   id: string;
@@ -61,7 +66,7 @@ export default function RoutinePage() {
 
   const getUserSchoolId = () => {
     try {
-      const payload = JSON.parse(atob(API_TOKEN.split('.')[1]));
+      const payload = JSON.parse(atob(getApiToken().split('.')[1]));
       return payload.schoolId;
     } catch (e) {
       return null;
@@ -76,7 +81,7 @@ export default function RoutinePage() {
     try {
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
       
       const response = await fetch(`${API_BASE_URL}/general/routine?schoolId=${userSchoolId}`, { headers });

@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc4MjAxOTkxMSwiZXhwIjoxNzgyMTA2MzExfQ.Q6MlzH1TyhbM2HurOeEqvCvOUZfOKIQ8DPCL50E42Z8';
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  }
+  return '';
+};
 
 interface ClassEntity {
   id: string;
@@ -140,7 +145,7 @@ export default function TeachersPage() {
 
   const getUserSchoolId = () => {
     try {
-      const payload = JSON.parse(atob(API_TOKEN.split('.')[1]));
+      const payload = JSON.parse(atob(getApiToken().split('.')[1]));
       return payload.schoolId;
     } catch (e) {
       return null;
@@ -163,7 +168,7 @@ export default function TeachersPage() {
     try {
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
       const [classesRes, sectionsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/admin/classes`, { headers }),
@@ -187,7 +192,7 @@ export default function TeachersPage() {
     try {
       const headers = {
         'accept': '*/*',
-        'Authorization': `Bearer ${API_TOKEN}`
+        'Authorization': `Bearer ${getApiToken()}`
       };
       
       const queryParams = new URLSearchParams({
@@ -287,7 +292,7 @@ export default function TeachersPage() {
       const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${API_TOKEN}`
+          'Authorization': `Bearer ${getApiToken()}`
         }
       });
       if (res.ok) {
@@ -313,7 +318,7 @@ export default function TeachersPage() {
       const response = await fetch(`${API_BASE_URL}/general/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${API_TOKEN}`
+          'Authorization': `Bearer ${getApiToken()}`
         },
         body: formData
       });
@@ -357,7 +362,7 @@ export default function TeachersPage() {
         method: modalMode === 'edit' ? 'PUT' : 'POST',
         headers: {
           'accept': '*/*',
-          'Authorization': `Bearer ${API_TOKEN}`,
+          'Authorization': `Bearer ${getApiToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
