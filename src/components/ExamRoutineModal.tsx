@@ -271,6 +271,51 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
     fetchStudents();
   }, [selectedClassId, selectedSectionId]);
 
+  useEffect(() => {
+    if (!selectedClassId || !selectedSectionId || !selectedSubjectId || students.length === 0) {
+      return;
+    }
+
+    const fetchMarks = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/marks?examId=${exam.id}`, {
+          headers: {
+            'accept': '*/*',
+            'Authorization': `Bearer ${getApiToken()}`
+          }
+        });
+        const json = await res.json();
+        
+        const marksData = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
+        
+        const newMarksForm: Record<string, any> = {};
+        
+        marksData.forEach((mark: any) => {
+          if (mark.subjectId === selectedSubjectId) {
+            newMarksForm[mark.studentId] = {
+              marksObtained: mark.marksObtained,
+              totalMarks: mark.totalMarks
+            };
+          }
+        });
+
+        setMarksForm(prev => {
+          const merged = { ...prev };
+          for (const studentId of Object.keys(newMarksForm)) {
+            if (!merged[studentId] || merged[studentId].marksObtained === '' || merged[studentId].totalMarks === '') {
+              merged[studentId] = newMarksForm[studentId];
+            }
+          }
+          return merged;
+        });
+      } catch (err) {
+        console.error('Failed to fetch existing marks:', err);
+      }
+    };
+
+    fetchMarks();
+  }, [exam.id, selectedClassId, selectedSectionId, selectedSubjectId, students]);
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'TBA';
     return new Date(dateString).toLocaleDateString('en-US', {
