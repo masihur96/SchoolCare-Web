@@ -146,6 +146,8 @@ body {
 .animate-delay-100 { animation-delay: 100ms; }
 .animate-delay-200 { animation-delay: 200ms; }
 .animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
@@ -297,19 +299,31 @@ body {
   border-radius: 20px;
   display: flex;
   align-items: center;
+  gap: 0.5rem;
   position: relative;
 }
 
 .marquee-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.marquee-content span {
+  display: inline-block;
   white-space: nowrap;
-  animation: marquee 20s linear infinite;
+  animation: marquee 30s linear infinite;
   padding-left: 100%;
   color: var(--warning);
   font-weight: 500;
+  font-size: 0.82rem;
 }
 
 @keyframes marquee {
-  0% { transform: translateX(0); }
+  0%   { transform: translateX(0); }
   100% { transform: translateX(-100%); }
 }
 
