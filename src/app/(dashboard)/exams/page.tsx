@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, BookOpen, Users, Calendar, Clock, Loader2, Edit, FileText, CheckCircle, CircleDashed } from 'lucide-react';
 import CreateExamModal from '@/components/CreateExamModal';
+import ExamRoutineModal from '@/components/ExamRoutineModal';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -34,6 +35,7 @@ export default function ExamsPage() {
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [examToEdit, setExamToEdit] = useState<Exam | null>(null);
+  const [examForRoutine, setExamForRoutine] = useState<Exam | null>(null);
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -212,7 +214,11 @@ export default function ExamsPage() {
 
                     {/* Actions */}
                     <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)', marginTop: 'auto' }}>
-                      <button className="btn" style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                      <button 
+                        className="btn" 
+                        style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                        onClick={() => setExamForRoutine(exam)}
+                      >
                         <FileText size={16} /> Routine & Results
                       </button>
                       <button 
@@ -271,6 +277,13 @@ export default function ExamsPage() {
             };
             fetchExams();
           }} 
+        />
+      )}
+
+      {examForRoutine && (
+        <ExamRoutineModal 
+          exam={examForRoutine} 
+          onClose={() => setExamForRoutine(null)} 
         />
       )}
     </div>
