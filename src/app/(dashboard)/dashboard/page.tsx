@@ -200,8 +200,6 @@ export default function DashboardPage() {
 
   // ── Marquee state ──
   const [marqueeItems, setMarqueeItems] = useState<MarqueeItem[]>([]);
-  const [marqueeIndex, setMarqueeIndex] = useState(0);
-  const [marqueeFading, setMarqueeFading] = useState(false);
   const [showMarqueeModal, setShowMarqueeModal] = useState(false);
   const [marqueeForm, setMarqueeForm] = useState({ text: '', type: 'STUDENT' });
   const [marqueeSubmitting, setMarqueeSubmitting] = useState(false);
@@ -303,18 +301,7 @@ export default function DashboardPage() {
     init();
   }, []);
 
-  // Cycle marquee items one by one every 4s
-  useEffect(() => {
-    if (marqueeItems.length <= 1) return;
-    const timer = setInterval(() => {
-      setMarqueeFading(true);
-      setTimeout(() => {
-        setMarqueeIndex(i => (i + 1) % marqueeItems.length);
-        setMarqueeFading(false);
-      }, 400);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [marqueeItems]);
+
 
   if (loading) {
     return (
@@ -367,20 +354,26 @@ export default function DashboardPage() {
         </div>
         <div className="db-marquee-track">
           {marqueeItems.length > 0 ? (
-            <div className={`db-marquee-cycle ${marqueeFading ? 'fading' : ''}`}>
-              <span className={`db-marquee-type-badge type-${marqueeItems[marqueeIndex]?.type?.toLowerCase()}`}>
-                {marqueeItems[marqueeIndex]?.type}
-              </span>
-              <span className="db-marquee-cycle-text">{marqueeItems[marqueeIndex]?.text}</span>
-              {marqueeItems.length > 1 && (
-                <span className="db-marquee-counter">
-                  {marqueeIndex + 1}/{marqueeItems.length}
-                </span>
-              )}
+            <div className="db-marquee-scroll-wrap">
+              <div
+                className="db-marquee-scroll-inner"
+                style={{ '--item-count': marqueeItems.length } as React.CSSProperties}
+              >
+                {/* Duplicate items for seamless loop */}
+                {[...marqueeItems, ...marqueeItems].map((item, idx) => (
+                  <span key={idx} className="db-marquee-item">
+                    <span className={`db-marquee-type-badge type-${item.type?.toLowerCase()}`}>
+                      {item.type}
+                    </span>
+                    <span className="db-marquee-item-text">{item.text}</span>
+                    <span className="db-marquee-separator">✦</span>
+                  </span>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="db-marquee-cycle">
-              <span className="db-marquee-cycle-text">📢 No announcements yet — add one using the button!</span>
+            <div className="db-marquee-scroll-wrap">
+              <span className="db-marquee-empty">📢 No announcements yet — add one using the button!</span>
             </div>
           )}
         </div>
@@ -1182,26 +1175,56 @@ export default function DashboardPage() {
           display: flex;
           align-items: center;
         }
-        .db-marquee-cycle {
+        /* ── Horizontal scroll ticker ── */
+        .db-marquee-scroll-wrap {
+          width: 100%;
+          overflow: hidden;
+          height: 100%;
           display: flex;
           align-items: center;
-          gap: 0.6rem;
-          padding: 0 1rem;
-          width: 100%;
-          transition: opacity 0.4s ease;
-          opacity: 1;
+          /* fade edges */
+          -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
         }
-        .db-marquee-cycle.fading {
-          opacity: 0;
+        .db-marquee-scroll-inner {
+          display: flex;
+          align-items: center;
+          white-space: nowrap;
+          /* speed: 8s per item; total = items * 8s (only half used → loop seamless) */
+          animation: marquee-scroll calc(var(--item-count, 1) * 30s) linear infinite;
+          will-change: transform;
         }
-        .db-marquee-cycle-text {
+        .db-marquee-scroll-inner:hover {
+          animation-play-state: paused;
+        }
+        @keyframes marquee-scroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .db-marquee-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.55rem;
+          padding: 0 1.5rem;
+          flex-shrink: 0;
+        }
+        .db-marquee-item-text {
           font-size: 0.84rem;
           font-weight: 500;
           color: var(--foreground);
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          flex: 1;
+        }
+        .db-marquee-separator {
+          font-size: 0.6rem;
+          color: rgba(245,158,11,0.5);
+          margin-left: 0.5rem;
+        }
+        .db-marquee-empty {
+          font-size: 0.84rem;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          padding: 0 1rem;
+          white-space: nowrap;
         }
         .db-marquee-type-badge {
           display: inline-flex;
@@ -1233,16 +1256,6 @@ export default function DashboardPage() {
           background: rgba(245,158,11,0.12);
           color: #f59e0b;
           border: 1px solid rgba(245,158,11,0.25);
-        }
-        .db-marquee-counter {
-          font-size: 0.68rem;
-          font-weight: 600;
-          color: var(--muted-foreground);
-          background: var(--muted);
-          padding: 0.1rem 0.5rem;
-          border-radius: 999px;
-          flex-shrink: 0;
-          white-space: nowrap;
         }
         .db-marquee-add-btn {
           display: flex;

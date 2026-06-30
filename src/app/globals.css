@@ -363,6 +363,7 @@ body {
   cursor: pointer;
   color: var(--muted-foreground);
   transition: all 0.2s;
+  position: relative;
 }
 
 .icon-btn:hover {
