@@ -234,8 +234,12 @@ export default function SettingsPage() {
             style={{ padding: '1.5rem 1rem', textAlign: 'center', marginBottom: '1rem' }}
           >
             {profileLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
-                <Loader2 size={28} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem' }}>
+                <div className="shimmer shimmer-circle" style={{ width: 72, height: 72 }}></div>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                  <div className="shimmer shimmer-text" style={{ width: '80%', height: '18px', margin: 0 }}></div>
+                  <div className="shimmer shimmer-text short" style={{ width: '50%', margin: 0 }}></div>
+                </div>
               </div>
             ) : (
               <>

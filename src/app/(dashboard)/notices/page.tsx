@@ -350,9 +350,30 @@ export default function NoticesPage() {
             {/* Notices Content */}
             <div className="widget-content" style={{ padding: '1.25rem' }}>
               {loading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem', gap: '1rem', color: 'var(--muted-foreground)' }}>
-                  <Loader2 size={36} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Loading announcements…</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={`skeleton-${i}`} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                      <div style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.625rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: 1, minWidth: 0 }}>
+                            <div className="shimmer shimmer-circle" style={{ width: '36px', height: '36px', flexShrink: 0 }}></div>
+                            <div style={{ flex: 1 }}>
+                              <div className="shimmer shimmer-text" style={{ width: '60%', height: '18px', marginBottom: '6px' }}></div>
+                              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <div className="shimmer shimmer-text short" style={{ width: '60px', height: '12px', margin: 0 }}></div>
+                                <div className="shimmer shimmer-text short" style={{ width: '80px', height: '12px', margin: 0 }}></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="shimmer shimmer-block" style={{ width: '60px', height: '24px', borderRadius: '999px' }}></div>
+                        </div>
+                        <div>
+                          <div className="shimmer shimmer-text" style={{ width: '100%', marginBottom: '4px' }}></div>
+                          <div className="shimmer shimmer-text" style={{ width: '80%', margin: 0 }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredNotices.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>

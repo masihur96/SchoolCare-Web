@@ -446,14 +446,37 @@ export default function AttendancePage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                      <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
-                      <p style={{ color: 'var(--muted-foreground)' }}>Loading attendance data...</p>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '80px', margin: 0 }}></div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', width: '120px' }}>
+                        <div className="shimmer shimmer-text"></div>
+                        <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '80px' }}>
+                        <div className="shimmer shimmer-text"></div>
+                        <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100px' }}>
+                        <div className="shimmer shimmer-text"></div>
+                        <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '60px', margin: 0 }}></div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div className="shimmer shimmer-block" style={{ width: '80px', height: '24px', borderRadius: '999px' }}></div>
+                    </td>
+                  </tr>
+                ))
               ) : records.length > 0 ? (
                 records.map((record) => (
                   <tr key={record.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s' }}>

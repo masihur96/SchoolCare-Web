@@ -549,14 +549,42 @@ export default function ClassesPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                      <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
-                      <p style={{ color: 'var(--muted-foreground)' }}>Loading curriculum data...</p>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '36px', height: '36px', borderRadius: '0.5rem', flexShrink: 0 }}></div>
+                        <div className="shimmer shimmer-text" style={{ width: '100px', margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '40px', height: '22px', borderRadius: '999px' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '50px', height: '22px', borderRadius: '999px' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '30px', height: '22px', borderRadius: '999px' }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '18px', height: '18px', borderRadius: '4px' }}></div>
+                        <div className="shimmer shimmer-text short" style={{ width: '60px', margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '18px', height: '18px', borderRadius: '4px' }}></div>
+                        <div className="shimmer shimmer-text short" style={{ width: '40px', margin: 0 }}></div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               ) : filteredClasses.length > 0 ? (
                 filteredClasses.map(c => (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s' }}>

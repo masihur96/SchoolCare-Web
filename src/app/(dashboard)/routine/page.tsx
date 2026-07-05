@@ -286,9 +286,34 @@ export default function RoutinePage() {
         {/* ROUTINE VIEW */}
         <div className="widget-content" style={{ padding: '2rem' }}>
           {loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6rem 0', gap: '1rem' }}>
-              <Loader2 size={40} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '1.1rem', fontWeight: 500 }}>Loading school routine...</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+              {Array.from({ length: 2 }).map((_, dayIdx) => (
+                <div key={`skeleton-day-${dayIdx}`} className="day-section" style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="shimmer shimmer-text title" style={{ width: '120px', height: '28px', margin: 0 }}></div>
+                    <div style={{ flex: 1, height: '2px', background: 'var(--border)' }} />
+                    <div className="shimmer shimmer-block" style={{ width: '80px', height: '24px', borderRadius: '9999px' }}></div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
+                    {Array.from({ length: 3 }).map((_, cardIdx) => (
+                      <div key={`skeleton-card-${cardIdx}`} className="glass-card" style={{ padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div className="shimmer shimmer-block" style={{ height: '24px', width: '120px', borderRadius: '4px' }}></div>
+                          <div className="shimmer shimmer-circle" style={{ width: '32px', height: '32px' }}></div>
+                        </div>
+                        <div>
+                          <div className="shimmer shimmer-text title" style={{ width: '70%', height: '20px', marginBottom: '0.5rem' }}></div>
+                          <div className="shimmer shimmer-text" style={{ width: '50%' }}></div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <div className="shimmer shimmer-block" style={{ height: '24px', width: '80px', borderRadius: '999px' }}></div>
+                          <div className="shimmer shimmer-block" style={{ height: '24px', width: '80px', borderRadius: '999px' }}></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filteredRoutines.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--muted-foreground)' }}>

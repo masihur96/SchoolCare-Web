@@ -120,9 +120,33 @@ export default function ExamsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.02)', borderRadius: '1.5rem', border: '1px dashed var(--border)' }}>
-            <Loader2 size={48} className="text-primary" style={{ animation: 'spin 1s linear infinite', marginBottom: '1rem' }} />
-            <p style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Fetching active examinations...</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '2rem' }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`skeleton-${i}`} className="glass-card" style={{ display: 'flex', flexDirection: 'column', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <div className="shimmer shimmer-block" style={{ height: '42px', width: '100%', borderRadius: '0' }}></div>
+                <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, gap: '1.25rem' }}>
+                  <div>
+                    <div className="shimmer shimmer-text title" style={{ width: '60%', margin: '0 0 0.5rem 0' }}></div>
+                    <div className="shimmer shimmer-text" style={{ width: '100%', margin: '0 0 4px 0' }}></div>
+                    <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.02)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
+                    <div>
+                      <div className="shimmer shimmer-text short" style={{ height: '12px', marginBottom: '8px' }}></div>
+                      <div className="shimmer shimmer-text" style={{ width: '80%', height: '16px', margin: 0 }}></div>
+                    </div>
+                    <div>
+                      <div className="shimmer shimmer-text short" style={{ height: '12px', marginBottom: '8px' }}></div>
+                      <div className="shimmer shimmer-text" style={{ width: '80%', height: '16px', margin: 0 }}></div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)', marginTop: 'auto' }}>
+                    <div className="shimmer shimmer-block" style={{ height: '36px', borderRadius: 'var(--radius)', flex: 1 }}></div>
+                    <div className="shimmer shimmer-block" style={{ height: '36px', width: '80px', borderRadius: 'var(--radius)' }}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : exams.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.02)', borderRadius: '1.5rem', border: '1px dashed var(--border)' }}>

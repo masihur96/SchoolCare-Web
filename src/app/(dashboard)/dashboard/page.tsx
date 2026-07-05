@@ -192,6 +192,91 @@ function AttendanceRing({ rate, present, absent, total, label, color }: Attendan
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="db-page skeleton-page">
+      {/* ── Header ── */}
+      <div className="db-header">
+        <div style={{ flex: 1 }}>
+          <div className="shimmer shimmer-text title"></div>
+          <div className="shimmer shimmer-text short" style={{ width: '150px' }}></div>
+        </div>
+        <div className="shimmer shimmer-block" style={{ width: '100px', height: '32px', borderRadius: '999px' }}></div>
+      </div>
+
+      {/* ── Marquee Banner ── */}
+      <div className="shimmer shimmer-block" style={{ height: '44px', borderRadius: '22px' }}></div>
+
+      {/* ── Stat Cards ── */}
+      <div className="db-stats-grid">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="db-stat-card glass-card">
+            <div className="shimmer shimmer-circle" style={{ width: '52px', height: '52px', flexShrink: 0 }}></div>
+            <div className="db-stat-body" style={{ flex: 1 }}>
+              <div className="shimmer shimmer-text short"></div>
+              <div className="shimmer shimmer-text title" style={{ marginBottom: '4px', height: '28px', width: '50%' }}></div>
+              <div className="shimmer shimmer-text" style={{ width: '70%', margin: 0 }}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Attendance Section ── */}
+      <div className="db-section-header">
+        <div className="shimmer shimmer-text title" style={{ width: '250px', margin: 0 }}></div>
+      </div>
+      <div className="db-att-grid">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="db-att-ring-card glass-card">
+            <div className="shimmer shimmer-circle" style={{ width: '90px', height: '90px', flexShrink: 0 }}></div>
+            <div className="db-att-ring-info" style={{ flex: 1, paddingLeft: '1rem' }}>
+              <div className="shimmer shimmer-text short" style={{ width: '120px', marginBottom: '1rem' }}></div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="shimmer shimmer-block" style={{ height: '24px', width: '80px', borderRadius: '12px' }}></div>
+                <div className="shimmer shimmer-block" style={{ height: '24px', width: '80px', borderRadius: '12px' }}></div>
+                <div className="shimmer shimmer-block" style={{ height: '24px', width: '80px', borderRadius: '12px' }}></div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <div className="db-att-breakdown glass-card">
+          <div className="shimmer shimmer-text short" style={{ marginBottom: '1.5rem', width: '150px' }}></div>
+          {Array.from({ length: 4 }).map((_, i) => (
+             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+               <div className="shimmer shimmer-text" style={{ width: '80px', margin: 0 }}></div>
+               <div className="shimmer shimmer-block" style={{ height: '8px', flex: 1 }}></div>
+               <div className="shimmer shimmer-text" style={{ width: '40px', margin: 0 }}></div>
+             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Bottom Grid ── */}
+      <div className="db-bottom-grid">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="db-widget glass-card">
+            <div className="db-widget-head" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="shimmer shimmer-circle" style={{ width: '32px', height: '32px', flexShrink: 0 }}></div>
+              <div className="shimmer shimmer-text short" style={{ margin: 0, height: '20px', width: '150px' }}></div>
+            </div>
+            <div className="db-widget-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem' }}>
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div className="shimmer shimmer-circle" style={{ width: '40px', height: '40px', flexShrink: 0 }}></div>
+                  <div style={{ flex: 1 }}>
+                     <div className="shimmer shimmer-text" style={{ width: '80%' }}></div>
+                     <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -304,12 +389,7 @@ export default function DashboardPage() {
 
 
   if (loading) {
-    return (
-      <div className="db-loading">
-        <Loader2 size={40} className="db-spinner" />
-        <p>Loading dashboard…</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error || !data) {
