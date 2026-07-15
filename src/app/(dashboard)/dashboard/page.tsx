@@ -5,7 +5,8 @@ import {
   Users, GraduationCap, BookOpen, Bell, ClipboardList,
   TrendingUp, TrendingDown, Calendar, Clock, ChevronRight,
   AlertCircle, CheckCircle2, XCircle, Activity, Award,
-  FileText, Megaphone, BookMarked, Loader2, Plus, X, Radio
+  FileText, Megaphone, BookMarked, Loader2, Plus, X, Radio,
+  BarChart2, ChevronDown, Star, BookCheck, UserCheck, Search
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -79,6 +80,55 @@ interface DashboardData {
     email: string;
     role: string;
   };
+}
+
+// ─── Performance Types ────────────────────────────────────────────────────────
+interface TeacherPerformance {
+  teacherId?: string;
+  teacherName?: string;
+  name?: string;
+  subject?: string;
+  subjectName?: string;
+  totalClasses?: number;
+  classesAttended?: number;
+  attendanceRate?: number;
+  homeworkAssigned?: number;
+  homeworkChecked?: number;
+  totalStudents?: number;
+  presentStudents?: number;
+  absentStudents?: number;
+  studentAttendanceRate?: number;
+  performanceScore?: number;
+  rating?: number;
+  grade?: string;
+  month?: number;
+  year?: number;
+  // catch-all for any extra fields
+  [key: string]: unknown;
+}
+
+interface StudentPerformance {
+  studentId?: string;
+  studentName?: string;
+  name?: string;
+  className?: string;
+  class?: string;
+  section?: string;
+  rollNumber?: string | number;
+  totalClasses?: number;
+  attendedClasses?: number;
+  attendanceRate?: number;
+  averageGrade?: number;
+  averageScore?: number;
+  totalMarks?: number;
+  obtainedMarks?: number;
+  performanceScore?: number;
+  grade?: string;
+  rank?: number;
+  month?: number;
+  year?: number;
+  // catch-all for any extra fields
+  [key: string]: unknown;
 }
 
 interface UserProfile {
@@ -294,6 +344,17 @@ export default function DashboardPage() {
   // ── User profile state ──
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
+  // ── Performance state ──
+  const now = new Date();
+  const [perfTab, setPerfTab] = useState<'teacher' | 'student'>('teacher');
+  const [perfMonth, setPerfMonth] = useState(now.getMonth() + 1);
+  const [perfYear, setPerfYear] = useState(now.getFullYear());
+  const [teacherPerf, setTeacherPerf] = useState<TeacherPerformance[]>([]);
+  const [studentPerf, setStudentPerf] = useState<StudentPerformance[]>([]);
+  const [perfLoading, setPerfLoading] = useState(false);
+  const [perfError, setPerfError] = useState('');
+  const [perfSearch, setPerfSearch] = useState('');
+
   async function fetchProfile(): Promise<UserProfile | null> {
     try {
       const res = await fetch(
@@ -360,6 +421,44 @@ export default function DashboardPage() {
     }
   }
 
+  async function fetchPerformance(month: number, year: number) {
+    setPerfLoading(true);
+    setPerfError('');
+    try {
+      const [tRes, sRes] = await Promise.all([
+        fetch(
+          `https://smart-school-backend-production.up.railway.app/performance/teacher?month=${month}&year=${year}`,
+          { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } }
+        ),
+        fetch(
+          `https://smart-school-backend-production.up.railway.app/performance/student?month=${month}&year=${year}`,
+          { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } }
+        ),
+      ]);
+
+      const tJson = await tRes.json();
+      const sJson = await sRes.json();
+
+      if (tRes.ok) {
+        const tData = Array.isArray(tJson.data) ? tJson.data : Array.isArray(tJson) ? tJson : [];
+        setTeacherPerf(tData);
+      } else {
+        setTeacherPerf([]);
+      }
+
+      if (sRes.ok) {
+        const sData = Array.isArray(sJson.data) ? sJson.data : Array.isArray(sJson) ? sJson : [];
+        setStudentPerf(sData);
+      } else {
+        setStudentPerf([]);
+      }
+    } catch (e: unknown) {
+      setPerfError(e instanceof Error ? e.message : 'Failed to load performance data');
+    } finally {
+      setPerfLoading(false);
+    }
+  }
+
   useEffect(() => {
     async function init() {
       // Fetch profile first to get real schoolId, then fetch marquee
@@ -384,6 +483,8 @@ export default function DashboardPage() {
       }
     }
     init();
+    // Fetch performance for current month on mount
+    fetchPerformance(now.getMonth() + 1, now.getFullYear());
   }, []);
 
 
@@ -659,6 +760,275 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Performance Analytics Section ── */}
+      <div className="db-section-header animate-fade-in" style={{ animationDelay: '520ms' }}>
+        <h2><BarChart2 size={18} /> Performance Analytics</h2>
+      </div>
+
+      <div className="db-perf-section glass-card animate-fade-in" style={{ animationDelay: '560ms' }}>
+        {/* Filter bar */}
+        <div className="db-perf-filter-bar">
+          <div className="db-perf-tabs">
+            <button
+              id="perf-tab-teacher"
+              className={`db-perf-tab ${perfTab === 'teacher' ? 'active' : ''}`}
+              onClick={() => { setPerfTab('teacher'); setPerfSearch(''); }}
+            >
+              <GraduationCap size={15} />
+              Teacher Performance
+            </button>
+            <button
+              id="perf-tab-student"
+              className={`db-perf-tab ${perfTab === 'student' ? 'active' : ''}`}
+              onClick={() => { setPerfTab('student'); setPerfSearch(''); }}
+            >
+              <Users size={15} />
+              Student Performance
+            </button>
+          </div>
+
+          <div className="db-perf-controls">
+            <div className="db-perf-select-wrap">
+              <select
+                id="perf-month"
+                className="db-perf-select"
+                value={perfMonth}
+                onChange={(e) => setPerfMonth(Number(e.target.value))}
+              >
+                {[
+                  'January','February','March','April','May','June',
+                  'July','August','September','October','November','December'
+                ].map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="db-perf-select-icon" />
+            </div>
+            <div className="db-perf-select-wrap">
+              <select
+                id="perf-year"
+                className="db-perf-select"
+                value={perfYear}
+                onChange={(e) => setPerfYear(Number(e.target.value))}
+              >
+                {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="db-perf-select-icon" />
+            </div>
+            <button
+              id="perf-fetch-btn"
+              className="db-perf-fetch-btn"
+              onClick={() => fetchPerformance(perfMonth, perfYear)}
+              disabled={perfLoading}
+            >
+              {perfLoading ? <Loader2 size={14} className="db-spinner" /> : <BarChart2 size={14} />}
+              {perfLoading ? 'Loading…' : 'Fetch'}
+            </button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="db-perf-search-row">
+          <div className="db-perf-search-wrap">
+            <Search size={14} className="db-perf-search-icon" />
+            <input
+              id="perf-search"
+              type="text"
+              className="db-perf-search"
+              placeholder={`Search ${perfTab === 'teacher' ? 'teachers' : 'students'}…`}
+              value={perfSearch}
+              onChange={(e) => setPerfSearch(e.target.value)}
+            />
+          </div>
+          <span className="db-perf-count">
+            {perfTab === 'teacher' ? teacherPerf.length : studentPerf.length} records
+          </span>
+        </div>
+
+        {/* Content */}
+        {perfLoading ? (
+          <div className="db-perf-loading">
+            <div className="db-perf-skeleton-grid">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="db-perf-skeleton-card">
+                  <div className="shimmer shimmer-circle" style={{ width: '40px', height: '40px', flexShrink: 0 }}></div>
+                  <div style={{ flex: 1 }}>
+                    <div className="shimmer shimmer-text" style={{ width: '70%' }}></div>
+                    <div className="shimmer shimmer-text short" style={{ width: '40%', margin: 0 }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : perfError ? (
+          <div className="db-perf-empty">
+            <AlertCircle size={28} color="var(--destructive)" />
+            <p>{perfError}</p>
+          </div>
+        ) : perfTab === 'teacher' ? (
+          (() => {
+            const search = perfSearch.trim().toLowerCase();
+            const filtered = teacherPerf.filter(t => {
+              if (!search) return true;
+              const n = (t.teacherName || t.name || '').toLowerCase();
+              const s = (t.subject || t.subjectName || '').toLowerCase();
+              return n.includes(search) || s.includes(search);
+            });
+            return filtered.length === 0 ? (
+              <div className="db-perf-empty">
+                <BarChart2 size={28} color="var(--muted-foreground)" />
+                <p>{teacherPerf.length === 0 ? 'No teacher performance data for this period.' : 'No results match your search.'}</p>
+              </div>
+            ) : (
+              <div className="db-perf-card-grid">
+                {filtered.map((t, i) => {
+                  const score = t.performanceScore ?? t.rating ?? t.attendanceRate ?? 0;
+                  const scoreNum = typeof score === 'number' ? score : parseFloat(String(score)) || 0;
+                  const scoreDisplay = scoreNum > 1 ? scoreNum.toFixed(1) : (scoreNum * 100).toFixed(1);
+                  const scorePct = scoreNum > 1 ? scoreNum : scoreNum * 100;
+                  const tier = scorePct >= 90 ? 'excellent' : scorePct >= 75 ? 'good' : scorePct >= 50 ? 'average' : 'poor';
+                  const tierLabel = scorePct >= 90 ? 'Excellent' : scorePct >= 75 ? 'Good' : scorePct >= 50 ? 'Average' : 'Poor';
+                  const name = t.teacherName || t.name || `Teacher ${i + 1}`;
+                  const subject = t.subject || t.subjectName || '—';
+                  const attRate = typeof t.attendanceRate === 'number'
+                    ? (t.attendanceRate > 1 ? t.attendanceRate : t.attendanceRate * 100).toFixed(1)
+                    : (t.classesAttended && t.totalClasses
+                        ? ((t.classesAttended / t.totalClasses) * 100).toFixed(1)
+                        : '—');
+                  const hwRate = t.homeworkChecked && t.homeworkAssigned
+                    ? ((t.homeworkChecked / t.homeworkAssigned) * 100).toFixed(1) + '%'
+                    : t.homeworkAssigned ? `${t.homeworkAssigned} assigned` : '—';
+                  return (
+                    <div key={t.teacherId || i} className={`db-perf-card db-perf-card-${tier}`}>
+                      <div className="db-perf-card-header">
+                        <div className="db-perf-avatar" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="db-perf-card-meta">
+                          <p className="db-perf-name">{name}</p>
+                          <p className="db-perf-sub">{subject}</p>
+                        </div>
+                        <span className={`db-perf-badge db-perf-badge-${tier}`}>{tierLabel}</span>
+                      </div>
+                      <div className="db-perf-score-row">
+                        <div className="db-perf-score-track">
+                          <div
+                            className="db-perf-score-fill"
+                            style={{ width: `${Math.min(100, scorePct)}%` }}
+                          />
+                        </div>
+                        <span className="db-perf-score-val">{scoreDisplay}%</span>
+                      </div>
+                      <div className="db-perf-stats">
+                        <div className="db-perf-stat">
+                          <UserCheck size={12} />
+                          <span>Attendance</span>
+                          <strong>{attRate !== '—' ? `${attRate}%` : '—'}</strong>
+                        </div>
+                        <div className="db-perf-stat">
+                          <BookCheck size={12} />
+                          <span>Homework</span>
+                          <strong>{hwRate}</strong>
+                        </div>
+                        {t.totalStudents !== undefined && (
+                          <div className="db-perf-stat">
+                            <Users size={12} />
+                            <span>Students</span>
+                            <strong>{t.totalStudents}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        ) : (
+          (() => {
+            const search = perfSearch.trim().toLowerCase();
+            const filtered = studentPerf.filter(s => {
+              if (!search) return true;
+              const n = (s.studentName || s.name || '').toLowerCase();
+              const c = (s.className || s.class || '').toLowerCase();
+              return n.includes(search) || c.includes(search);
+            });
+            return filtered.length === 0 ? (
+              <div className="db-perf-empty">
+                <BarChart2 size={28} color="var(--muted-foreground)" />
+                <p>{studentPerf.length === 0 ? 'No student performance data for this period.' : 'No results match your search.'}</p>
+              </div>
+            ) : (
+              <div className="db-perf-card-grid">
+                {filtered.map((s, i) => {
+                  const score = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
+                    (s.obtainedMarks && s.totalMarks ? (s.obtainedMarks / s.totalMarks) * 100 : s.attendanceRate ?? 0);
+                  const scoreNum = typeof score === 'number' ? score : parseFloat(String(score)) || 0;
+                  const scoreDisplay = scoreNum > 1 ? scoreNum.toFixed(1) : (scoreNum * 100).toFixed(1);
+                  const scorePct = scoreNum > 1 ? scoreNum : scoreNum * 100;
+                  const tier = scorePct >= 90 ? 'excellent' : scorePct >= 75 ? 'good' : scorePct >= 50 ? 'average' : 'poor';
+                  const tierLabel = scorePct >= 90 ? 'Excellent' : scorePct >= 75 ? 'Good' : scorePct >= 50 ? 'Average' : 'Poor';
+                  const name = s.studentName || s.name || `Student ${i + 1}`;
+                  const cls = s.className || s.class || '—';
+                  const attRate = typeof s.attendanceRate === 'number'
+                    ? (s.attendanceRate > 1 ? s.attendanceRate : s.attendanceRate * 100).toFixed(1)
+                    : (s.attendedClasses && s.totalClasses
+                        ? ((s.attendedClasses / s.totalClasses) * 100).toFixed(1)
+                        : '—');
+                  const gradeStr = s.grade ||
+                    (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' :
+                     scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
+                  return (
+                    <div key={s.studentId || i} className={`db-perf-card db-perf-card-${tier}`}>
+                      <div className="db-perf-card-header">
+                        <div className="db-perf-avatar" style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="db-perf-card-meta">
+                          <p className="db-perf-name">{name}</p>
+                          <p className="db-perf-sub">{cls}{s.section ? ` · ${s.section}` : ''}</p>
+                        </div>
+                        <span className={`db-perf-badge db-perf-badge-${tier}`}>{tierLabel}</span>
+                      </div>
+                      <div className="db-perf-score-row">
+                        <div className="db-perf-score-track">
+                          <div
+                            className="db-perf-score-fill"
+                            style={{ width: `${Math.min(100, scorePct)}%` }}
+                          />
+                        </div>
+                        <span className="db-perf-score-val">{scoreDisplay}%</span>
+                      </div>
+                      <div className="db-perf-stats">
+                        <div className="db-perf-stat">
+                          <UserCheck size={12} />
+                          <span>Attendance</span>
+                          <strong>{attRate !== '—' ? `${attRate}%` : '—'}</strong>
+                        </div>
+                        <div className="db-perf-stat">
+                          <Star size={12} />
+                          <span>Grade</span>
+                          <strong>{gradeStr}</strong>
+                        </div>
+                        {s.rank !== undefined && (
+                          <div className="db-perf-stat">
+                            <Award size={12} />
+                            <span>Rank</span>
+                            <strong>#{s.rank}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* ── Bottom Grid (Notices | Homework | Exams) ── */}
@@ -1505,6 +1875,317 @@ export default function DashboardPage() {
           border: none;
         }
         .db-mf-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* ── Performance Section ── */
+        .db-perf-section {
+          border-radius: 1.1rem;
+          background: var(--card);
+          border: 1px solid var(--border);
+          overflow: hidden;
+        }
+
+        /* Filter bar */
+        .db-perf-filter-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 0.75rem;
+          padding: 1.1rem 1.25rem;
+          border-bottom: 1px solid var(--border);
+          background: linear-gradient(135deg, rgba(99,102,241,0.04), transparent);
+        }
+        .db-perf-tabs {
+          display: flex;
+          gap: 0.4rem;
+        }
+        .db-perf-tab {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 1rem;
+          border-radius: 0.6rem;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--muted-foreground);
+          font-size: 0.82rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .db-perf-tab:hover {
+          background: rgba(255,255,255,0.05);
+          color: var(--foreground);
+        }
+        .db-perf-tab.active {
+          background: linear-gradient(135deg, #6366f1, #4f46e5);
+          color: #fff;
+          border-color: transparent;
+          box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+        }
+        .db-perf-controls {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .db-perf-select-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .db-perf-select {
+          appearance: none;
+          padding: 0.45rem 2rem 0.45rem 0.8rem;
+          border-radius: 0.6rem;
+          border: 1px solid var(--border);
+          background: var(--background);
+          color: var(--foreground);
+          font-size: 0.82rem;
+          font-weight: 500;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+        .db-perf-select:focus {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+        }
+        .db-perf-select-icon {
+          position: absolute;
+          right: 0.5rem;
+          pointer-events: none;
+          color: var(--muted-foreground);
+        }
+        .db-perf-fetch-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 1.1rem;
+          border-radius: 0.6rem;
+          background: linear-gradient(135deg, #6366f1, #4f46e5);
+          color: #fff;
+          border: none;
+          font-size: 0.82rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: opacity 0.2s, transform 0.2s;
+          box-shadow: 0 4px 12px rgba(99,102,241,0.25);
+        }
+        .db-perf-fetch-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+        .db-perf-fetch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Search row */
+        .db-perf-search-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1.25rem;
+          border-bottom: 1px solid var(--border);
+        }
+        .db-perf-search-wrap {
+          position: relative;
+          flex: 1;
+          max-width: 340px;
+        }
+        .db-perf-search-icon {
+          position: absolute;
+          left: 0.7rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--muted-foreground);
+          pointer-events: none;
+        }
+        .db-perf-search {
+          width: 100%;
+          padding: 0.4rem 0.8rem 0.4rem 2rem;
+          border-radius: 0.55rem;
+          border: 1px solid var(--border);
+          background: var(--background);
+          color: var(--foreground);
+          font-size: 0.82rem;
+          outline: none;
+          transition: border-color 0.2s;
+          font-family: inherit;
+        }
+        .db-perf-search:focus {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+        .db-perf-count {
+          font-size: 0.75rem;
+          color: var(--muted-foreground);
+          font-weight: 500;
+          white-space: nowrap;
+          margin-left: auto;
+        }
+
+        /* Card grid */
+        .db-perf-card-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1rem;
+          padding: 1.25rem;
+        }
+        @media (max-width: 1100px) { .db-perf-card-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px)  { .db-perf-card-grid { grid-template-columns: 1fr; } }
+
+        .db-perf-card {
+          border-radius: 0.9rem;
+          border: 1px solid var(--border);
+          padding: 1rem;
+          background: var(--background);
+          transition: transform 0.2s, box-shadow 0.2s;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          position: relative;
+          overflow: hidden;
+        }
+        .db-perf-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 3px;
+          border-radius: 3px 3px 0 0;
+        }
+        .db-perf-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+        }
+        .db-perf-card-excellent::before { background: linear-gradient(90deg, #10b981, #059669); }
+        .db-perf-card-good::before      { background: linear-gradient(90deg, #6366f1, #4f46e5); }
+        .db-perf-card-average::before   { background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .db-perf-card-poor::before      { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+        .db-perf-card-header {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+        .db-perf-avatar {
+          width: 38px; height: 38px;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 1rem;
+          font-weight: 800;
+          color: #fff;
+          flex-shrink: 0;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        .db-perf-card-meta { flex: 1; min-width: 0; }
+        .db-perf-name {
+          font-size: 0.85rem;
+          font-weight: 700;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .db-perf-sub {
+          font-size: 0.72rem;
+          color: var(--muted-foreground);
+          margin-top: 0.1rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* Tier badges */
+        .db-perf-badge {
+          font-size: 0.62rem;
+          font-weight: 800;
+          padding: 0.2rem 0.55rem;
+          border-radius: 999px;
+          letter-spacing: 0.04em;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .db-perf-badge-excellent { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+        .db-perf-badge-good      { background: rgba(99,102,241,0.12); color: #6366f1; border: 1px solid rgba(99,102,241,0.25); }
+        .db-perf-badge-average   { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+        .db-perf-badge-poor      { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+
+        /* Score bar */
+        .db-perf-score-row {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+        .db-perf-score-track {
+          flex: 1;
+          height: 6px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.07);
+          overflow: hidden;
+        }
+        .db-perf-score-fill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #6366f1, #10b981);
+          transition: width 0.9s ease;
+        }
+        .db-perf-score-val {
+          font-size: 0.8rem;
+          font-weight: 800;
+          color: var(--foreground);
+          min-width: 38px;
+          text-align: right;
+        }
+
+        /* Stat pills */
+        .db-perf-stats {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .db-perf-stat {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+          font-size: 0.7rem;
+          color: var(--muted-foreground);
+          background: rgba(255,255,255,0.04);
+          border: 1px solid var(--border);
+          border-radius: 0.45rem;
+          padding: 0.2rem 0.55rem;
+          flex: 1;
+          min-width: 80px;
+        }
+        .db-perf-stat span { flex: 1; }
+        .db-perf-stat strong {
+          font-weight: 700;
+          color: var(--foreground);
+        }
+
+        /* Empty / Loading */
+        .db-perf-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          padding: 3.5rem 1rem;
+          color: var(--muted-foreground);
+          font-size: 0.88rem;
+        }
+        .db-perf-loading { padding: 1.25rem; }
+        .db-perf-skeleton-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1rem;
+        }
+        @media (max-width: 1100px) { .db-perf-skeleton-grid { grid-template-columns: repeat(2,1fr); } }
+        @media (max-width: 640px)  { .db-perf-skeleton-grid { grid-template-columns: 1fr; } }
+        .db-perf-skeleton-card {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1rem;
+          border-radius: 0.9rem;
+          border: 1px solid var(--border);
+          background: var(--background);
+        }
       `}</style>
     </div>
   );
