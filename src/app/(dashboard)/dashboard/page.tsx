@@ -344,27 +344,29 @@ function getTier(pct: number): { tier: string; tierLabel: string; tierColor: str
 
 interface PerfTeacherCardsProps {
   data: TeacherPerformance[];
-  search: string;
+  onViewAll: () => void;
 }
-function PerfTeacherCards({ data, search }: PerfTeacherCardsProps) {
-  const q = search.trim().toLowerCase();
-  const filtered = data.filter(t => {
-    if (!q) return true;
-    return (t.teacherName || t.name || '').toLowerCase().includes(q) ||
-           (t.subject || t.subjectName || '').toLowerCase().includes(q);
-  });
-  if (filtered.length === 0) {
+function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
+  if (data.length === 0) {
     return (
       <div className="db-perf-empty">
         <BarChart2 size={32} color="var(--muted-foreground)" />
-        <p>{data.length === 0 ? 'No teacher performance data for this period.' : 'No results match your search.'}</p>
+        <p>No teacher performance data for this period.</p>
       </div>
     );
   }
+  // Sort ascending by score
+  const sorted = [...data].sort((a, b) => {
+    const sa = getPerfScore(a.performanceScore ?? a.rating ?? a.attendanceRate).scorePct;
+    const sb = getPerfScore(b.performanceScore ?? b.rating ?? b.attendanceRate).scorePct;
+    return sa - sb;
+  });
+  const preview = sorted.slice(0, 8);
+  const remaining = sorted.length - preview.length;
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
-        {filtered.map((t, i) => {
+        {preview.map((t, i) => {
           const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
           const { scorePct, scoreDisplay } = getPerfScore(raw);
           const { tier, tierLabel, tierColor } = getTier(scorePct);
@@ -425,6 +427,12 @@ function PerfTeacherCards({ data, search }: PerfTeacherCardsProps) {
             </div>
           );
         })}
+        {remaining > 0 && (
+          <div className="db-perf-more-chip" onClick={onViewAll}>
+            <span>+{remaining} more</span>
+            <ChevronRight size={14} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -432,27 +440,33 @@ function PerfTeacherCards({ data, search }: PerfTeacherCardsProps) {
 
 interface PerfStudentCardsProps {
   data: StudentPerformance[];
-  search: string;
+  onViewAll: () => void;
 }
-function PerfStudentCards({ data, search }: PerfStudentCardsProps) {
-  const q = search.trim().toLowerCase();
-  const filtered = data.filter(s => {
-    if (!q) return true;
-    return (s.studentName || s.name || '').toLowerCase().includes(q) ||
-           (s.className || s.class || '').toLowerCase().includes(q);
-  });
-  if (filtered.length === 0) {
+function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
+  if (data.length === 0) {
     return (
       <div className="db-perf-empty">
         <BarChart2 size={32} color="var(--muted-foreground)" />
-        <p>{data.length === 0 ? 'No student performance data for this period.' : 'No results match your search.'}</p>
+        <p>No student performance data for this period.</p>
       </div>
     );
   }
+  // Sort ascending by score
+  const sorted = [...data].sort((a, b) => {
+    const rawA = a.performanceScore ?? a.averageGrade ?? a.averageScore ??
+      (a.obtainedMarks != null && a.totalMarks != null && Number(a.totalMarks) > 0
+        ? (Number(a.obtainedMarks) / Number(a.totalMarks)) * 100 : a.attendanceRate);
+    const rawB = b.performanceScore ?? b.averageGrade ?? b.averageScore ??
+      (b.obtainedMarks != null && b.totalMarks != null && Number(b.totalMarks) > 0
+        ? (Number(b.obtainedMarks) / Number(b.totalMarks)) * 100 : b.attendanceRate);
+    return getPerfScore(rawA as number | undefined).scorePct - getPerfScore(rawB as number | undefined).scorePct;
+  });
+  const preview = sorted.slice(0, 8);
+  const remaining = sorted.length - preview.length;
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
-        {filtered.map((s, i) => {
+        {preview.map((s, i) => {
           const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
             (s.obtainedMarks != null && s.totalMarks != null && s.totalMarks > 0
               ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100
@@ -514,6 +528,12 @@ function PerfStudentCards({ data, search }: PerfStudentCardsProps) {
             </div>
           );
         })}
+        {remaining > 0 && (
+          <div className="db-perf-more-chip" onClick={onViewAll}>
+            <span>+{remaining} more</span>
+            <ChevronRight size={14} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -537,6 +557,214 @@ function PerfRing({ pct, color, label, centerText }: PerfRingProps) {
         </span>
       </div>
       <p className="db-perf-ring-label">{label}</p>
+    </div>
+  );
+}
+
+// ─── Performance Detail Modal ──────────────────────────────────────────
+interface PerfDetailModalProps {
+  tab: 'teacher' | 'student';
+  onTabChange: (t: 'teacher' | 'student') => void;
+  teacherData: TeacherPerformance[];
+  studentData: StudentPerformance[];
+  month: number;
+  year: number;
+  onClose: () => void;
+}
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function PerfDetailModal({ tab, onTabChange, teacherData, studentData, month, year, onClose }: PerfDetailModalProps) {
+  const [search, setSearch] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const q = search.trim().toLowerCase();
+
+  // Teacher rows
+  const teacherRows = teacherData
+    .map((t, i) => {
+      const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
+      const { scorePct, scoreDisplay } = getPerfScore(raw);
+      const { tier, tierLabel, tierColor } = getTier(scorePct);
+      const name = t.teacherName || t.name || `Teacher ${i + 1}`;
+      const subject = t.subject || t.subjectName || '—';
+      const attRaw = typeof t.attendanceRate === 'number' ? t.attendanceRate
+        : (t.classesAttended && t.totalClasses ? t.classesAttended / t.totalClasses : undefined);
+      const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
+      const hwTotal = t.homeworkAssigned ?? 0;
+      const hwChecked = t.homeworkChecked ?? 0;
+      return { name, subject, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, hwTotal, hwChecked, totalStudents: t.totalStudents };
+    })
+    .filter(r => !q || r.name.toLowerCase().includes(q) || r.subject.toLowerCase().includes(q))
+    .sort((a, b) => sortDir === 'asc' ? a.scorePct - b.scorePct : b.scorePct - a.scorePct);
+
+  // Student rows
+  const studentRows = studentData
+    .map((s, i) => {
+      const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
+        (s.obtainedMarks != null && s.totalMarks != null && Number(s.totalMarks) > 0
+          ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100 : s.attendanceRate);
+      const { scorePct, scoreDisplay } = getPerfScore(rawScore as number | undefined);
+      const { tier, tierLabel, tierColor } = getTier(scorePct);
+      const name = s.studentName || s.name || `Student ${i + 1}`;
+      const cls = [s.className || s.class, s.section].filter(Boolean).join(' · ') || '—';
+      const attRaw = typeof s.attendanceRate === 'number' ? s.attendanceRate
+        : (s.attendedClasses && s.totalClasses ? s.attendedClasses / s.totalClasses : undefined);
+      const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
+      const gradeStr = s.grade || (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' : scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
+      return { name, cls, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, gradeStr, rank: s.rank };
+    })
+    .filter(r => !q || r.name.toLowerCase().includes(q) || r.cls.toLowerCase().includes(q))
+    .sort((a, b) => sortDir === 'asc' ? a.scorePct - b.scorePct : b.scorePct - a.scorePct);
+
+  return (
+    <div className="pf-overlay" onClick={onClose}>
+      <div className="pf-panel" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="pf-header">
+          <div className="pf-header-left">
+            <div className="pf-header-icon"><BarChart2 size={18} /></div>
+            <div>
+              <h2 className="pf-title">Performance Details</h2>
+              <p className="pf-subtitle">{MONTHS[month - 1]} {year}</p>
+            </div>
+          </div>
+          <div className="pf-header-right">
+            {/* Tab switcher */}
+            <div className="pf-tab-group">
+              <button id="pf-tab-teacher" className={`pf-tab ${tab === 'teacher' ? 'active' : ''}`} onClick={() => onTabChange('teacher')}>
+                <GraduationCap size={13} /> Teachers
+                <span className="pf-tab-count">{teacherData.length}</span>
+              </button>
+              <button id="pf-tab-student" className={`pf-tab ${tab === 'student' ? 'active' : ''}`} onClick={() => onTabChange('student')}>
+                <Users size={13} /> Students
+                <span className="pf-tab-count">{studentData.length}</span>
+              </button>
+            </div>
+            {/* Sort toggle */}
+            <button
+              id="pf-sort-btn"
+              className="pf-sort-btn"
+              onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+              title={`Sort ${sortDir === 'asc' ? 'descending' : 'ascending'}`}
+            >
+              {sortDir === 'asc' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {sortDir === 'asc' ? 'Lowest first' : 'Highest first'}
+            </button>
+            <button id="pf-close-btn" className="pf-close-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="pf-search-bar">
+          <div className="pf-search-wrap">
+            <Search size={15} className="pf-search-icon" />
+            <input
+              id="pf-search-input"
+              type="text"
+              className="pf-search-input"
+              placeholder={`Search ${tab === 'teacher' ? 'teachers by name or subject' : 'students by name or class'}…`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+            />
+            {search && (
+              <button className="pf-search-clear" onClick={() => setSearch('')}><X size={13} /></button>
+            )}
+          </div>
+          <span className="pf-result-count">
+            {tab === 'teacher' ? teacherRows.length : studentRows.length} results
+          </span>
+        </div>
+
+        {/* Table */}
+        <div className="pf-table-wrap">
+          {tab === 'teacher' ? (
+            teacherRows.length === 0 ? (
+              <div className="pf-empty"><BarChart2 size={32} color="var(--muted-foreground)" /><p>No results found.</p></div>
+            ) : (
+              <table className="pf-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Teacher</th>
+                    <th>Subject</th>
+                    <th>Performance Score</th>
+                    <th>Attendance</th>
+                    <th>Homework</th>
+                    <th>Students</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teacherRows.map((r, idx) => (
+                    <tr key={idx} className={`pf-row pf-row-${r.tier}`}>
+                      <td className="pf-td-rank">#{idx + 1}</td>
+                      <td>
+                        <div className="pf-td-person">
+                          <div className="pf-td-avatar" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>{r.name.charAt(0)}</div>
+                          <span className="pf-td-name">{r.name}</span>
+                        </div>
+                      </td>
+                      <td><span className="pf-td-muted">{r.subject}</span></td>
+                      <td>
+                        <div className="pf-td-bar-wrap">
+                          <div className="pf-td-bar-track"><div className="pf-td-bar-fill" style={{ width: `${Math.min(100, r.scorePct)}%`, background: `linear-gradient(90deg,${r.tierColor},${r.tierColor}88)` }} /></div>
+                          <span className="pf-td-bar-val" style={{ color: r.tierColor }}>{r.scoreDisplay}%</span>
+                        </div>
+                      </td>
+                      <td><span className="pf-td-val">{r.attPct ? `${r.attPct}%` : '—'}</span></td>
+                      <td><span className="pf-td-val">{r.hwTotal > 0 ? `${r.hwChecked}/${r.hwTotal}` : '—'}</span></td>
+                      <td><span className="pf-td-val">{r.totalStudents ?? '—'}</span></td>
+                      <td><span className="pf-badge" style={{ background: `${r.tierColor}1a`, color: r.tierColor, borderColor: `${r.tierColor}40` }}>{r.tierLabel}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          ) : (
+            studentRows.length === 0 ? (
+              <div className="pf-empty"><BarChart2 size={32} color="var(--muted-foreground)" /><p>No results found.</p></div>
+            ) : (
+              <table className="pf-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Student</th>
+                    <th>Class</th>
+                    <th>Performance Score</th>
+                    <th>Attendance</th>
+                    <th>Grade</th>
+                    <th>Rank</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentRows.map((r, idx) => (
+                    <tr key={idx} className={`pf-row pf-row-${r.tier}`}>
+                      <td className="pf-td-rank">#{idx + 1}</td>
+                      <td>
+                        <div className="pf-td-person">
+                          <div className="pf-td-avatar" style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>{r.name.charAt(0)}</div>
+                          <span className="pf-td-name">{r.name}</span>
+                        </div>
+                      </td>
+                      <td><span className="pf-td-muted">{r.cls}</span></td>
+                      <td>
+                        <div className="pf-td-bar-wrap">
+                          <div className="pf-td-bar-track"><div className="pf-td-bar-fill" style={{ width: `${Math.min(100, r.scorePct)}%`, background: `linear-gradient(90deg,${r.tierColor},${r.tierColor}88)` }} /></div>
+                          <span className="pf-td-bar-val" style={{ color: r.tierColor }}>{r.scoreDisplay}%</span>
+                        </div>
+                      </td>
+                      <td><span className="pf-td-val">{r.attPct ? `${r.attPct}%` : '—'}</span></td>
+                      <td><span className="pf-grade-pill" style={{ color: r.tierColor }}>{r.gradeStr}</span></td>
+                      <td><span className="pf-td-val">{r.rank !== undefined ? `#${r.rank}` : '—'}</span></td>
+                      <td><span className="pf-badge" style={{ background: `${r.tierColor}1a`, color: r.tierColor, borderColor: `${r.tierColor}40` }}>{r.tierLabel}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -567,7 +795,8 @@ export default function DashboardPage() {
   const [studentPerf, setStudentPerf] = useState<StudentPerformance[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
   const [perfError, setPerfError] = useState('');
-  const [perfSearch, setPerfSearch] = useState('');
+  const [showPerfModal, setShowPerfModal] = useState(false);
+  const [perfModalTab, setPerfModalTab] = useState<'teacher' | 'student'>('teacher');
 
   async function fetchProfile(): Promise<UserProfile | null> {
     try {
@@ -675,13 +904,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function init() {
-      // Fetch profile first to get real schoolId, then fetch marquee
       const profile = await fetchProfile();
-      if (profile?.schoolId) {
-        fetchMarquee(profile.schoolId);
-      }
-
-      // Fetch dashboard data in parallel
+      if (profile?.schoolId) fetchMarquee(profile.schoolId);
       try {
         const res = await fetch(
           'https://smart-school-backend-production.up.railway.app/dashboard/admin',
@@ -697,9 +921,12 @@ export default function DashboardPage() {
       }
     }
     init();
-    // Fetch performance for current month on mount
-    fetchPerformance(now.getMonth() + 1, now.getFullYear());
   }, []);
+
+  // Auto-fetch performance whenever month or year changes
+  useEffect(() => {
+    fetchPerformance(perfMonth, perfYear);
+  }, [perfMonth, perfYear]);
 
 
 
@@ -982,28 +1209,30 @@ export default function DashboardPage() {
       </div>
 
       <div className="db-perf-section glass-card animate-fade-in" style={{ animationDelay: '560ms' }}>
-        {/* Filter bar */}
         <div className="db-perf-filter-bar">
           <div className="db-perf-tabs">
             <button
               id="perf-tab-teacher"
               className={`db-perf-tab ${perfTab === 'teacher' ? 'active' : ''}`}
-              onClick={() => { setPerfTab('teacher'); setPerfSearch(''); }}
+              onClick={() => setPerfTab('teacher')}
             >
               <GraduationCap size={15} />
               Teacher Performance
+              {teacherPerf.length > 0 && <span className="db-perf-tab-badge">{teacherPerf.length}</span>}
             </button>
             <button
               id="perf-tab-student"
               className={`db-perf-tab ${perfTab === 'student' ? 'active' : ''}`}
-              onClick={() => { setPerfTab('student'); setPerfSearch(''); }}
+              onClick={() => setPerfTab('student')}
             >
               <Users size={15} />
               Student Performance
+              {studentPerf.length > 0 && <span className="db-perf-tab-badge">{studentPerf.length}</span>}
             </button>
           </div>
 
           <div className="db-perf-controls">
+            {perfLoading && <Loader2 size={15} className="db-spinner" style={{ color: '#6366f1' }} />}
             <div className="db-perf-select-wrap">
               <select
                 id="perf-month"
@@ -1034,34 +1263,18 @@ export default function DashboardPage() {
               <ChevronDown size={13} className="db-perf-select-icon" />
             </div>
             <button
-              id="perf-fetch-btn"
-              className="db-perf-fetch-btn"
-              onClick={() => fetchPerformance(perfMonth, perfYear)}
-              disabled={perfLoading}
+              id="perf-view-details-btn"
+              className="db-perf-view-btn"
+              onClick={() => { setPerfModalTab(perfTab); setShowPerfModal(true); }}
+              disabled={teacherPerf.length === 0 && studentPerf.length === 0}
             >
-              {perfLoading ? <Loader2 size={14} className="db-spinner" /> : <BarChart2 size={14} />}
-              {perfLoading ? 'Loading…' : 'Fetch'}
+              <BarChart2 size={14} />
+              View Details
             </button>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="db-perf-search-row">
-          <div className="db-perf-search-wrap">
-            <Search size={14} className="db-perf-search-icon" />
-            <input
-              id="perf-search"
-              type="text"
-              className="db-perf-search"
-              placeholder={`Search ${perfTab === 'teacher' ? 'teachers' : 'students'}…`}
-              value={perfSearch}
-              onChange={(e) => setPerfSearch(e.target.value)}
-            />
-          </div>
-          <span className="db-perf-count">
-            {perfTab === 'teacher' ? teacherPerf.length : studentPerf.length} records
-          </span>
-        </div>
+        {/* Search row removed – search is now inside the detail modal */}
 
         {/* Content */}
         {perfLoading ? (
@@ -1092,11 +1305,30 @@ export default function DashboardPage() {
             <p>{perfError}</p>
           </div>
         ) : perfTab === 'teacher' ? (
-          <PerfTeacherCards data={teacherPerf} search={perfSearch} />
+          <PerfTeacherCards
+            data={teacherPerf}
+            onViewAll={() => { setPerfModalTab('teacher'); setShowPerfModal(true); }}
+          />
         ) : (
-          <PerfStudentCards data={studentPerf} search={perfSearch} />
+          <PerfStudentCards
+            data={studentPerf}
+            onViewAll={() => { setPerfModalTab('student'); setShowPerfModal(true); }}
+          />
         )}
       </div>
+
+      {/* Performance Detail Modal */}
+      {showPerfModal && (
+        <PerfDetailModal
+          tab={perfModalTab}
+          onTabChange={setPerfModalTab}
+          teacherData={teacherPerf}
+          studentData={studentPerf}
+          month={perfMonth}
+          year={perfYear}
+          onClose={() => setShowPerfModal(false)}
+        />
+      )}
 
       {/* ── Bottom Grid (Notices | Homework | Exams) ── */}
       <div className="db-bottom-grid animate-fade-in" style={{ animationDelay: '500ms' }}>
@@ -2024,7 +2256,8 @@ export default function DashboardPage() {
           pointer-events: none;
           color: var(--muted-foreground);
         }
-        .db-perf-fetch-btn {
+        /* View Details button */
+        .db-perf-view-btn {
           display: flex;
           align-items: center;
           gap: 0.4rem;
@@ -2039,52 +2272,51 @@ export default function DashboardPage() {
           transition: opacity 0.2s, transform 0.2s;
           box-shadow: 0 4px 12px rgba(99,102,241,0.25);
         }
-        .db-perf-fetch-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-        .db-perf-fetch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .db-perf-view-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+        .db-perf-view-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        /* Search row */
-        .db-perf-search-row {
-          display: flex;
+        /* Tab count badge */
+        .db-perf-tab-badge {
+          display: inline-flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1.25rem;
-          border-bottom: 1px solid var(--border);
+          justify-content: center;
+          min-width: 18px; height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          font-size: 0.6rem;
+          font-weight: 800;
+          background: rgba(255,255,255,0.25);
+          color: inherit;
+          margin-left: 0.2rem;
         }
-        .db-perf-search-wrap {
-          position: relative;
-          flex: 1;
-          max-width: 340px;
+        .db-perf-tab.active .db-perf-tab-badge {
+          background: rgba(255,255,255,0.3);
         }
-        .db-perf-search-icon {
-          position: absolute;
-          left: 0.7rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--muted-foreground);
-          pointer-events: none;
-        }
-        .db-perf-search {
-          width: 100%;
-          padding: 0.4rem 0.8rem 0.4rem 2rem;
-          border-radius: 0.55rem;
-          border: 1px solid var(--border);
-          background: var(--background);
-          color: var(--foreground);
+
+        /* +N more chip */
+        .db-perf-more-chip {
+          width: 110px;
+          flex-shrink: 0;
+          border-radius: 1rem;
+          border: 2px dashed rgba(99,102,241,0.35);
+          padding: 1.1rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+          cursor: pointer;
+          color: #6366f1;
           font-size: 0.82rem;
-          outline: none;
-          transition: border-color 0.2s;
-          font-family: inherit;
+          font-weight: 700;
+          transition: all 0.2s;
+          background: rgba(99,102,241,0.04);
+          align-self: stretch;
         }
-        .db-perf-search:focus {
+        .db-perf-more-chip:hover {
+          background: rgba(99,102,241,0.1);
           border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
-        }
-        .db-perf-count {
-          font-size: 0.75rem;
-          color: var(--muted-foreground);
-          font-weight: 500;
-          white-space: nowrap;
-          margin-left: auto;
+          transform: translateY(-3px);
         }
 
         /* ── Horizontal scroll track ── */
@@ -2092,9 +2324,8 @@ export default function DashboardPage() {
           overflow-x: auto;
           overflow-y: visible;
           padding: 1.25rem;
-          /* fade right edge */
-          -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
-          mask-image: linear-gradient(to right, black 90%, transparent 100%);
+          -webkit-mask-image: linear-gradient(to right, black 88%, transparent 100%);
+          mask-image: linear-gradient(to right, black 88%, transparent 100%);
           scrollbar-width: thin;
           scrollbar-color: rgba(99,102,241,0.3) transparent;
         }
@@ -2134,12 +2365,7 @@ export default function DashboardPage() {
         .db-perf-card-h-good::before      { background: linear-gradient(90deg,#6366f1,#4f46e5); }
         .db-perf-card-h-average::before   { background: linear-gradient(90deg,#f59e0b,#d97706); }
         .db-perf-card-h-poor::before      { background: linear-gradient(90deg,#ef4444,#dc2626); }
-
-        .db-perf-card-h-top {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-        }
+        .db-perf-card-h-top { display: flex; align-items: center; gap: 0.6rem; }
         .db-perf-avatar-h {
           width: 40px; height: 40px;
           border-radius: 50%;
@@ -2149,104 +2375,273 @@ export default function DashboardPage() {
           box-shadow: 0 4px 12px rgba(0,0,0,0.18);
         }
         .db-perf-card-h-meta { flex: 1; min-width: 0; }
-        .db-perf-name-h {
-          font-size: 0.82rem; font-weight: 700; line-height: 1.25;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .db-perf-sub-h {
-          font-size: 0.68rem; color: var(--muted-foreground); margin-top: 0.1rem;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .db-perf-badge-h {
-          font-size: 0.58rem; font-weight: 800;
-          padding: 0.18rem 0.5rem;
-          border-radius: 999px;
-          border: 1px solid;
-          letter-spacing: 0.04em;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        /* Ring row */
-        .db-perf-ring-row {
-          display: flex;
-          justify-content: space-around;
-          align-items: flex-end;
-          gap: 0.25rem;
-        }
-        .db-perf-ring {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.2rem;
-          position: relative;
-        }
-        .db-perf-ring-center {
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 18px;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .db-perf-ring-label {
-          font-size: 0.6rem;
-          color: var(--muted-foreground);
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        /* Stat pills (horizontal card) */
-        .db-perf-card-h-stats {
-          display: flex;
-          flex-direction: column;
-          gap: 0.35rem;
-        }
-        .db-perf-stat-h {
-          display: flex;
-          align-items: center;
-          gap: 0.35rem;
-          font-size: 0.7rem;
-          color: var(--muted-foreground);
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 0.45rem;
-          padding: 0.22rem 0.55rem;
-        }
+        .db-perf-name-h { font-size: 0.82rem; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .db-perf-sub-h { font-size: 0.68rem; color: var(--muted-foreground); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .db-perf-badge-h { font-size: 0.58rem; font-weight: 800; padding: 0.18rem 0.5rem; border-radius: 999px; border: 1px solid; letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0; }
+        .db-perf-ring-row { display: flex; justify-content: space-around; align-items: flex-end; gap: 0.25rem; }
+        .db-perf-ring { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; position: relative; }
+        .db-perf-ring-center { position: absolute; top: 0; left: 0; right: 0; bottom: 18px; display: flex; align-items: center; justify-content: center; }
+        .db-perf-ring-label { font-size: 0.6rem; color: var(--muted-foreground); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .db-perf-card-h-stats { display: flex; flex-direction: column; gap: 0.35rem; }
+        .db-perf-stat-h { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--muted-foreground); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.45rem; padding: 0.22rem 0.55rem; }
         .db-perf-stat-h span { flex: 1; font-size: 0.68rem; }
         .db-perf-stat-h strong { font-weight: 700; color: var(--foreground); font-size: 0.72rem; }
+        .db-perf-score-bar-wrap { display: flex; align-items: center; gap: 0.5rem; }
+        .db-perf-score-bar-track { flex: 1; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+        .db-perf-score-bar-fill { height: 100%; border-radius: 999px; transition: width 1s ease; }
+        .db-perf-score-bar-label { font-size: 0.72rem; font-weight: 800; color: var(--foreground); min-width: 34px; text-align: right; }
+        .db-perf-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3.5rem 1rem; color: var(--muted-foreground); font-size: 0.88rem; }
+        .db-perf-loading { overflow: hidden; }
+        .db-perf-skeleton-card-h { min-height: 200px; background: var(--background); }
 
-        /* Score bar at bottom of card */
-        .db-perf-score-bar-wrap {
-          display: flex; align-items: center; gap: 0.5rem;
+        /* ═══════════════════════════════════════════════════════════
+           Performance Detail Modal (Full-screen overlay)
+           ═══════════════════════════════════════════════════════════ */
+        .pf-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          background: rgba(0,0,0,0.6);
+          backdrop-filter: blur(6px);
+          display: flex;
+          align-items: stretch;
+          justify-content: flex-end;
+          animation: pf-fade-in 0.2s ease;
         }
-        .db-perf-score-bar-track {
-          flex: 1; height: 5px; border-radius: 999px;
-          background: rgba(255,255,255,0.07); overflow: hidden;
-        }
-        .db-perf-score-bar-fill {
-          height: 100%; border-radius: 999px;
-          transition: width 1s ease;
-        }
-        .db-perf-score-bar-label {
-          font-size: 0.72rem; font-weight: 800;
-          color: var(--foreground); min-width: 34px; text-align: right;
-        }
+        @keyframes pf-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Empty / Loading */
-        .db-perf-empty {
+        .pf-panel {
+          width: min(95vw, 1100px);
+          height: 100dvh;
+          background: var(--card);
+          border-left: 1px solid var(--border);
           display: flex;
           flex-direction: column;
+          animation: pf-slide-in 0.28s cubic-bezier(0.16,1,0.3,1);
+          overflow: hidden;
+          box-shadow: -20px 0 60px rgba(0,0,0,0.25);
+        }
+        @keyframes pf-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* Header */
+        .pf-header {
+          display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
           gap: 0.75rem;
-          padding: 3.5rem 1rem;
+          padding: 1.1rem 1.5rem;
+          border-bottom: 1px solid var(--border);
+          background: linear-gradient(135deg, rgba(99,102,241,0.06), transparent);
+          flex-shrink: 0;
+        }
+        .pf-header-left { display: flex; align-items: center; gap: 0.85rem; }
+        .pf-header-icon {
+          width: 38px; height: 38px;
+          border-radius: 0.7rem;
+          background: linear-gradient(135deg,#6366f1,#4f46e5);
+          display: flex; align-items: center; justify-content: center;
+          color: #fff; flex-shrink: 0;
+          box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+        }
+        .pf-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 0.1rem; }
+        .pf-subtitle { font-size: 0.75rem; color: var(--muted-foreground); }
+        .pf-header-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .pf-tab-group { display: flex; gap: 0.3rem; }
+        .pf-tab {
+          display: flex; align-items: center; gap: 0.4rem;
+          padding: 0.4rem 0.9rem;
+          border-radius: 0.55rem;
+          border: 1px solid var(--border);
+          background: transparent;
           color: var(--muted-foreground);
-          font-size: 0.88rem;
+          font-size: 0.78rem; font-weight: 600;
+          cursor: pointer; transition: all 0.18s;
         }
-        .db-perf-loading { overflow: hidden; }
-        .db-perf-skeleton-card-h {
-          min-height: 200px;
+        .pf-tab:hover { background: rgba(255,255,255,0.05); color: var(--foreground); }
+        .pf-tab.active { background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(99,102,241,0.3); }
+        .pf-tab-count {
+          font-size: 0.6rem; font-weight: 800;
+          background: rgba(255,255,255,0.2);
+          padding: 0.1rem 0.4rem;
+          border-radius: 999px;
+        }
+        .pf-sort-btn {
+          display: flex; align-items: center; gap: 0.35rem;
+          padding: 0.4rem 0.85rem;
+          border-radius: 0.55rem;
+          border: 1px solid var(--border);
           background: var(--background);
+          color: var(--muted-foreground);
+          font-size: 0.75rem; font-weight: 600;
+          cursor: pointer; transition: all 0.18s;
         }
+        .pf-sort-btn:hover { border-color: #6366f1; color: #6366f1; }
+        .pf-close-btn {
+          width: 34px; height: 34px;
+          border-radius: 50%;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--muted-foreground);
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s; flex-shrink: 0;
+        }
+        .pf-close-btn:hover { background: var(--destructive); color: #fff; border-color: var(--destructive); }
+
+        /* Search bar */
+        .pf-search-bar {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.85rem 1.5rem;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .pf-search-wrap {
+          position: relative;
+          flex: 1;
+          max-width: 480px;
+        }
+        .pf-search-icon {
+          position: absolute; left: 0.8rem; top: 50%;
+          transform: translateY(-50%);
+          color: var(--muted-foreground); pointer-events: none;
+        }
+        .pf-search-input {
+          width: 100%;
+          padding: 0.6rem 2.4rem 0.6rem 2.4rem;
+          border-radius: 0.65rem;
+          border: 1px solid var(--border);
+          background: var(--background);
+          color: var(--foreground);
+          font-size: 0.85rem;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          font-family: inherit;
+        }
+        .pf-search-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+        .pf-search-clear {
+          position: absolute; right: 0.7rem; top: 50%;
+          transform: translateY(-50%);
+          width: 20px; height: 20px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(255,255,255,0.1);
+          color: var(--muted-foreground);
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all 0.15s;
+        }
+        .pf-search-clear:hover { background: var(--destructive); color: #fff; }
+        .pf-result-count {
+          font-size: 0.75rem;
+          color: var(--muted-foreground);
+          font-weight: 500;
+          white-space: nowrap;
+          margin-left: auto;
+        }
+
+        /* Table wrapper */
+        .pf-table-wrap {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(99,102,241,0.25) transparent;
+        }
+        .pf-table-wrap::-webkit-scrollbar { width: 5px; }
+        .pf-table-wrap::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 999px; }
+
+        /* Table */
+        .pf-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.83rem;
+        }
+        .pf-table thead {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: var(--card);
+        }
+        .pf-table thead th {
+          padding: 0.85rem 1rem;
+          text-align: left;
+          font-size: 0.72rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--muted-foreground);
+          border-bottom: 1px solid var(--border);
+          white-space: nowrap;
+        }
+        .pf-table thead th:first-child { padding-left: 1.5rem; }
+        .pf-table thead th:last-child { padding-right: 1.5rem; }
+
+        .pf-row {
+          transition: background 0.15s;
+          border-bottom: 1px solid var(--border);
+        }
+        .pf-row:last-child { border-bottom: none; }
+        .pf-row:hover { background: rgba(255,255,255,0.03); }
+        .pf-row-excellent:hover { background: rgba(16,185,129,0.04); }
+        .pf-row-good:hover      { background: rgba(99,102,241,0.04); }
+        .pf-row-average:hover   { background: rgba(245,158,11,0.04); }
+        .pf-row-poor:hover      { background: rgba(239,68,68,0.04); }
+
+        .pf-table td {
+          padding: 0.8rem 1rem;
+          vertical-align: middle;
+        }
+        .pf-table td:first-child { padding-left: 1.5rem; }
+        .pf-table td:last-child { padding-right: 1.5rem; }
+
+        .pf-td-rank {
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: var(--muted-foreground);
+          width: 40px;
+        }
+        .pf-td-person {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          min-width: 160px;
+        }
+        .pf-td-avatar {
+          width: 32px; height: 32px;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 0.85rem; font-weight: 800; color: #fff;
+          flex-shrink: 0;
+        }
+        .pf-td-name {
+          font-size: 0.84rem; font-weight: 700;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          max-width: 180px;
+        }
+        .pf-td-muted { font-size: 0.8rem; color: var(--muted-foreground); }
+        .pf-td-val { font-size: 0.82rem; font-weight: 600; }
+        .pf-td-bar-wrap { display: flex; align-items: center; gap: 0.65rem; min-width: 160px; }
+        .pf-td-bar-track { flex: 1; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+        .pf-td-bar-fill { height: 100%; border-radius: 999px; transition: width 0.8s ease; }
+        .pf-td-bar-val { font-size: 0.78rem; font-weight: 800; min-width: 38px; text-align: right; }
+        .pf-badge {
+          display: inline-flex; align-items: center;
+          font-size: 0.62rem; font-weight: 800;
+          padding: 0.2rem 0.6rem;
+          border-radius: 999px; border: 1px solid;
+          letter-spacing: 0.04em; white-space: nowrap;
+        }
+        .pf-grade-pill {
+          font-size: 0.9rem; font-weight: 900;
+          letter-spacing: -0.02em;
+        }
+        .pf-empty {
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 0.75rem; padding: 5rem 1rem;
+          color: var(--muted-foreground); font-size: 0.88rem;
       `}</style>
     </div>
   );
