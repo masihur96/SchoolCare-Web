@@ -327,6 +327,220 @@ function DashboardSkeleton() {
   );
 }
 
+// ─── Performance helpers (extracted to avoid IIFE-in-JSX crash) ─────────────
+
+function getPerfScore(raw: number | undefined): { scoreNum: number; scorePct: number; scoreDisplay: string } {
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? 0)) || 0;
+  const pct = n > 1 ? Math.min(n, 100) : n * 100;
+  return { scoreNum: n, scorePct: pct, scoreDisplay: pct.toFixed(1) };
+}
+
+function getTier(pct: number): { tier: string; tierLabel: string; tierColor: string } {
+  if (pct >= 90) return { tier: 'excellent', tierLabel: 'Excellent', tierColor: '#10b981' };
+  if (pct >= 75) return { tier: 'good',      tierLabel: 'Good',      tierColor: '#6366f1' };
+  if (pct >= 50) return { tier: 'average',   tierLabel: 'Average',   tierColor: '#f59e0b' };
+  return           { tier: 'poor',      tierLabel: 'Poor',      tierColor: '#ef4444' };
+}
+
+interface PerfTeacherCardsProps {
+  data: TeacherPerformance[];
+  search: string;
+}
+function PerfTeacherCards({ data, search }: PerfTeacherCardsProps) {
+  const q = search.trim().toLowerCase();
+  const filtered = data.filter(t => {
+    if (!q) return true;
+    return (t.teacherName || t.name || '').toLowerCase().includes(q) ||
+           (t.subject || t.subjectName || '').toLowerCase().includes(q);
+  });
+  if (filtered.length === 0) {
+    return (
+      <div className="db-perf-empty">
+        <BarChart2 size={32} color="var(--muted-foreground)" />
+        <p>{data.length === 0 ? 'No teacher performance data for this period.' : 'No results match your search.'}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="db-perf-hscroll-wrap">
+      <div className="db-perf-hscroll-inner">
+        {filtered.map((t, i) => {
+          const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
+          const { scorePct, scoreDisplay } = getPerfScore(raw);
+          const { tier, tierLabel, tierColor } = getTier(scorePct);
+          const name = t.teacherName || t.name || `Teacher ${i + 1}`;
+          const subject = t.subject || t.subjectName || '—';
+          const attRaw = typeof t.attendanceRate === 'number' ? t.attendanceRate
+            : (t.classesAttended && t.totalClasses ? t.classesAttended / t.totalClasses : undefined);
+          const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
+          const hwTotal = t.homeworkAssigned ?? 0;
+          const hwChecked = t.homeworkChecked ?? 0;
+          const hwPct = hwTotal > 0 ? ((hwChecked / hwTotal) * 100).toFixed(0) : null;
+          return (
+            <div key={t.teacherId ?? i} className={`db-perf-card-h db-perf-card-h-${tier}`}>
+              <div className="db-perf-card-h-top">
+                <div className="db-perf-avatar-h" style={{ background: `linear-gradient(135deg,#10b981,#059669)` }}>
+                  {name.charAt(0).toUpperCase()}
+                </div>
+                <div className="db-perf-card-h-meta">
+                  <p className="db-perf-name-h">{name}</p>
+                  <p className="db-perf-sub-h">{subject}</p>
+                </div>
+                <span className="db-perf-badge-h" style={{ background: `${tierColor}1a`, color: tierColor, borderColor: `${tierColor}40` }}>{tierLabel}</span>
+              </div>
+              <div className="db-perf-ring-row">
+                <PerfRing pct={scorePct} color={tierColor} label="Score" />
+                {attPct && <PerfRing pct={parseFloat(attPct)} color="#06b6d4" label="Attend" />}
+                {hwPct && <PerfRing pct={parseFloat(hwPct)} color="#8b5cf6" label="HW" />}
+              </div>
+              <div className="db-perf-card-h-stats">
+                {attPct && (
+                  <div className="db-perf-stat-h">
+                    <UserCheck size={11} />
+                    <span>Attendance</span>
+                    <strong>{attPct}%</strong>
+                  </div>
+                )}
+                {hwTotal > 0 && (
+                  <div className="db-perf-stat-h">
+                    <BookCheck size={11} />
+                    <span>Homework</span>
+                    <strong>{hwChecked}/{hwTotal}</strong>
+                  </div>
+                )}
+                {t.totalStudents !== undefined && (
+                  <div className="db-perf-stat-h">
+                    <Users size={11} />
+                    <span>Students</span>
+                    <strong>{t.totalStudents}</strong>
+                  </div>
+                )}
+              </div>
+              <div className="db-perf-score-bar-wrap">
+                <div className="db-perf-score-bar-track">
+                  <div className="db-perf-score-bar-fill" style={{ width: `${Math.min(100, scorePct)}%`, background: `linear-gradient(90deg, ${tierColor}, ${tierColor}99)` }} />
+                </div>
+                <span className="db-perf-score-bar-label">{scoreDisplay}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface PerfStudentCardsProps {
+  data: StudentPerformance[];
+  search: string;
+}
+function PerfStudentCards({ data, search }: PerfStudentCardsProps) {
+  const q = search.trim().toLowerCase();
+  const filtered = data.filter(s => {
+    if (!q) return true;
+    return (s.studentName || s.name || '').toLowerCase().includes(q) ||
+           (s.className || s.class || '').toLowerCase().includes(q);
+  });
+  if (filtered.length === 0) {
+    return (
+      <div className="db-perf-empty">
+        <BarChart2 size={32} color="var(--muted-foreground)" />
+        <p>{data.length === 0 ? 'No student performance data for this period.' : 'No results match your search.'}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="db-perf-hscroll-wrap">
+      <div className="db-perf-hscroll-inner">
+        {filtered.map((s, i) => {
+          const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
+            (s.obtainedMarks != null && s.totalMarks != null && s.totalMarks > 0
+              ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100
+              : s.attendanceRate);
+          const { scorePct, scoreDisplay } = getPerfScore(rawScore as number | undefined);
+          const { tier, tierLabel, tierColor } = getTier(scorePct);
+          const name = s.studentName || s.name || `Student ${i + 1}`;
+          const cls = [s.className || s.class, s.section].filter(Boolean).join(' · ') || '—';
+          const attRaw = typeof s.attendanceRate === 'number' ? s.attendanceRate
+            : (s.attendedClasses && s.totalClasses ? s.attendedClasses / s.totalClasses : undefined);
+          const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
+          const gradeStr = s.grade ||
+            (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' :
+             scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
+          return (
+            <div key={s.studentId ?? i} className={`db-perf-card-h db-perf-card-h-${tier}`}>
+              <div className="db-perf-card-h-top">
+                <div className="db-perf-avatar-h" style={{ background: `linear-gradient(135deg,#6366f1,#4f46e5)` }}>
+                  {name.charAt(0).toUpperCase()}
+                </div>
+                <div className="db-perf-card-h-meta">
+                  <p className="db-perf-name-h">{name}</p>
+                  <p className="db-perf-sub-h">{cls}</p>
+                </div>
+                <span className="db-perf-badge-h" style={{ background: `${tierColor}1a`, color: tierColor, borderColor: `${tierColor}40` }}>{tierLabel}</span>
+              </div>
+              <div className="db-perf-ring-row">
+                <PerfRing pct={scorePct} color={tierColor} label="Score" />
+                {attPct && <PerfRing pct={parseFloat(attPct)} color="#06b6d4" label="Attend" />}
+                <PerfRing pct={scorePct >= 90 ? 100 : scorePct >= 80 ? 85 : scorePct >= 70 ? 72 : scorePct >= 60 ? 62 : scorePct >= 50 ? 52 : 30} color="#f59e0b" label="Grade" centerText={gradeStr} />
+              </div>
+              <div className="db-perf-card-h-stats">
+                {attPct && (
+                  <div className="db-perf-stat-h">
+                    <UserCheck size={11} />
+                    <span>Attendance</span>
+                    <strong>{attPct}%</strong>
+                  </div>
+                )}
+                <div className="db-perf-stat-h">
+                  <Star size={11} />
+                  <span>Grade</span>
+                  <strong>{gradeStr}</strong>
+                </div>
+                {s.rank !== undefined && (
+                  <div className="db-perf-stat-h">
+                    <Award size={11} />
+                    <span>Rank</span>
+                    <strong>#{s.rank}</strong>
+                  </div>
+                )}
+              </div>
+              <div className="db-perf-score-bar-wrap">
+                <div className="db-perf-score-bar-track">
+                  <div className="db-perf-score-bar-fill" style={{ width: `${Math.min(100, scorePct)}%`, background: `linear-gradient(90deg, ${tierColor}, ${tierColor}99)` }} />
+                </div>
+                <span className="db-perf-score-bar-label">{scoreDisplay}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface PerfRingProps { pct: number; color: string; label: string; centerText?: string; }
+function PerfRing({ pct, color, label, centerText }: PerfRingProps) {
+  const r = 22; const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.min(100, Math.max(0, pct)) / 100) * circ;
+  return (
+    <div className="db-perf-ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
+        <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="5"
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform="rotate(-90 28 28)" style={{ transition: 'stroke-dashoffset 1s ease' }} />
+      </svg>
+      <div className="db-perf-ring-center">
+        <span style={{ color, fontSize: '0.6rem', fontWeight: 800, lineHeight: 1 }}>
+          {centerText ?? `${Math.round(pct)}%`}
+        </span>
+      </div>
+      <p className="db-perf-ring-label">{label}</p>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -852,182 +1066,35 @@ export default function DashboardPage() {
         {/* Content */}
         {perfLoading ? (
           <div className="db-perf-loading">
-            <div className="db-perf-skeleton-grid">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="db-perf-skeleton-card">
-                  <div className="shimmer shimmer-circle" style={{ width: '40px', height: '40px', flexShrink: 0 }}></div>
-                  <div style={{ flex: 1 }}>
-                    <div className="shimmer shimmer-text" style={{ width: '70%' }}></div>
-                    <div className="shimmer shimmer-text short" style={{ width: '40%', margin: 0 }}></div>
+            <div className="db-perf-hscroll-wrap">
+              <div className="db-perf-hscroll-inner">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="db-perf-card-h db-perf-skeleton-card-h">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
+                      <div className="shimmer shimmer-circle" style={{ width: '42px', height: '42px', flexShrink: 0 }}></div>
+                      <div style={{ flex: 1 }}>
+                        <div className="shimmer shimmer-text" style={{ width: '75%' }}></div>
+                        <div className="shimmer shimmer-text short" style={{ width: '50%', margin: 0 }}></div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginBottom: '1rem' }}>
+                      {[0,1,2].map(j => <div key={j} className="shimmer shimmer-circle" style={{ width: '56px', height: '56px' }}></div>)}
+                    </div>
+                    <div className="shimmer shimmer-block" style={{ height: '8px', borderRadius: '999px' }}></div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         ) : perfError ? (
           <div className="db-perf-empty">
-            <AlertCircle size={28} color="var(--destructive)" />
+            <AlertCircle size={32} color="var(--destructive)" />
             <p>{perfError}</p>
           </div>
         ) : perfTab === 'teacher' ? (
-          (() => {
-            const search = perfSearch.trim().toLowerCase();
-            const filtered = teacherPerf.filter(t => {
-              if (!search) return true;
-              const n = (t.teacherName || t.name || '').toLowerCase();
-              const s = (t.subject || t.subjectName || '').toLowerCase();
-              return n.includes(search) || s.includes(search);
-            });
-            return filtered.length === 0 ? (
-              <div className="db-perf-empty">
-                <BarChart2 size={28} color="var(--muted-foreground)" />
-                <p>{teacherPerf.length === 0 ? 'No teacher performance data for this period.' : 'No results match your search.'}</p>
-              </div>
-            ) : (
-              <div className="db-perf-card-grid">
-                {filtered.map((t, i) => {
-                  const score = t.performanceScore ?? t.rating ?? t.attendanceRate ?? 0;
-                  const scoreNum = typeof score === 'number' ? score : parseFloat(String(score)) || 0;
-                  const scoreDisplay = scoreNum > 1 ? scoreNum.toFixed(1) : (scoreNum * 100).toFixed(1);
-                  const scorePct = scoreNum > 1 ? scoreNum : scoreNum * 100;
-                  const tier = scorePct >= 90 ? 'excellent' : scorePct >= 75 ? 'good' : scorePct >= 50 ? 'average' : 'poor';
-                  const tierLabel = scorePct >= 90 ? 'Excellent' : scorePct >= 75 ? 'Good' : scorePct >= 50 ? 'Average' : 'Poor';
-                  const name = t.teacherName || t.name || `Teacher ${i + 1}`;
-                  const subject = t.subject || t.subjectName || '—';
-                  const attRate = typeof t.attendanceRate === 'number'
-                    ? (t.attendanceRate > 1 ? t.attendanceRate : t.attendanceRate * 100).toFixed(1)
-                    : (t.classesAttended && t.totalClasses
-                        ? ((t.classesAttended / t.totalClasses) * 100).toFixed(1)
-                        : '—');
-                  const hwRate = t.homeworkChecked && t.homeworkAssigned
-                    ? ((t.homeworkChecked / t.homeworkAssigned) * 100).toFixed(1) + '%'
-                    : t.homeworkAssigned ? `${t.homeworkAssigned} assigned` : '—';
-                  return (
-                    <div key={t.teacherId || i} className={`db-perf-card db-perf-card-${tier}`}>
-                      <div className="db-perf-card-header">
-                        <div className="db-perf-avatar" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-                          {name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="db-perf-card-meta">
-                          <p className="db-perf-name">{name}</p>
-                          <p className="db-perf-sub">{subject}</p>
-                        </div>
-                        <span className={`db-perf-badge db-perf-badge-${tier}`}>{tierLabel}</span>
-                      </div>
-                      <div className="db-perf-score-row">
-                        <div className="db-perf-score-track">
-                          <div
-                            className="db-perf-score-fill"
-                            style={{ width: `${Math.min(100, scorePct)}%` }}
-                          />
-                        </div>
-                        <span className="db-perf-score-val">{scoreDisplay}%</span>
-                      </div>
-                      <div className="db-perf-stats">
-                        <div className="db-perf-stat">
-                          <UserCheck size={12} />
-                          <span>Attendance</span>
-                          <strong>{attRate !== '—' ? `${attRate}%` : '—'}</strong>
-                        </div>
-                        <div className="db-perf-stat">
-                          <BookCheck size={12} />
-                          <span>Homework</span>
-                          <strong>{hwRate}</strong>
-                        </div>
-                        {t.totalStudents !== undefined && (
-                          <div className="db-perf-stat">
-                            <Users size={12} />
-                            <span>Students</span>
-                            <strong>{t.totalStudents}</strong>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()
+          <PerfTeacherCards data={teacherPerf} search={perfSearch} />
         ) : (
-          (() => {
-            const search = perfSearch.trim().toLowerCase();
-            const filtered = studentPerf.filter(s => {
-              if (!search) return true;
-              const n = (s.studentName || s.name || '').toLowerCase();
-              const c = (s.className || s.class || '').toLowerCase();
-              return n.includes(search) || c.includes(search);
-            });
-            return filtered.length === 0 ? (
-              <div className="db-perf-empty">
-                <BarChart2 size={28} color="var(--muted-foreground)" />
-                <p>{studentPerf.length === 0 ? 'No student performance data for this period.' : 'No results match your search.'}</p>
-              </div>
-            ) : (
-              <div className="db-perf-card-grid">
-                {filtered.map((s, i) => {
-                  const score = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
-                    (s.obtainedMarks && s.totalMarks ? (s.obtainedMarks / s.totalMarks) * 100 : s.attendanceRate ?? 0);
-                  const scoreNum = typeof score === 'number' ? score : parseFloat(String(score)) || 0;
-                  const scoreDisplay = scoreNum > 1 ? scoreNum.toFixed(1) : (scoreNum * 100).toFixed(1);
-                  const scorePct = scoreNum > 1 ? scoreNum : scoreNum * 100;
-                  const tier = scorePct >= 90 ? 'excellent' : scorePct >= 75 ? 'good' : scorePct >= 50 ? 'average' : 'poor';
-                  const tierLabel = scorePct >= 90 ? 'Excellent' : scorePct >= 75 ? 'Good' : scorePct >= 50 ? 'Average' : 'Poor';
-                  const name = s.studentName || s.name || `Student ${i + 1}`;
-                  const cls = s.className || s.class || '—';
-                  const attRate = typeof s.attendanceRate === 'number'
-                    ? (s.attendanceRate > 1 ? s.attendanceRate : s.attendanceRate * 100).toFixed(1)
-                    : (s.attendedClasses && s.totalClasses
-                        ? ((s.attendedClasses / s.totalClasses) * 100).toFixed(1)
-                        : '—');
-                  const gradeStr = s.grade ||
-                    (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' :
-                     scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
-                  return (
-                    <div key={s.studentId || i} className={`db-perf-card db-perf-card-${tier}`}>
-                      <div className="db-perf-card-header">
-                        <div className="db-perf-avatar" style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
-                          {name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="db-perf-card-meta">
-                          <p className="db-perf-name">{name}</p>
-                          <p className="db-perf-sub">{cls}{s.section ? ` · ${s.section}` : ''}</p>
-                        </div>
-                        <span className={`db-perf-badge db-perf-badge-${tier}`}>{tierLabel}</span>
-                      </div>
-                      <div className="db-perf-score-row">
-                        <div className="db-perf-score-track">
-                          <div
-                            className="db-perf-score-fill"
-                            style={{ width: `${Math.min(100, scorePct)}%` }}
-                          />
-                        </div>
-                        <span className="db-perf-score-val">{scoreDisplay}%</span>
-                      </div>
-                      <div className="db-perf-stats">
-                        <div className="db-perf-stat">
-                          <UserCheck size={12} />
-                          <span>Attendance</span>
-                          <strong>{attRate !== '—' ? `${attRate}%` : '—'}</strong>
-                        </div>
-                        <div className="db-perf-stat">
-                          <Star size={12} />
-                          <span>Grade</span>
-                          <strong>{gradeStr}</strong>
-                        </div>
-                        {s.rank !== undefined && (
-                          <div className="db-perf-stat">
-                            <Award size={12} />
-                            <span>Rank</span>
-                            <strong>#{s.rank}</strong>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()
+          <PerfStudentCards data={studentPerf} search={perfSearch} />
         )}
       </div>
 
@@ -2020,142 +2087,148 @@ export default function DashboardPage() {
           margin-left: auto;
         }
 
-        /* Card grid */
-        .db-perf-card-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
+        /* ── Horizontal scroll track ── */
+        .db-perf-hscroll-wrap {
+          overflow-x: auto;
+          overflow-y: visible;
           padding: 1.25rem;
+          /* fade right edge */
+          -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+          mask-image: linear-gradient(to right, black 90%, transparent 100%);
+          scrollbar-width: thin;
+          scrollbar-color: rgba(99,102,241,0.3) transparent;
         }
-        @media (max-width: 1100px) { .db-perf-card-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 640px)  { .db-perf-card-grid { grid-template-columns: 1fr; } }
+        .db-perf-hscroll-wrap::-webkit-scrollbar { height: 5px; }
+        .db-perf-hscroll-wrap::-webkit-scrollbar-track { background: transparent; }
+        .db-perf-hscroll-wrap::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.35); border-radius: 999px; }
+        .db-perf-hscroll-inner {
+          display: flex;
+          gap: 1rem;
+          width: max-content;
+          padding-bottom: 0.5rem;
+        }
 
-        .db-perf-card {
-          border-radius: 0.9rem;
+        /* ── Individual horizontal card ── */
+        .db-perf-card-h {
+          width: 230px;
+          flex-shrink: 0;
+          border-radius: 1rem;
           border: 1px solid var(--border);
-          padding: 1rem;
+          padding: 1.1rem;
           background: var(--background);
-          transition: transform 0.2s, box-shadow 0.2s;
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 0.8rem;
           position: relative;
           overflow: hidden;
+          transition: transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s;
         }
-        .db-perf-card::before {
+        .db-perf-card-h::before {
           content: '';
           position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 3px;
+          top: 0; left: 0; right: 0; height: 3px;
           border-radius: 3px 3px 0 0;
         }
-        .db-perf-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 24px rgba(0,0,0,0.1);
-        }
-        .db-perf-card-excellent::before { background: linear-gradient(90deg, #10b981, #059669); }
-        .db-perf-card-good::before      { background: linear-gradient(90deg, #6366f1, #4f46e5); }
-        .db-perf-card-average::before   { background: linear-gradient(90deg, #f59e0b, #d97706); }
-        .db-perf-card-poor::before      { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .db-perf-card-h:hover { transform: translateY(-5px); box-shadow: 0 14px 32px rgba(0,0,0,0.14); }
+        .db-perf-card-h-excellent::before { background: linear-gradient(90deg,#10b981,#059669); }
+        .db-perf-card-h-good::before      { background: linear-gradient(90deg,#6366f1,#4f46e5); }
+        .db-perf-card-h-average::before   { background: linear-gradient(90deg,#f59e0b,#d97706); }
+        .db-perf-card-h-poor::before      { background: linear-gradient(90deg,#ef4444,#dc2626); }
 
-        .db-perf-card-header {
+        .db-perf-card-h-top {
           display: flex;
           align-items: center;
-          gap: 0.65rem;
+          gap: 0.6rem;
         }
-        .db-perf-avatar {
-          width: 38px; height: 38px;
+        .db-perf-avatar-h {
+          width: 40px; height: 40px;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          font-size: 1rem;
-          font-weight: 800;
-          color: #fff;
+          font-size: 1rem; font-weight: 800; color: #fff;
           flex-shrink: 0;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.18);
         }
-        .db-perf-card-meta { flex: 1; min-width: 0; }
-        .db-perf-name {
-          font-size: 0.85rem;
-          font-weight: 700;
-          line-height: 1.2;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .db-perf-card-h-meta { flex: 1; min-width: 0; }
+        .db-perf-name-h {
+          font-size: 0.82rem; font-weight: 700; line-height: 1.25;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .db-perf-sub {
-          font-size: 0.72rem;
-          color: var(--muted-foreground);
-          margin-top: 0.1rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .db-perf-sub-h {
+          font-size: 0.68rem; color: var(--muted-foreground); margin-top: 0.1rem;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-
-        /* Tier badges */
-        .db-perf-badge {
-          font-size: 0.62rem;
-          font-weight: 800;
-          padding: 0.2rem 0.55rem;
+        .db-perf-badge-h {
+          font-size: 0.58rem; font-weight: 800;
+          padding: 0.18rem 0.5rem;
           border-radius: 999px;
+          border: 1px solid;
           letter-spacing: 0.04em;
-          flex-shrink: 0;
           white-space: nowrap;
-        }
-        .db-perf-badge-excellent { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
-        .db-perf-badge-good      { background: rgba(99,102,241,0.12); color: #6366f1; border: 1px solid rgba(99,102,241,0.25); }
-        .db-perf-badge-average   { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
-        .db-perf-badge-poor      { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
-
-        /* Score bar */
-        .db-perf-score-row {
-          display: flex;
-          align-items: center;
-          gap: 0.65rem;
-        }
-        .db-perf-score-track {
-          flex: 1;
-          height: 6px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.07);
-          overflow: hidden;
-        }
-        .db-perf-score-fill {
-          height: 100%;
-          border-radius: 999px;
-          background: linear-gradient(90deg, #6366f1, #10b981);
-          transition: width 0.9s ease;
-        }
-        .db-perf-score-val {
-          font-size: 0.8rem;
-          font-weight: 800;
-          color: var(--foreground);
-          min-width: 38px;
-          text-align: right;
+          flex-shrink: 0;
         }
 
-        /* Stat pills */
-        .db-perf-stats {
+        /* Ring row */
+        .db-perf-ring-row {
           display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
+          justify-content: space-around;
+          align-items: flex-end;
+          gap: 0.25rem;
         }
-        .db-perf-stat {
+        .db-perf-ring {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.2rem;
+          position: relative;
+        }
+        .db-perf-ring-center {
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 18px;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .db-perf-ring-label {
+          font-size: 0.6rem;
+          color: var(--muted-foreground);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        /* Stat pills (horizontal card) */
+        .db-perf-card-h-stats {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+        .db-perf-stat-h {
           display: flex;
           align-items: center;
-          gap: 0.3rem;
+          gap: 0.35rem;
           font-size: 0.7rem;
           color: var(--muted-foreground);
-          background: rgba(255,255,255,0.04);
-          border: 1px solid var(--border);
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.06);
           border-radius: 0.45rem;
-          padding: 0.2rem 0.55rem;
-          flex: 1;
-          min-width: 80px;
+          padding: 0.22rem 0.55rem;
         }
-        .db-perf-stat span { flex: 1; }
-        .db-perf-stat strong {
-          font-weight: 700;
-          color: var(--foreground);
+        .db-perf-stat-h span { flex: 1; font-size: 0.68rem; }
+        .db-perf-stat-h strong { font-weight: 700; color: var(--foreground); font-size: 0.72rem; }
+
+        /* Score bar at bottom of card */
+        .db-perf-score-bar-wrap {
+          display: flex; align-items: center; gap: 0.5rem;
+        }
+        .db-perf-score-bar-track {
+          flex: 1; height: 5px; border-radius: 999px;
+          background: rgba(255,255,255,0.07); overflow: hidden;
+        }
+        .db-perf-score-bar-fill {
+          height: 100%; border-radius: 999px;
+          transition: width 1s ease;
+        }
+        .db-perf-score-bar-label {
+          font-size: 0.72rem; font-weight: 800;
+          color: var(--foreground); min-width: 34px; text-align: right;
         }
 
         /* Empty / Loading */
@@ -2169,21 +2242,9 @@ export default function DashboardPage() {
           color: var(--muted-foreground);
           font-size: 0.88rem;
         }
-        .db-perf-loading { padding: 1.25rem; }
-        .db-perf-skeleton-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-        }
-        @media (max-width: 1100px) { .db-perf-skeleton-grid { grid-template-columns: repeat(2,1fr); } }
-        @media (max-width: 640px)  { .db-perf-skeleton-grid { grid-template-columns: 1fr; } }
-        .db-perf-skeleton-card {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 1rem;
-          border-radius: 0.9rem;
-          border: 1px solid var(--border);
+        .db-perf-loading { overflow: hidden; }
+        .db-perf-skeleton-card-h {
+          min-height: 200px;
           background: var(--background);
         }
       `}</style>
