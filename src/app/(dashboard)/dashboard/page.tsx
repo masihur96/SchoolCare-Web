@@ -361,12 +361,10 @@ function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
     const sb = getPerfScore(b.performanceScore ?? b.rating ?? b.attendanceRate).scorePct;
     return sa - sb;
   });
-  const preview = sorted.slice(0, 8);
-  const remaining = sorted.length - preview.length;
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
-        {preview.map((t, i) => {
+        {sorted.map((t, i) => {
           const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
           const { scorePct, scoreDisplay } = getPerfScore(raw);
           const { tier, tierLabel, tierColor } = getTier(scorePct);
@@ -417,6 +415,13 @@ function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
                     <strong>{t.totalStudents}</strong>
                   </div>
                 )}
+                {t.classesAttended !== undefined && t.totalClasses !== undefined && (
+                  <div className="db-perf-stat-h">
+                    <Calendar size={11} />
+                    <span>Classes</span>
+                    <strong>{t.classesAttended}/{t.totalClasses}</strong>
+                  </div>
+                )}
               </div>
               <div className="db-perf-score-bar-wrap">
                 <div className="db-perf-score-bar-track">
@@ -427,12 +432,6 @@ function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
             </div>
           );
         })}
-        {remaining > 0 && (
-          <div className="db-perf-more-chip" onClick={onViewAll}>
-            <span>+{remaining} more</span>
-            <ChevronRight size={14} />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -461,12 +460,10 @@ function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
         ? (Number(b.obtainedMarks) / Number(b.totalMarks)) * 100 : b.attendanceRate);
     return getPerfScore(rawA as number | undefined).scorePct - getPerfScore(rawB as number | undefined).scorePct;
   });
-  const preview = sorted.slice(0, 8);
-  const remaining = sorted.length - preview.length;
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
-        {preview.map((s, i) => {
+        {sorted.map((s, i) => {
           const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
             (s.obtainedMarks != null && s.totalMarks != null && s.totalMarks > 0
               ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100
@@ -518,6 +515,13 @@ function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
                     <strong>#{s.rank}</strong>
                   </div>
                 )}
+                {s.obtainedMarks !== undefined && s.totalMarks !== undefined && (
+                  <div className="db-perf-stat-h">
+                    <BookCheck size={11} />
+                    <span>Marks</span>
+                    <strong>{s.obtainedMarks}/{s.totalMarks}</strong>
+                  </div>
+                )}
               </div>
               <div className="db-perf-score-bar-wrap">
                 <div className="db-perf-score-bar-track">
@@ -528,12 +532,6 @@ function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
             </div>
           );
         })}
-        {remaining > 0 && (
-          <div className="db-perf-more-chip" onClick={onViewAll}>
-            <span>+{remaining} more</span>
-            <ChevronRight size={14} />
-          </div>
-        )}
       </div>
     </div>
   );
