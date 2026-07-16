@@ -285,11 +285,11 @@ function DashboardSkeleton() {
         <div className="db-att-breakdown glass-card">
           <div className="shimmer shimmer-text short" style={{ marginBottom: '1.5rem', width: '150px' }}></div>
           {Array.from({ length: 4 }).map((_, i) => (
-             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-               <div className="shimmer shimmer-text" style={{ width: '80px', margin: 0 }}></div>
-               <div className="shimmer shimmer-block" style={{ height: '8px', flex: 1 }}></div>
-               <div className="shimmer shimmer-text" style={{ width: '40px', margin: 0 }}></div>
-             </div>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="shimmer shimmer-text" style={{ width: '80px', margin: 0 }}></div>
+              <div className="shimmer shimmer-block" style={{ height: '8px', flex: 1 }}></div>
+              <div className="shimmer shimmer-text" style={{ width: '40px', margin: 0 }}></div>
+            </div>
           ))}
         </div>
       </div>
@@ -307,8 +307,8 @@ function DashboardSkeleton() {
                 <div key={j} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div className="shimmer shimmer-circle" style={{ width: '40px', height: '40px', flexShrink: 0 }}></div>
                   <div style={{ flex: 1 }}>
-                     <div className="shimmer shimmer-text" style={{ width: '80%' }}></div>
-                     <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                    <div className="shimmer shimmer-text" style={{ width: '80%' }}></div>
+                    <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
                   </div>
                 </div>
               ))}
@@ -330,9 +330,9 @@ function getPerfScore(raw: number | undefined): { scoreNum: number; scorePct: nu
 
 function getTier(pct: number): { tier: string; tierLabel: string; tierColor: string } {
   if (pct >= 90) return { tier: 'excellent', tierLabel: 'Excellent', tierColor: '#10b981' };
-  if (pct >= 75) return { tier: 'good',      tierLabel: 'Good',      tierColor: '#6366f1' };
-  if (pct >= 50) return { tier: 'average',   tierLabel: 'Average',   tierColor: '#f59e0b' };
-  return           { tier: 'poor',      tierLabel: 'Poor',      tierColor: '#ef4444' };
+  if (pct >= 75) return { tier: 'good', tierLabel: 'Good', tierColor: '#6366f1' };
+  if (pct >= 50) return { tier: 'average', tierLabel: 'Average', tierColor: '#f59e0b' };
+  return { tier: 'poor', tierLabel: 'Poor', tierColor: '#ef4444' };
 }
 
 interface PerfTeacherCardsProps {
@@ -522,7 +522,7 @@ interface PerfDetailModalProps {
   year: number;
   onClose: () => void;
 }
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 function PerfDetailModal({ tab, onTabChange, teacherData, studentData, month, year, onClose }: PerfDetailModalProps) {
   const [search, setSearch] = useState('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -1193,7 +1193,7 @@ export default function DashboardPage() {
 
           <div className="db-perf-controls">
             {perfLoading && <Loader2 size={15} className="db-spinner" style={{ color: '#6366f1' }} />}
-            
+
             {perfTab === 'student' && (
               <>
                 <div className="db-perf-select-wrap">
@@ -1229,8 +1229,8 @@ export default function DashboardPage() {
                 onChange={(e) => setPerfMonth(Number(e.target.value))}
               >
                 {[
-                  'January','February','March','April','May','June',
-                  'July','August','September','October','November','December'
+                  'January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'
                 ].map((m, i) => (
                   <option key={m} value={i + 1}>{m}</option>
                 ))}
@@ -1279,7 +1279,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginBottom: '1rem' }}>
-                      {[0,1,2].map(j => <div key={j} className="shimmer shimmer-circle" style={{ width: '56px', height: '56px' }}></div>)}
+                      {[0, 1, 2].map(j => <div key={j} className="shimmer shimmer-circle" style={{ width: '56px', height: '56px' }}></div>)}
                     </div>
                     <div className="shimmer shimmer-block" style={{ height: '8px', borderRadius: '999px' }}></div>
                   </div>

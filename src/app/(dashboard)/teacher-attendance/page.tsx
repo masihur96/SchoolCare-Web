@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, ChevronLeft, ChevronRight, Loader2, Download, Check, Clock } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, Loader2, Download, Check, Clock, Plus } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import CreateTeacherAttendanceModal from '@/components/CreateTeacherAttendanceModal';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -59,6 +60,7 @@ export default function TeacherAttendancePage() {
   const [endDate, setEndDate] = useState(today);
 
   const [showFilters, setShowFilters] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const getUserSchoolId = () => {
     try {
@@ -254,9 +256,14 @@ export default function TeacherAttendancePage() {
           </h1>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>View and export daily attendance for teachers</p>
         </div>
-        <button className="btn btn-primary gap-2" onClick={exportToPDF} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
-          <Download size={18} /> Export PDF
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button className="btn btn-primary gap-2" onClick={() => setShowCreateModal(true)} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
+            <Plus size={18} /> Create Attendance
+          </button>
+          <button className="btn btn-secondary gap-2" onClick={exportToPDF} style={{ border: '1px solid var(--border)' }}>
+            <Download size={18} /> Export PDF
+          </button>
+        </div>
       </div>
 
       <div className="data-table-wrapper glass-card">
@@ -435,6 +442,13 @@ export default function TeacherAttendancePage() {
           </div>
         )}
       </div>
+      
+      {showCreateModal && (
+        <CreateTeacherAttendanceModal 
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={fetchAttendance}
+        />
+      )}
     </div>
   );
 }
