@@ -85,49 +85,42 @@ interface DashboardData {
 // ─── Performance Types ────────────────────────────────────────────────────────
 interface TeacherPerformance {
   teacherId?: string;
-  teacherName?: string;
   name?: string;
-  subject?: string;
-  subjectName?: string;
-  totalClasses?: number;
-  classesAttended?: number;
-  attendanceRate?: number;
-  homeworkAssigned?: number;
-  homeworkChecked?: number;
-  totalStudents?: number;
-  presentStudents?: number;
-  absentStudents?: number;
-  studentAttendanceRate?: number;
-  performanceScore?: number;
-  rating?: number;
-  grade?: string;
-  month?: number;
-  year?: number;
-  // catch-all for any extra fields
+  designation?: string;
+  attendance?: {
+    totalWorkingDays: number;
+    presentDays: number;
+    percentage: number;
+  };
+  homework?: {
+    totalProvided: number;
+    target: number;
+    percentage: number;
+  };
   [key: string]: unknown;
 }
 
 interface StudentPerformance {
   studentId?: string;
-  studentName?: string;
   name?: string;
-  className?: string;
-  class?: string;
-  section?: string;
-  rollNumber?: string | number;
-  totalClasses?: number;
-  attendedClasses?: number;
-  attendanceRate?: number;
-  averageGrade?: number;
-  averageScore?: number;
-  totalMarks?: number;
-  obtainedMarks?: number;
-  performanceScore?: number;
-  grade?: string;
-  rank?: number;
-  month?: number;
-  year?: number;
-  // catch-all for any extra fields
+  rollNumber?: string | number | null;
+  class?: { name: string } | null;
+  section?: { name: string } | null;
+  attendance?: {
+    totalWorkingDays: number;
+    presentDays: number;
+    percentage: number;
+  };
+  homework?: {
+    totalAssigned: number;
+    totalDone: number;
+    percentage: number;
+  };
+  exams?: {
+    totalMarksObtained: number;
+    totalMaximumMarks: number;
+    percentage: number;
+  };
   [key: string]: unknown;
 }
 
@@ -355,27 +348,23 @@ function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
       </div>
     );
   }
-  // Sort ascending by score
+  // Sort descending by score
   const sorted = [...data].sort((a, b) => {
-    const sa = getPerfScore(a.performanceScore ?? a.rating ?? a.attendanceRate).scorePct;
-    const sb = getPerfScore(b.performanceScore ?? b.rating ?? b.attendanceRate).scorePct;
-    return sa - sb;
+    const sa = ((a.attendance?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 2;
+    const sb = ((b.attendance?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 2;
+    return sb - sa;
   });
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
         {sorted.map((t, i) => {
-          const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
-          const { scorePct, scoreDisplay } = getPerfScore(raw);
+          const attPct = t.attendance?.percentage ?? 0;
+          const hwPct = t.homework?.percentage ?? 0;
+          const scorePct = (attPct + hwPct) / 2;
+          const { scoreDisplay } = getPerfScore(scorePct);
           const { tier, tierLabel, tierColor } = getTier(scorePct);
-          const name = t.teacherName || t.name || `Teacher ${i + 1}`;
-          const subject = t.subject || t.subjectName || '—';
-          const attRaw = typeof t.attendanceRate === 'number' ? t.attendanceRate
-            : (t.classesAttended && t.totalClasses ? t.classesAttended / t.totalClasses : undefined);
-          const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
-          const hwTotal = t.homeworkAssigned ?? 0;
-          const hwChecked = t.homeworkChecked ?? 0;
-          const hwPct = hwTotal > 0 ? ((hwChecked / hwTotal) * 100).toFixed(0) : null;
+          const name = t.name || `Teacher ${i + 1}`;
+          const designation = t.designation || '—';
           return (
             <div key={t.teacherId ?? i} className={`db-perf-card-h db-perf-card-h-${tier}`}>
               <div className="db-perf-card-h-top">
@@ -384,44 +373,26 @@ function PerfTeacherCards({ data, onViewAll }: PerfTeacherCardsProps) {
                 </div>
                 <div className="db-perf-card-h-meta">
                   <p className="db-perf-name-h">{name}</p>
-                  <p className="db-perf-sub-h">{subject}</p>
+                  <p className="db-perf-sub-h">{designation}</p>
                 </div>
                 <span className="db-perf-badge-h" style={{ background: `${tierColor}1a`, color: tierColor, borderColor: `${tierColor}40` }}>{tierLabel}</span>
               </div>
               <div className="db-perf-ring-row">
                 <PerfRing pct={scorePct} color={tierColor} label="Score" />
-                {attPct && <PerfRing pct={parseFloat(attPct)} color="#06b6d4" label="Attend" />}
-                {hwPct && <PerfRing pct={parseFloat(hwPct)} color="#8b5cf6" label="HW" />}
+                <PerfRing pct={attPct} color="#06b6d4" label="Attend" />
+                <PerfRing pct={hwPct} color="#8b5cf6" label="HW" />
               </div>
               <div className="db-perf-card-h-stats">
-                {attPct && (
-                  <div className="db-perf-stat-h">
-                    <UserCheck size={11} />
-                    <span>Attendance</span>
-                    <strong>{attPct}%</strong>
-                  </div>
-                )}
-                {hwTotal > 0 && (
-                  <div className="db-perf-stat-h">
-                    <BookCheck size={11} />
-                    <span>Homework</span>
-                    <strong>{hwChecked}/{hwTotal}</strong>
-                  </div>
-                )}
-                {t.totalStudents !== undefined && (
-                  <div className="db-perf-stat-h">
-                    <Users size={11} />
-                    <span>Students</span>
-                    <strong>{t.totalStudents}</strong>
-                  </div>
-                )}
-                {t.classesAttended !== undefined && t.totalClasses !== undefined && (
-                  <div className="db-perf-stat-h">
-                    <Calendar size={11} />
-                    <span>Classes</span>
-                    <strong>{t.classesAttended}/{t.totalClasses}</strong>
-                  </div>
-                )}
+                <div className="db-perf-stat-h">
+                  <UserCheck size={11} />
+                  <span>Attendance</span>
+                  <strong>{t.attendance?.presentDays ?? 0}/{t.attendance?.totalWorkingDays ?? 0}</strong>
+                </div>
+                <div className="db-perf-stat-h">
+                  <BookCheck size={11} />
+                  <span>Homework</span>
+                  <strong>{t.homework?.totalProvided ?? 0}/{t.homework?.target ?? 0}</strong>
+                </div>
               </div>
               <div className="db-perf-score-bar-wrap">
                 <div className="db-perf-score-bar-track">
@@ -450,34 +421,27 @@ function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
       </div>
     );
   }
-  // Sort ascending by score
+  // Sort descending by score
   const sorted = [...data].sort((a, b) => {
-    const rawA = a.performanceScore ?? a.averageGrade ?? a.averageScore ??
-      (a.obtainedMarks != null && a.totalMarks != null && Number(a.totalMarks) > 0
-        ? (Number(a.obtainedMarks) / Number(a.totalMarks)) * 100 : a.attendanceRate);
-    const rawB = b.performanceScore ?? b.averageGrade ?? b.averageScore ??
-      (b.obtainedMarks != null && b.totalMarks != null && Number(b.totalMarks) > 0
-        ? (Number(b.obtainedMarks) / Number(b.totalMarks)) * 100 : b.attendanceRate);
-    return getPerfScore(rawA as number | undefined).scorePct - getPerfScore(rawB as number | undefined).scorePct;
+    const sa = a.exams?.percentage ?? ((a.attendance?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 2;
+    const sb = b.exams?.percentage ?? ((b.attendance?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 2;
+    return sb - sa;
   });
   return (
     <div className="db-perf-hscroll-wrap">
       <div className="db-perf-hscroll-inner">
         {sorted.map((s, i) => {
-          const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
-            (s.obtainedMarks != null && s.totalMarks != null && s.totalMarks > 0
-              ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100
-              : s.attendanceRate);
-          const { scorePct, scoreDisplay } = getPerfScore(rawScore as number | undefined);
+          const examPct = s.exams?.percentage ?? 0;
+          const attPct = s.attendance?.percentage ?? 0;
+          const hwPct = s.homework?.percentage ?? 0;
+          const scorePct = s.exams?.totalMaximumMarks ? examPct : ((attPct + hwPct) / 2);
+          const { scoreDisplay } = getPerfScore(scorePct);
           const { tier, tierLabel, tierColor } = getTier(scorePct);
-          const name = s.studentName || s.name || `Student ${i + 1}`;
-          const cls = [s.className || s.class, s.section].filter(Boolean).join(' · ') || '—';
-          const attRaw = typeof s.attendanceRate === 'number' ? s.attendanceRate
-            : (s.attendedClasses && s.totalClasses ? s.attendedClasses / s.totalClasses : undefined);
-          const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
-          const gradeStr = s.grade ||
-            (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' :
-             scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
+          const name = s.name || `Student ${i + 1}`;
+          const clsName = s.class?.name || '';
+          const secName = s.section?.name || '';
+          const cls = [clsName, secName].filter(Boolean).join(' · ') || '—';
+          const gradeStr = scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' : scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F';
           return (
             <div key={s.studentId ?? i} className={`db-perf-card-h db-perf-card-h-${tier}`}>
               <div className="db-perf-card-h-top">
@@ -492,36 +456,25 @@ function PerfStudentCards({ data, onViewAll }: PerfStudentCardsProps) {
               </div>
               <div className="db-perf-ring-row">
                 <PerfRing pct={scorePct} color={tierColor} label="Score" />
-                {attPct && <PerfRing pct={parseFloat(attPct)} color="#06b6d4" label="Attend" />}
-                <PerfRing pct={scorePct >= 90 ? 100 : scorePct >= 80 ? 85 : scorePct >= 70 ? 72 : scorePct >= 60 ? 62 : scorePct >= 50 ? 52 : 30} color="#f59e0b" label="Grade" centerText={gradeStr} />
+                <PerfRing pct={attPct} color="#06b6d4" label="Attend" />
+                <PerfRing pct={hwPct} color="#8b5cf6" label="HW" />
               </div>
               <div className="db-perf-card-h-stats">
-                {attPct && (
-                  <div className="db-perf-stat-h">
-                    <UserCheck size={11} />
-                    <span>Attendance</span>
-                    <strong>{attPct}%</strong>
-                  </div>
-                )}
+                <div className="db-perf-stat-h">
+                  <UserCheck size={11} />
+                  <span>Attendance</span>
+                  <strong>{s.attendance?.presentDays ?? 0}/{s.attendance?.totalWorkingDays ?? 0}</strong>
+                </div>
                 <div className="db-perf-stat-h">
                   <Star size={11} />
                   <span>Grade</span>
                   <strong>{gradeStr}</strong>
                 </div>
-                {s.rank !== undefined && (
-                  <div className="db-perf-stat-h">
-                    <Award size={11} />
-                    <span>Rank</span>
-                    <strong>#{s.rank}</strong>
-                  </div>
-                )}
-                {s.obtainedMarks !== undefined && s.totalMarks !== undefined && (
-                  <div className="db-perf-stat-h">
-                    <BookCheck size={11} />
-                    <span>Marks</span>
-                    <strong>{s.obtainedMarks}/{s.totalMarks}</strong>
-                  </div>
-                )}
+                <div className="db-perf-stat-h">
+                  <BookCheck size={11} />
+                  <span>Marks</span>
+                  <strong>{s.exams?.totalMarksObtained ?? 0}/{s.exams?.totalMaximumMarks ?? 0}</strong>
+                </div>
               </div>
               <div className="db-perf-score-bar-wrap">
                 <div className="db-perf-score-bar-track">
@@ -572,23 +525,22 @@ interface PerfDetailModalProps {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 function PerfDetailModal({ tab, onTabChange, teacherData, studentData, month, year, onClose }: PerfDetailModalProps) {
   const [search, setSearch] = useState('');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const q = search.trim().toLowerCase();
 
   // Teacher rows
   const teacherRows = teacherData
     .map((t, i) => {
-      const raw = t.performanceScore ?? t.rating ?? t.attendanceRate;
-      const { scorePct, scoreDisplay } = getPerfScore(raw);
+      const attPct = t.attendance?.percentage ?? 0;
+      const hwPct = t.homework?.percentage ?? 0;
+      const scorePct = (attPct + hwPct) / 2;
+      const { scoreDisplay } = getPerfScore(scorePct);
       const { tier, tierLabel, tierColor } = getTier(scorePct);
-      const name = t.teacherName || t.name || `Teacher ${i + 1}`;
-      const subject = t.subject || t.subjectName || '—';
-      const attRaw = typeof t.attendanceRate === 'number' ? t.attendanceRate
-        : (t.classesAttended && t.totalClasses ? t.classesAttended / t.totalClasses : undefined);
-      const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
-      const hwTotal = t.homeworkAssigned ?? 0;
-      const hwChecked = t.homeworkChecked ?? 0;
-      return { name, subject, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, hwTotal, hwChecked, totalStudents: t.totalStudents };
+      const name = t.name || `Teacher ${i + 1}`;
+      const subject = t.designation || '—';
+      const hwTotal = t.homework?.target ?? 0;
+      const hwChecked = t.homework?.totalProvided ?? 0;
+      return { name, subject, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, hwTotal, hwChecked, totalStudents: undefined };
     })
     .filter(r => !q || r.name.toLowerCase().includes(q) || r.subject.toLowerCase().includes(q))
     .sort((a, b) => sortDir === 'asc' ? a.scorePct - b.scorePct : b.scorePct - a.scorePct);
@@ -596,18 +548,18 @@ function PerfDetailModal({ tab, onTabChange, teacherData, studentData, month, ye
   // Student rows
   const studentRows = studentData
     .map((s, i) => {
-      const rawScore = s.performanceScore ?? s.averageGrade ?? s.averageScore ??
-        (s.obtainedMarks != null && s.totalMarks != null && Number(s.totalMarks) > 0
-          ? (Number(s.obtainedMarks) / Number(s.totalMarks)) * 100 : s.attendanceRate);
-      const { scorePct, scoreDisplay } = getPerfScore(rawScore as number | undefined);
+      const examPct = s.exams?.percentage ?? 0;
+      const attPct = s.attendance?.percentage ?? 0;
+      const hwPct = s.homework?.percentage ?? 0;
+      const scorePct = s.exams?.totalMaximumMarks ? examPct : ((attPct + hwPct) / 2);
+      const { scoreDisplay } = getPerfScore(scorePct);
       const { tier, tierLabel, tierColor } = getTier(scorePct);
-      const name = s.studentName || s.name || `Student ${i + 1}`;
-      const cls = [s.className || s.class, s.section].filter(Boolean).join(' · ') || '—';
-      const attRaw = typeof s.attendanceRate === 'number' ? s.attendanceRate
-        : (s.attendedClasses && s.totalClasses ? s.attendedClasses / s.totalClasses : undefined);
-      const attPct = attRaw !== undefined ? (attRaw > 1 ? attRaw : attRaw * 100).toFixed(1) : null;
-      const gradeStr = s.grade || (scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' : scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F');
-      return { name, cls, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, gradeStr, rank: s.rank };
+      const name = s.name || `Student ${i + 1}`;
+      const clsName = s.class?.name || '';
+      const secName = s.section?.name || '';
+      const cls = [clsName, secName].filter(Boolean).join(' · ') || '—';
+      const gradeStr = scorePct >= 90 ? 'A+' : scorePct >= 80 ? 'A' : scorePct >= 70 ? 'B' : scorePct >= 60 ? 'C' : scorePct >= 50 ? 'D' : 'F';
+      return { name, cls, scorePct, scoreDisplay, tier, tierLabel, tierColor, attPct, gradeStr, rank: undefined };
     })
     .filter(r => !q || r.name.toLowerCase().includes(q) || r.cls.toLowerCase().includes(q))
     .sort((a, b) => sortDir === 'asc' ? a.scorePct - b.scorePct : b.scorePct - a.scorePct);
