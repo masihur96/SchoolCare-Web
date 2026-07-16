@@ -743,6 +743,8 @@ export default function DashboardPage() {
   const [perfYear, setPerfYear] = useState(now.getFullYear());
   const [teacherPerf, setTeacherPerf] = useState<TeacherPerformance[]>([]);
   const [studentPerf, setStudentPerf] = useState<StudentPerformance[]>([]);
+  const [perfClassFilter, setPerfClassFilter] = useState('');
+  const [perfSectionFilter, setPerfSectionFilter] = useState('');
   const [perfLoading, setPerfLoading] = useState(false);
   const [perfError, setPerfError] = useState('');
   const [showPerfModal, setShowPerfModal] = useState(false);
@@ -896,6 +898,14 @@ export default function DashboardPage() {
   const { attendTeacher, attendStudent, recentNotice, recentHomework, currentExam } = data;
   const today = new Date(attendTeacher.date).toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  const perfClasses = Array.from(new Set(studentPerf.map(s => s.class?.name).filter(Boolean))) as string[];
+  const perfSections = Array.from(new Set(studentPerf.map(s => s.section?.name).filter(Boolean))) as string[];
+  const filteredStudentPerf = studentPerf.filter(s => {
+    if (perfClassFilter && s.class?.name !== perfClassFilter) return false;
+    if (perfSectionFilter && s.section?.name !== perfSectionFilter) return false;
+    return true;
   });
 
   return (
@@ -1183,6 +1193,34 @@ export default function DashboardPage() {
 
           <div className="db-perf-controls">
             {perfLoading && <Loader2 size={15} className="db-spinner" style={{ color: '#6366f1' }} />}
+            
+            {perfTab === 'student' && (
+              <>
+                <div className="db-perf-select-wrap">
+                  <select
+                    className="db-perf-select"
+                    value={perfClassFilter}
+                    onChange={(e) => setPerfClassFilter(e.target.value)}
+                  >
+                    <option value="">All Classes</option>
+                    {perfClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="db-perf-select-icon" />
+                </div>
+                <div className="db-perf-select-wrap">
+                  <select
+                    className="db-perf-select"
+                    value={perfSectionFilter}
+                    onChange={(e) => setPerfSectionFilter(e.target.value)}
+                  >
+                    <option value="">All Sections</option>
+                    {perfSections.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="db-perf-select-icon" />
+                </div>
+              </>
+            )}
+
             <div className="db-perf-select-wrap">
               <select
                 id="perf-month"
@@ -1261,7 +1299,7 @@ export default function DashboardPage() {
           />
         ) : (
           <PerfStudentCards
-            data={studentPerf}
+            data={filteredStudentPerf}
             onViewAll={() => { setPerfModalTab('student'); setShowPerfModal(true); }}
           />
         )}
@@ -1273,7 +1311,7 @@ export default function DashboardPage() {
           tab={perfModalTab}
           onTabChange={setPerfModalTab}
           teacherData={teacherPerf}
-          studentData={studentPerf}
+          studentData={filteredStudentPerf}
           month={perfMonth}
           year={perfYear}
           onClose={() => setShowPerfModal(false)}
