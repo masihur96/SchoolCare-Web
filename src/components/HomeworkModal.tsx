@@ -36,6 +36,10 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
   const [studentId, setStudentId] = useState('All');
   const [students, setStudents] = useState<any[]>([]);
   
+  const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
+  const [homeworkList, setHomeworkList] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+
   const [isExisting, setIsExisting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -73,6 +77,41 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
   }, [routine.sectionEntity?.id]);
 
   useEffect(() => {
+    if (viewMode !== 'list') return;
+    const fetchAllHomeworks = async () => {
+      const schoolId = getUserSchoolId();
+      if (!schoolId) return;
+      setLoadingList(true);
+      try {
+        const queryParams = new URLSearchParams({
+          classId: routine.classEntity?.id || '',
+          sectionId: routine.sectionEntity?.id || '',
+          subjectId: routine.subjectEntity?.id || '',
+          schoolId: schoolId
+        });
+        const headers = { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` };
+        const res = await fetch(`${API_BASE_URL}/admin/homework?${queryParams.toString()}`, { headers });
+        const json = await res.json();
+        let records: any[] = [];
+        if (json.data?.data && Array.isArray(json.data.data)) {
+          records = json.data.data;
+        } else if (json.data && Array.isArray(json.data)) {
+          records = json.data;
+        } else if (Array.isArray(json)) {
+          records = json;
+        }
+        setHomeworkList(records);
+      } catch (err) {
+        console.error("Failed to fetch homeworks:", err);
+      } finally {
+        setLoadingList(false);
+      }
+    };
+    fetchAllHomeworks();
+  }, [viewMode, routine.classEntity?.id, routine.sectionEntity?.id, routine.subjectEntity?.id]);
+
+  useEffect(() => {
+    if (viewMode !== 'form') return;
     const fetchExistingHomework = async () => {
       if (!dueDate) return;
       const schoolId = getUserSchoolId();
@@ -126,7 +165,7 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
     };
     
     fetchExistingHomework();
-  }, [dueDate, routine.classEntity?.id, routine.sectionEntity?.id, routine.subjectEntity?.id, studentId]);
+  }, [dueDate, routine.classEntity?.id, routine.sectionEntity?.id, routine.subjectEntity?.id, studentId, viewMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,8 +213,11 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
       
       const json = await res.json();
       if (res.ok && (json.statusCode === 201 || json.statusCode === 200)) {
-        setSuccessMsg('Homework assigned successfully!');
-        setTimeout(() => onClose(), 1500);
+        setSuccessMsg('Homework saved successfully!');
+        setTimeout(() => {
+          setViewMode('list');
+          setSuccessMsg('');
+        }, 1500);
       } else {
         setErrorMsg(json.message || 'Failed to assign homework.');
       }
@@ -200,8 +242,10 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Assign Homework</h2>
-                  {isExisting && !loading && (
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                    {viewMode === 'list' ? 'Homework List' : 'Assign Homework'}
+                  </h2>
+                  {viewMode === 'form' && isExisting && !loading && (
                     <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.25rem 0.6rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                       <Check size={14} /> Already Assigned
                     </span>
@@ -233,91 +277,142 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
             </div>
           )}
 
-          <form id="homework-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Homework Title <span style={{ color: 'var(--destructive)' }}>*</span></label>
-              <input 
-                type="text" 
-                className="input" 
-                placeholder="e.g. Mathematics Chapter 3 – Algebra"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Description / Instructions <span style={{ color: 'var(--destructive)' }}>*</span></label>
-              <textarea 
-                className="input" 
-                placeholder="e.g. Solve exercises 1 to 10 from Chapter 3."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', resize: 'vertical' }}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Student</label>
-                <select 
-                  className="input" 
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
-                >
-                  <option value="All">All Students</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNumber || 'N/A'})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status</label>
-                <select 
-                  className="input" 
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
-                >
-                  <option value="Assigned">Assigned</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Late">Late</option>
-                </select>
-              </div>
-
-              <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Due Date <span style={{ color: 'var(--destructive)' }}>*</span></label>
+          {viewMode === 'list' ? (
+             <div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                  <button className="btn btn-primary" onClick={() => {
+                     setTitle('');
+                     setDescription('');
+                     setDueDate(new Date().toISOString().split('T')[0]);
+                     setStatus('Assigned');
+                     setStudentId('All');
+                     setIsExisting(false);
+                     setViewMode('form');
+                  }}>Assign New Homework</button>
+                </div>
+                
+                {loadingList ? (
+                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 className="animate-spin" style={{ color: 'var(--primary)' }} /></div>
+                ) : homeworkList.length === 0 ? (
+                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted-foreground)', background: 'var(--card)', borderRadius: '0.5rem', border: '1px dashed var(--border)' }}>
+                     No homework assigned yet for this routine.
+                   </div>
+                ) : (
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                     {homeworkList.map(hw => (
+                        <div key={hw.id} style={{ padding: '1.25rem', border: '1px solid var(--border)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+                           <div>
+                             <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--foreground)' }}>{hw.title}</div>
+                             <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.4rem', display: 'flex', gap: '1rem' }}>
+                               <span>Due: {new Date(hw.dueDate).toLocaleDateString()}</span>
+                               <span>Status: <strong style={{ color: hw.status === 'Completed' ? '#10b981' : hw.status === 'Late' ? 'var(--destructive)' : 'var(--primary)' }}>{hw.status || 'Assigned'}</strong></span>
+                             </div>
+                           </div>
+                           <button className="btn" onClick={() => {
+                              setTitle(hw.title || '');
+                              setDescription(hw.description || '');
+                              setDueDate(hw.dueDate);
+                              setStatus(hw.status || 'Assigned');
+                              setStudentId(hw.studentId || 'All');
+                              setIsExisting(true);
+                              setViewMode('form');
+                           }} style={{ padding: '0.5rem 1.25rem', background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}>
+                              Edit
+                           </button>
+                        </div>
+                     ))}
+                   </div>
+                )}
+             </div>
+          ) : (
+            <form id="homework-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Homework Title <span style={{ color: 'var(--destructive)' }}>*</span></label>
                 <input 
-                  type="date" 
+                  type="text" 
                   className="input" 
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  placeholder="e.g. Mathematics Chapter 3 – Algebra"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
                   required
                 />
               </div>
-            </div>
 
-          </form>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Description / Instructions <span style={{ color: 'var(--destructive)' }}>*</span></label>
+                <textarea 
+                  className="input" 
+                  placeholder="e.g. Solve exercises 1 to 10 from Chapter 3."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', resize: 'vertical' }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Student</label>
+                  <select 
+                    className="input" 
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                  >
+                    <option value="All">All Students</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNumber || 'N/A'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status</label>
+                  <select 
+                    className="input" 
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                  >
+                    <option value="Assigned">Assigned</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Late">Late</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Due Date <span style={{ color: 'var(--destructive)' }}>*</span></label>
+                  <input 
+                    type="date" 
+                    className="input" 
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                    required
+                  />
+                </div>
+              </div>
+
+            </form>
+          )}
 
         </div>
         
         {/* Footer */}
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem', background: 'var(--card)' }}>
-          <button type="button" className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
-            Cancel
-          </button>
-          <button type="submit" form="homework-form" className="btn btn-primary" disabled={submitting || loading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: (submitting || loading) ? 0.7 : 1 }}>
-            {(submitting || loading) ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={18} />}
-            {submitting ? 'Assigning...' : isExisting ? 'Update Homework' : 'Assign Homework'}
-          </button>
-        </div>
+        {viewMode === 'form' && (
+          <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem', background: 'var(--card)' }}>
+            <button type="button" className="btn" onClick={() => setViewMode('list')} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
+              Cancel
+            </button>
+            <button type="submit" form="homework-form" className="btn btn-primary" disabled={submitting || loading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: (submitting || loading) ? 0.7 : 1 }}>
+              {(submitting || loading) ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={18} />}
+              {submitting ? 'Saving...' : isExisting ? 'Update Homework' : 'Assign Homework'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
