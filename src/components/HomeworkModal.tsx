@@ -32,6 +32,9 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState('Assigned');
+  const [studentId, setStudentId] = useState('All');
+  const [students, setStudents] = useState<any[]>([]);
   
   const [isExisting, setIsExisting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -45,6 +48,29 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
       return null;
     }
   };
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      const schoolId = getUserSchoolId();
+      if (!schoolId) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/users?role=student&limit=1000&schoolId=${schoolId}`, {
+          headers: { 'Authorization': `Bearer ${getApiToken()}` }
+        });
+        const json = await res.json();
+        let allStudents = json.data?.data || json.data || [];
+        const sectionStudents = allStudents.filter((st: any) => 
+          st.sections?.some((sec: any) => sec.id === routine.sectionEntity?.id)
+        );
+        setStudents(sectionStudents);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    if (routine.sectionEntity?.id) {
+      fetchStudents();
+    }
+  }, [routine.sectionEntity?.id]);
 
   useEffect(() => {
     const fetchExistingHomework = async () => {
@@ -63,6 +89,9 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
           date: dueDate,
           schoolId: schoolId
         });
+        if (studentId !== 'All') {
+          queryParams.append('studentId', studentId);
+        }
         
         const headers = { 'accept': '*/*', 'Authorization': `Bearer ${getApiToken()}` };
         const res = await fetch(`${API_BASE_URL}/admin/homework?${queryParams.toString()}`, { headers });
@@ -81,10 +110,12 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
           const hw = records[0];
           setTitle(hw.title || '');
           setDescription(hw.description || '');
+          if (hw.status) setStatus(hw.status);
           setIsExisting(true);
         } else {
           setTitle('');
           setDescription('');
+          setStatus('Assigned');
           setIsExisting(false);
         }
       } catch (err) {
@@ -95,7 +126,7 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
     };
     
     fetchExistingHomework();
-  }, [dueDate, routine.classEntity?.id, routine.sectionEntity?.id, routine.subjectEntity?.id]);
+  }, [dueDate, routine.classEntity?.id, routine.sectionEntity?.id, routine.subjectEntity?.id, studentId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +145,7 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
     setErrorMsg('');
     setSuccessMsg('');
     
-    const payload = {
+    const payload: any = {
       classId: routine.classEntity?.id,
       subjectId: routine.subjectEntity?.id,
       teacherId: routine.teacherEntity?.id,
@@ -122,8 +153,13 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
       description,
       dueDate,
       sectionId: routine.sectionEntity?.id,
-      schoolId
+      schoolId,
+      status
     };
+    
+    if (studentId !== 'All') {
+      payload.studentId = studentId;
+    }
     
     try {
       const res = await fetch(`${API_BASE_URL}/admin/homework`, {
@@ -224,17 +260,50 @@ export default function HomeworkModal({ routine, onClose }: HomeworkModalProps) 
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Due Date <span style={{ color: 'var(--destructive)' }}>*</span></label>
-              <input 
-                type="date" 
-                className="input" 
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                style={{ width: '100%', maxWidth: '250px', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
-                required
-              />
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Student</label>
+                <select 
+                  className="input" 
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                >
+                  <option value="All">All Students</option>
+                  {students.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNumber || 'N/A'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status</label>
+                <select 
+                  className="input" 
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                >
+                  <option value="Assigned">Assigned</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Late">Late</option>
+                </select>
+              </div>
+
+              <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Due Date <span style={{ color: 'var(--destructive)' }}>*</span></label>
+                <input 
+                  type="date" 
+                  className="input" 
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                  required
+                />
+              </div>
             </div>
+
           </form>
 
         </div>
