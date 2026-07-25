@@ -121,7 +121,7 @@ const sections = [
     title: '11. Contact Us',
     content: [
       'If you have any questions about these Terms and Conditions, please contact us:',
-      'Email: schoolcare2026@gmail.com\nSupport: support@schoolcare.io\nAddress: SchoolCare EMS, Educational Technology Division',
+      <>Email: <a href="mailto:schoolcare2026@gmail.com" style={{color: '#818cf8', textDecoration: 'none'}}>schoolcare2026@gmail.com</a><br/>Support: <a href="mailto:schoolcare2026@gmail.com" style={{color: '#818cf8', textDecoration: 'none'}}>schoolcare2026@gmail.com</a><br/>Address: SchoolCare EMS, Educational Technology Division</>,
       'We will endeavour to respond to all enquiries within 5 business days.',
     ],
   },
