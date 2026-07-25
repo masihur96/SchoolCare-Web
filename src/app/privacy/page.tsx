@@ -91,7 +91,7 @@ const sections = [
     content: [
       'Depending on your location, you may have the following rights regarding your personal data:',
       'Access: Request a copy of the personal data we hold about you.\nCorrection: Request that we correct inaccurate or incomplete data.\nDeletion: Request that we delete your personal data ("right to be forgotten").\nPortability: Request that we provide your data in a structured, machine-readable format.\nRestriction: Request that we restrict the processing of your data in certain circumstances.\nObjection: Object to our processing of your data where we rely on legitimate interests.',
-      'To exercise any of these rights, please contact us at privacy@schoolcare.io. We will respond to your request within 30 days (or sooner as required by law).',
+      'To exercise any of these rights, please contact us at schoolcare2026@gmail.com. We will respond to your request within 30 days (or sooner as required by law).',
       'If you believe that we have not adequately addressed your privacy concerns, you have the right to lodge a complaint with the relevant data protection authority in your jurisdiction.',
     ],
   },
@@ -144,7 +144,7 @@ const sections = [
     title: '12. Contact & Data Protection Officer',
     content: [
       'If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:',
-      'Privacy & Data Protection: privacy@schoolcare.io\nGeneral Support: support@schoolcare.io\nLegal Enquiries: legal@schoolcare.io',
+      'Privacy & Data Protection:schoolcare2026@gmail.com\nGeneral Support: support@schoolcare.io\nLegal Enquiries: schoolcare2026@gmail.com',
       'For users in the EEA or UK, you may also contact our Data Protection Officer (DPO) directly. We will respond to all enquiries within 5 business days and to data subject requests within 30 days.',
     ],
   },
