@@ -411,8 +411,8 @@ export default function RegisterPage() {
             {/* Footer */}
             <p className="reg-terms">
               By creating an account, you agree to our{' '}
-              <Link href="#">Terms of Service</Link> and{' '}
-              <Link href="#">Privacy Policy</Link>.
+              <Link href="/terms">Terms of Service</Link> and{' '}
+              <Link href="/privacy">Privacy Policy</Link>.
             </p>
           </div>
         </div>
