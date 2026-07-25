@@ -246,7 +246,7 @@ export default function TermsPage() {
             <div>
               <div className="legal-end-title">Questions about our Terms?</div>
               <div className="legal-end-sub">
-                Reach us at <a href="mailto:legal@schoolcare.io">legal@schoolcare.io</a> — we respond within 5 business days.
+                Reach us at <a href="mailto:schoolcare2026@gmail.com">legal@schoolcare.io</a> — we respond within 5 business days.
               </div>
             </div>
           </div>

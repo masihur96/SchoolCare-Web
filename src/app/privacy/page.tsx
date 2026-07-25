@@ -288,7 +288,7 @@ export default function PrivacyPage() {
             <div>
               <div className="legal-end-title">Your privacy matters to us</div>
               <div className="legal-end-sub">
-                Questions? Contact our Privacy team at <a href="mailto:privacy@schoolcare.io">privacy@schoolcare.io</a>.
+                Questions? Contact our Privacy team at <a href="mailto:schoolcare2026@gmail.com">privacy@schoolcare.io</a>.
                 We respond within 5 business days.
               </div>
             </div>
