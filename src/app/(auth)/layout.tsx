@@ -5,11 +5,5 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="auth-layout glass">
-      <div className="auth-container animate-fade-in">
-        {children}
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 }

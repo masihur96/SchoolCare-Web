@@ -698,6 +698,329 @@ body {
   text-decoration: underline;
 }
 
+/* ============================================
+   LOGIN PAGE — Full-screen dark override
+   ============================================ */
+.login-fullpage {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-y: auto;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 33.33vw 33.33vh;
+}
+
+.lp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 3rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(9,9,11,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.lp-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.4px;
+  color: #fff;
+  text-decoration: none;
+}
+
+.lp-nav-logo {
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.lp-nav-links {
+  display: flex;
+  gap: 2rem;
+  font-size: 0.875rem;
+  color: #a1a1aa;
+  list-style: none;
+}
+
+.lp-nav-links a {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.2s;
+}
+
+.lp-nav-links a:hover {
+  color: #fff;
+}
+
+.lp-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.lp-nav-ghost-link {
+  text-decoration: none;
+  color: #e4e4e7;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.lp-nav-ghost-link:hover {
+  color: #fff;
+}
+
+.lp-nav-signup {
+  background: #ffffff;
+  color: #09090b;
+  padding: 0.45rem 1.2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.lp-nav-signup:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.lp-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 72px);
+  padding: 2rem 1rem;
+}
+
+.lp-card {
+  width: 100%;
+  max-width: 430px;
+  background: #111113;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 30px 60px -15px rgba(0,0,0,0.6);
+}
+
+.lp-card-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.5px;
+}
+
+.lp-card-subtitle {
+  text-align: center;
+  color: #71717a;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin-bottom: 1.75rem;
+}
+
+.lp-social-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e4e4e7;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 0.65rem;
+  transition: background 0.18s, border-color 0.18s;
+  font-family: inherit;
+}
+
+.lp-social-btn:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.lp-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  color: #3f3f46;
+  font-size: 0.75rem;
+}
+
+.lp-divider::before,
+.lp-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+}
+
+.lp-field {
+  margin-bottom: 1rem;
+}
+
+.lp-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+  color: #d4d4d8;
+}
+
+.lp-input {
+  width: 100%;
+  background: #1c1c1f;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  padding: 0.65rem 1rem;
+  color: #fff;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.lp-input:focus {
+  outline: none;
+  border-color: #0066ff;
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15);
+}
+
+.lp-input::placeholder {
+  color: #52525b;
+}
+
+.lp-pw-wrap {
+  position: relative;
+}
+
+.lp-pw-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #52525b;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.lp-pw-toggle:hover {
+  color: #a1a1aa;
+}
+
+.lp-submit {
+  width: 100%;
+  background: #0066ff;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  margin-top: 1.25rem;
+  font-family: inherit;
+}
+
+.lp-submit:hover:not(:disabled) {
+  background: #0052cc;
+  transform: translateY(-1px);
+}
+
+.lp-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lp-footer-text {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: #71717a;
+}
+
+.lp-footer-text a {
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lp-footer-text a:hover {
+  text-decoration: underline;
+}
+
+.lp-terms {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #52525b;
+  margin-top: 1.5rem;
+  line-height: 1.65;
+}
+
+.lp-terms a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.lp-terms a:hover {
+  text-decoration: underline;
+}
+
+.lp-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: #f87171;
+  padding: 0.7rem 1rem;
+  border-radius: 7px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .lp-nav-links {
+    display: none;
+  }
+  .lp-nav {
+    padding: 1rem 1.25rem;
+  }
+}
+
 /* Data Tables */
 .data-table-wrapper {
   background: var(--card);
