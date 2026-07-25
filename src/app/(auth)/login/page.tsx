@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, ChevronRight, GraduationCap, Users, BookOpen, Award, Star } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,139 +57,196 @@ export default function LoginPage() {
   return (
     <div className="login-fullpage">
 
-      {/* ── Navbar ── */}
+      {/* ── Top Navbar ── */}
       <nav className="lp-nav">
         <Link href="/" className="lp-nav-brand">
           <span className="lp-nav-logo">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6"  x2="21" y2="6"/>
-              <line x1="3" y1="12" x2="21" y2="12"/>
-              <line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
+            <GraduationCap size={16} />
           </span>
-          AK
+          SchoolCare
         </Link>
 
         <ul className="lp-nav-links">
           <li><Link href="/">Home</Link></li>
           <li><Link href="#features">Features</Link></li>
           <li><Link href="#pricing">Pricing</Link></li>
-          <li><Link href="#download">Download</Link></li>
-          <li><Link href="#blog">Blog</Link></li>
+          <li><Link href="#about">About</Link></li>
           <li><Link href="#contact">Contact</Link></li>
         </ul>
 
         <div className="lp-nav-actions">
-          {/* Theme icon */}
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717a', display: 'flex', padding: 0 }} aria-label="Toggle theme">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5"/>
-              <line x1="12" y1="1"  x2="12" y2="3"/>
-              <line x1="12" y1="21" x2="12" y2="23"/>
-              <line x1="4.22" y1="4.22"   x2="5.64"  y2="5.64"/>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1"  y1="12" x2="3"  y2="12"/>
-              <line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22"  y1="19.78" x2="5.64"  y2="18.36"/>
-              <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
-            </svg>
-          </button>
-          <Link href="/login"     className="lp-nav-ghost-link">Login</Link>
-          <Link href="/register"  className="lp-nav-signup">Sign Up</Link>
+          <Link href="/login" className="lp-nav-ghost-link">Login</Link>
+          <Link href="/register" className="lp-nav-signup">Get started →</Link>
         </div>
       </nav>
 
-      {/* ── Main card ── */}
-      <main className="lp-main">
-        <div className="lp-card">
+      {/* ── Two-column layout ── */}
+      <div className="lp-page-wrapper">
 
-          <h1 className="lp-card-title">Get Started</h1>
-          <p className="lp-card-subtitle">
-            Join us now and create an account to access<br />exclusive content!
-          </p>
-
-          {/* Social buttons */}
-          <button className="lp-social-btn" type="button">
-            {/* Google "G" SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.16C1.43 8.55 1 10.22 1 12s.43 3.45 1.16 4.93l3.68-2.84z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.16 7.07l3.68 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </button>
-
-          <button className="lp-social-btn" type="button">
-            {/* Apple SVG */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16.365 14.781c-.019-2.584 2.115-3.826 2.213-3.882-1.196-1.752-3.059-1.99-3.738-2.015-1.583-.162-3.092.932-3.896.932-.803 0-2.046-.897-3.344-.871-1.689.023-3.245.981-4.113 2.492-1.761 3.052-.451 7.574 1.266 10.052.841 1.213 1.836 2.576 3.167 2.525 1.282-.051 1.777-.828 3.315-.828 1.528 0 1.993.828 3.335.803 1.371-.026 2.223-1.226 3.054-2.438 1.052-1.536 1.488-3.024 1.51-3.1-.035-.015-2.75-1.055-2.769-4.223h.001zM14.996 5.516c.692-.838 1.157-2.001 1.03-3.164-1.006.041-2.214.67-2.923 1.503-.635.738-1.199 1.928-1.049 3.068 1.127.087 2.249-.569 2.942-1.407z"/>
-            </svg>
-            Continue with Apple
-          </button>
-
-          <div className="lp-divider">or</div>
-
-          {/* Login form */}
-          <form onSubmit={handleSubmit} noValidate>
-            {error && <div className="lp-error">{error}</div>}
-
-            <div className="lp-field">
-              <label htmlFor="identifier" className="lp-label">Email</label>
-              <input
-                id="identifier"
-                type="text"
-                className="lp-input"
-                placeholder="johndoe@example.com"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                required
-                autoComplete="email"
-              />
+        {/* ── Left dark panel ── */}
+        <div className="lp-left-panel">
+          <div>
+            <div className="lp-left-badge">
+              <Star size={11} />
+              Trusted by 500+ Schools
             </div>
 
-            <div className="lp-field">
-              <label htmlFor="password" className="lp-label">Password</label>
-              <div className="lp-pw-wrap">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  className="lp-input"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  style={{ paddingRight: '40px' }}
-                />
-                <button
-                  type="button"
-                  className="lp-pw-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+            <h1 className="lp-left-heading">
+              Manage Your School <span>Smarter</span> &amp; Faster
+            </h1>
+            <p className="lp-left-sub">
+              SchoolCare brings together attendance, student management, staff records,
+              and performance analytics — all in one powerful platform.
+            </p>
+
+            {/* Stats */}
+            <div className="lp-stat-row" style={{ marginBottom: '2.5rem' }}>
+              <div className="lp-stat">
+                <span className="lp-stat-num">500+</span>
+                <span className="lp-stat-label">Schools</span>
+              </div>
+              <div className="lp-stat">
+                <span className="lp-stat-num">120k+</span>
+                <span className="lp-stat-label">Students</span>
+              </div>
+              <div className="lp-stat">
+                <span className="lp-stat-num">99.9%</span>
+                <span className="lp-stat-label">Uptime</span>
               </div>
             </div>
 
-            <button type="submit" className="lp-submit" disabled={isLoading}>
-              {isLoading ? 'Logging in…' : 'Continue'}
-              {!isLoading && <ChevronRight size={16} />}
-            </button>
-          </form>
+            {/* Feature pills */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {[
+                { icon: <Users size={14} />, text: 'Attendance & Student Management' },
+                { icon: <BookOpen size={14} />, text: 'Exam & Grade Tracking' },
+                { icon: <Award size={14} />, text: 'Staff & Payroll Management' },
+              ].map((f, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.6rem',
+                  fontSize: '0.82rem', color: '#9ca3af',
+                }}>
+                  <span style={{ color: '#818cf8' }}>{f.icon}</span>
+                  {f.text}
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <p className="lp-footer-text">
-            Already have an account?&nbsp;<Link href="/login">Login</Link>
-          </p>
-
-          <p className="lp-terms">
-            By Proceeding, you agree to the<br />
-            <Link href="#">Terms &amp; Condition</Link> and <Link href="#">Privacy Policy</Link>
-          </p>
-
+          {/* Testimonial */}
+          <div className="lp-testimonial">
+            <p className="lp-testimonial-text">
+              "SchoolCare has completely transformed how we manage our school.
+              Attendance tracking and report generation now takes minutes instead of hours."
+            </p>
+            <div className="lp-testimonial-author">
+              <div className="lp-testimonial-avatar">RK</div>
+              <div>
+                <div className="lp-testimonial-name">Rahul Khan</div>
+                <div className="lp-testimonial-role">Principal, Greenfield Academy</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
+
+        {/* ── Right form panel ── */}
+        <div className="lp-right-panel">
+          <div className="lp-card lp-animate">
+
+            {/* Card logo */}
+            <div className="lp-card-logo">
+              <div className="lp-card-logo-icon">
+                <GraduationCap size={16} />
+              </div>
+              <span className="lp-card-logo-text">SchoolCare</span>
+            </div>
+
+            <h1 className="lp-card-title">Welcome back</h1>
+            <p className="lp-card-subtitle">
+              Sign in to your account to continue managing your school.
+            </p>
+
+            <form onSubmit={handleSubmit} noValidate>
+              {error && <div className="lp-error">{error}</div>}
+
+              {/* Email / Phone */}
+              <div className="lp-field">
+                <label htmlFor="identifier" className="lp-label">Email or Phone</label>
+                <input
+                  id="identifier"
+                  type="text"
+                  className="lp-input"
+                  placeholder="admin@school.com"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="lp-field">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label htmlFor="password" className="lp-label" style={{ margin: 0 }}>Password</label>
+                  <Link href="#" style={{ fontSize: '0.75rem', color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="lp-pw-wrap">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    className="lp-input"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="lp-pw-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="lp-submit" disabled={isLoading}>
+                {isLoading ? 'Signing in…' : 'Sign in'}
+                {!isLoading && <ChevronRight size={16} />}
+              </button>
+            </form>
+
+            <p className="lp-footer-text" style={{ marginTop: '1.5rem' }}>
+              Don&apos;t have an account?{' '}
+              <Link href="/register">Create one free</Link>
+            </p>
+
+            {/* Trusted badge */}
+            <div style={{
+              marginTop: '1.75rem',
+              paddingTop: '1.25rem',
+              borderTop: '1px solid #f3f4f6',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              justifyContent: 'center',
+            }}>
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={12} fill="#fbbf24" color="#fbbf24" />
+              ))}
+              <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginLeft: '0.25rem' }}>
+                4.9/5 from 200+ reviews
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
