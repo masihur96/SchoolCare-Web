@@ -123,9 +123,9 @@ export default function LoginPage() {
 
         <ul className="login-v2-nav-links">
           <li><Link href="/">Home</Link></li>
-          <li><Link href="#features">Features</Link></li>
-          <li><Link href="#pricing">Pricing</Link></li>
-          <li><Link href="#about">About</Link></li>
+          <li><Link href="/#features">Features</Link></li>
+          <li><Link href="/#pricing">Pricing</Link></li>
+          <li><Link href="/#about">About</Link></li>
         </ul>
 
         <div className="login-v2-nav-actions">
