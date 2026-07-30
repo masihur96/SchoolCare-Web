@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   Eye, EyeOff, GraduationCap, Users, BookOpen, Award,
   ShieldCheck, TrendingUp, Clock, ArrowRight, CheckCircle2,
-  Sparkles
+  Sparkles, Sun, Moon
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -129,6 +131,17 @@ export default function LoginPage() {
         </ul>
 
         <div className="login-v2-nav-actions">
+          {mounted && (
+            <button
+              className="icon-btn glass-card"
+              style={{ marginRight: '8px', width: '36px', height: '36px' }}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle Theme"
+            >
+              <Sun size={18} className="sun-icon" />
+              <Moon size={18} className="moon-icon" />
+            </button>
+          )}
           <Link href="/login" className="login-v2-nav-ghost">Sign in</Link>
           <Link href="/register" className="login-v2-nav-cta">
             Get started <ArrowRight size={14} />

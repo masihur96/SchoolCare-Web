@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import {
   Eye, EyeOff, GraduationCap, ArrowRight, ArrowLeft,
   ShieldCheck, CheckCircle2, User, Mail, Phone, Lock,
-  Sparkles, Building2, BadgeCheck, Zap,
+  Sparkles, Building2, BadgeCheck, Zap, Sun, Moon
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 type FormData = {
   name: string;
@@ -20,6 +21,7 @@ type FormData = {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1); // 1 = personal info, 2 = security
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -136,6 +138,17 @@ export default function RegisterPage() {
           <span>SchoolCare</span>
         </Link>
         <div className="reg-nav-actions">
+          {mounted && (
+            <button
+              className="icon-btn glass-card"
+              style={{ marginRight: '16px', width: '36px', height: '36px' }}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle Theme"
+            >
+              <Sun size={18} className="sun-icon" />
+              <Moon size={18} className="moon-icon" />
+            </button>
+          )}
           <span className="reg-nav-hint">Already have an account?</span>
           <Link href="/login" className="reg-nav-login">Sign in <ArrowRight size={13} /></Link>
         </div>
