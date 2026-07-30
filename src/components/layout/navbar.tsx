@@ -647,7 +647,7 @@ export function Navbar() {
           width: 440px;
           max-height: 480px;
           border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid var(--glass-border);
           box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15);
           display: flex;
           flex-direction: column;
@@ -830,7 +830,7 @@ export function Navbar() {
           width: 380px;
           max-height: 520px;
           border-radius: 1.1rem;
-          border: 1px solid rgba(255,255,255,0.12);
+          border: 1px solid var(--glass-border);
           box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.15);
           display: flex;
           flex-direction: column;

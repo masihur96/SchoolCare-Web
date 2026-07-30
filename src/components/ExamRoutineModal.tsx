@@ -330,7 +330,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       <div className="modal-content" style={{ maxWidth: '72rem', height: '85vh', display: 'flex', flexDirection: 'column' }}>
         
         {/* Header */}
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.015)' }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--glass-bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
               <FileText size={24} />
@@ -405,7 +405,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
               ) : (
                 <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1rem', overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)' }}>
+                    <thead style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border)' }}>
                       <tr>
                         <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Date</th>
                         <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Class</th>
@@ -515,7 +515,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
                 ) : (
                   <div style={{ overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                      <thead style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+                      <thead style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
                         <tr>
                           <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Roll No.</th>
                           <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Student Name</th>

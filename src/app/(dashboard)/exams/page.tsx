@@ -151,7 +151,7 @@ export default function ExamsPage() {
             ))}
           </div>
         ) : exams.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.02)', borderRadius: '1.5rem', border: '1px dashed var(--border)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 0', background: 'var(--glass-bg)', borderRadius: '1.5rem', border: '1px dashed var(--border)' }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', opacity: 0.5 }}>
               <BookOpen size={40} className="text-muted-foreground" />
             </div>

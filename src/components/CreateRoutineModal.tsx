@@ -188,7 +188,7 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
       <div className="modal-content">
         
         {/* Header */}
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.015)' }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--glass-bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
               <Calendar size={20} />
@@ -320,7 +320,7 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
         </div>
         
         {/* Footer */}
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.015)' }}>
+        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', background: 'var(--glass-bg)' }}>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
               Cancel

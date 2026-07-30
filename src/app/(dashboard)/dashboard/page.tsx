@@ -208,7 +208,7 @@ function AttendanceRing({ rate, present, absent, total, label, color }: Attendan
     <div className="db-att-ring-card glass-card">
       <div className="db-att-ring-chart">
         <svg width="90" height="90" viewBox="0 0 90 90">
-          <circle cx="45" cy="45" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+          <circle cx="45" cy="45" r={r} fill="none" stroke="var(--glass-border)" strokeWidth="8" />
           <circle
             cx="45" cy="45" r={r} fill="none"
             stroke={color} strokeWidth="8"
@@ -497,7 +497,7 @@ function PerfRing({ pct, color, label, centerText }: PerfRingProps) {
   return (
     <div className="db-perf-ring">
       <svg width="56" height="56" viewBox="0 0 56 56">
-        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
+        <circle cx="28" cy="28" r={r} fill="none" stroke="var(--glass-border)" strokeWidth="5" />
         <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="5"
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
           transform="rotate(-90 28 28)" style={{ transition: 'stroke-dashoffset 1s ease' }} />
@@ -1660,7 +1660,7 @@ export default function DashboardPage() {
           flex: 1;
           height: 8px;
           border-radius: 999px;
-          background: rgba(255,255,255,0.07);
+          background: var(--glass-border);
           overflow: hidden;
         }
         .db-bar-fill {
@@ -1743,7 +1743,7 @@ export default function DashboardPage() {
           cursor: pointer;
         }
         .db-notice-item:last-child { border-bottom: none; }
-        .db-notice-item:hover { background: rgba(255,255,255,0.03); }
+        .db-notice-item:hover { background: var(--glass-bg); }
         .db-notice-dot {
           width: 8px; height: 8px;
           border-radius: 50%;
@@ -1786,7 +1786,7 @@ export default function DashboardPage() {
           transition: background 0.15s;
         }
         .db-hw-item:last-child { border-bottom: none; }
-        .db-hw-item:hover { background: rgba(255,255,255,0.03); }
+        .db-hw-item:hover { background: var(--glass-bg); }
         .db-hw-icon {
           width: 30px; height: 30px;
           border-radius: 0.6rem;
@@ -1824,7 +1824,7 @@ export default function DashboardPage() {
           transition: background 0.15s;
         }
         .db-exam-item:last-child { border-bottom: none; }
-        .db-exam-item:hover { background: rgba(255,255,255,0.03); }
+        .db-exam-item:hover { background: var(--glass-bg); }
         .db-exam-header {
           display: flex;
           align-items: center;
@@ -2201,7 +2201,7 @@ export default function DashboardPage() {
           transition: all 0.2s;
         }
         .db-perf-tab:hover {
-          background: rgba(255,255,255,0.05);
+          background: var(--glass-bg);
           color: var(--foreground);
         }
         .db-perf-tab.active {
@@ -2273,12 +2273,12 @@ export default function DashboardPage() {
           border-radius: 999px;
           font-size: 0.6rem;
           font-weight: 800;
-          background: rgba(255,255,255,0.25);
+          background: var(--glass-border-strong);
           color: inherit;
           margin-left: 0.2rem;
         }
         .db-perf-tab.active .db-perf-tab-badge {
-          background: rgba(255,255,255,0.3);
+          background: var(--glass-border-strong);
         }
 
         /* +N more chip */
@@ -2371,11 +2371,11 @@ export default function DashboardPage() {
         .db-perf-ring-center { position: absolute; top: 0; left: 0; right: 0; bottom: 18px; display: flex; align-items: center; justify-content: center; }
         .db-perf-ring-label { font-size: 0.6rem; color: var(--muted-foreground); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
         .db-perf-card-h-stats { display: flex; flex-direction: column; gap: 0.35rem; }
-        .db-perf-stat-h { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--muted-foreground); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.45rem; padding: 0.22rem 0.55rem; }
+        .db-perf-stat-h { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--muted-foreground); background: var(--glass-bg); border: 1px solid var(--glass-bg); border-radius: 0.45rem; padding: 0.22rem 0.55rem; }
         .db-perf-stat-h span { flex: 1; font-size: 0.68rem; }
         .db-perf-stat-h strong { font-weight: 700; color: var(--foreground); font-size: 0.72rem; }
         .db-perf-score-bar-wrap { display: flex; align-items: center; gap: 0.5rem; }
-        .db-perf-score-bar-track { flex: 1; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+        .db-perf-score-bar-track { flex: 1; height: 5px; border-radius: 999px; background: var(--glass-border); overflow: hidden; }
         .db-perf-score-bar-fill { height: 100%; border-radius: 999px; transition: width 1s ease; }
         .db-perf-score-bar-label { font-size: 0.72rem; font-weight: 800; color: var(--foreground); min-width: 34px; text-align: right; }
         .db-perf-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 3.5rem 1rem; color: var(--muted-foreground); font-size: 0.88rem; }
@@ -2446,11 +2446,11 @@ export default function DashboardPage() {
           font-size: 0.78rem; font-weight: 600;
           cursor: pointer; transition: all 0.18s;
         }
-        .pf-tab:hover { background: rgba(255,255,255,0.05); color: var(--foreground); }
+        .pf-tab:hover { background: var(--glass-bg); color: var(--foreground); }
         .pf-tab.active { background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(99,102,241,0.3); }
         .pf-tab-count {
           font-size: 0.6rem; font-weight: 800;
-          background: rgba(255,255,255,0.2);
+          background: var(--glass-border-strong);
           padding: 0.1rem 0.4rem;
           border-radius: 999px;
         }
@@ -2515,7 +2515,7 @@ export default function DashboardPage() {
           width: 20px; height: 20px;
           border-radius: 50%;
           border: none;
-          background: rgba(255,255,255,0.1);
+          background: var(--glass-border);
           color: var(--muted-foreground);
           display: flex; align-items: center; justify-content: center;
           cursor: pointer; transition: all 0.15s;
@@ -2571,7 +2571,7 @@ export default function DashboardPage() {
           border-bottom: 1px solid var(--border);
         }
         .pf-row:last-child { border-bottom: none; }
-        .pf-row:hover { background: rgba(255,255,255,0.03); }
+        .pf-row:hover { background: var(--glass-bg); }
         .pf-row-excellent:hover { background: rgba(16,185,129,0.04); }
         .pf-row-good:hover      { background: rgba(99,102,241,0.04); }
         .pf-row-average:hover   { background: rgba(245,158,11,0.04); }
@@ -2611,7 +2611,7 @@ export default function DashboardPage() {
         .pf-td-muted { font-size: 0.8rem; color: var(--muted-foreground); }
         .pf-td-val { font-size: 0.82rem; font-weight: 600; }
         .pf-td-bar-wrap { display: flex; align-items: center; gap: 0.65rem; min-width: 160px; }
-        .pf-td-bar-track { flex: 1; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+        .pf-td-bar-track { flex: 1; height: 6px; border-radius: 999px; background: var(--glass-border); overflow: hidden; }
         .pf-td-bar-fill { height: 100%; border-radius: 999px; transition: width 0.8s ease; }
         .pf-td-bar-val { font-size: 0.78rem; font-weight: 800; min-width: 38px; text-align: right; }
         .pf-badge {
