@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -61,6 +61,10 @@ export default function StudentsPage() {
   const [modalMode, setModalMode] = useState<'add' | 'edit' | 'view'>('add');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Delete Confirmation Modal
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: '', name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [newStudent, setNewStudent] = useState({
     name: '',
     email: '',
@@ -211,22 +215,29 @@ export default function StudentsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this student?')) return;
+  const handleDelete = (id: string, name: string) => {
+    setDeleteModal({ open: true, id, name });
+  };
+
+  const confirmDelete = async () => {
+    setDeleteLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${deleteModal.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getApiToken()}`
         }
       });
       if (res.ok) {
+        setDeleteModal({ open: false, id: '', name: '' });
         fetchStudents();
       } else {
         alert('Failed to delete student.');
       }
     } catch (e) {
       alert('Error deleting student.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -489,7 +500,7 @@ export default function StudentsPage() {
                       <div className="action-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                         <button className="action-btn" title="View" onClick={() => openViewModal(student)}><Eye size={16} /></button>
                         <button className="action-btn" title="Edit" onClick={() => openEditModal(student)}><Edit size={16} /></button>
-                        <button className="action-btn" style={{ color: 'var(--destructive)' }} title="Delete" onClick={() => handleDelete(student.id)}>
+                        <button className="action-btn" style={{ color: 'var(--destructive)' }} title="Delete" onClick={() => handleDelete(student.id, student.name)}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -667,6 +678,44 @@ export default function StudentsPage() {
                   </div>
                 )}
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.open && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
+          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
+            <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(239,68,68,0.25)' }}>
+                <AlertTriangle size={28} style={{ color: '#ef4444' }} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>Delete Student Account</h2>
+                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9375rem', lineHeight: 1.5, margin: 0 }}>
+                  Are you sure you want to permanently delete <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', padding: '0 2rem 2rem 2rem' }}>
+              <button
+                className="btn"
+                style={{ flex: 1, border: '1px solid var(--border)', fontSize: '0.9375rem' }}
+                onClick={() => setDeleteModal({ open: false, id: '', name: '' })}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                style={{ flex: 1, background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff', fontSize: '0.9375rem', border: 'none', boxShadow: '0 4px 15px rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
