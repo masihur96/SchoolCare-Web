@@ -6,7 +6,7 @@ import {
   Loader2, CheckCircle2, AlertCircle,
   Camera, Phone, Mail, MapPin,
   Eye, EyeOff, Lock, Save,
-  RefreshCw,
+  RefreshCw, Trash2, AlertTriangle,
 } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
@@ -93,6 +93,11 @@ export default function SettingsPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwSaving, setPwSaving] = useState(false);
+
+  // Delete Account state
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Notification prefs (UI-only, no API)
   const [notifPrefs, setNotifPrefs] = useState({
@@ -202,6 +207,39 @@ export default function SettingsPage() {
       showToast('Failed to change password', 'error');
     } finally {
       setPwSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!profile) return;
+    if (deleteConfirmEmail.trim().toLowerCase() !== profile.email.toLowerCase()) {
+      showToast('Email does not match. Please try again.', 'error');
+      return;
+    }
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${profile.id}`, {
+        method: 'DELETE',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${getApiToken()}`,
+        },
+      });
+      if (res.ok) {
+        showToast('Account deleted successfully. Redirecting…');
+        setTimeout(() => {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }, 1500);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.message || 'Failed to delete account. Please try again.', 'error');
+      }
+    } catch {
+      showToast('Network error. Please try again.', 'error');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -696,6 +734,48 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </form>
+
+                  {/* ── Danger Zone ── */}
+                  <div style={{
+                    marginTop: '2.5rem',
+                    padding: '1.5rem',
+                    borderRadius: 'var(--radius)',
+                    border: '1.5px solid rgba(239,68,68,0.35)',
+                    background: 'rgba(239,68,68,0.04)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                        background: 'rgba(239,68,68,0.12)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1.5px solid rgba(239,68,68,0.25)',
+                      }}>
+                        <AlertTriangle size={18} style={{ color: '#ef4444' }} />
+                      </div>
+                      <div>
+                        <h4 style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#ef4444', margin: '0 0 0.25rem 0' }}>Danger Zone</h4>
+                        <p style={{ fontSize: '0.8375rem', color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
+                          Permanently delete your account and all associated data. This action is <strong>irreversible</strong> and required by Google Play Console policies.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setDeleteConfirmEmail(''); setDeleteAccountModal(true); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        padding: '0.625rem 1.25rem', borderRadius: 'var(--radius)',
+                        background: 'rgba(239,68,68,0.1)', border: '1.5px solid rgba(239,68,68,0.4)',
+                        color: '#ef4444', fontWeight: 600, fontSize: '0.875rem',
+                        cursor: 'pointer', transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                    >
+                      <Trash2 size={16} />
+                      Delete My Account
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -792,6 +872,129 @@ export default function SettingsPage() {
 
         </div>
       </div>
+
+      {/* ── Delete Account Confirmation Modal ── */}
+      {deleteAccountModal && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200, padding: '1rem',
+        }}>
+          <div
+            className="glass-card animate-fade-in"
+            style={{
+              background: 'var(--card)', width: '100%', maxWidth: 460,
+              borderRadius: '1.125rem', overflow: 'hidden',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.35)',
+              border: '1.5px solid rgba(239,68,68,0.25)',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.75rem 2rem 1.25rem',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: '1rem', textAlign: 'center',
+              background: 'linear-gradient(180deg, rgba(239,68,68,0.06) 0%, transparent 100%)',
+              borderBottom: '1px solid var(--border)',
+            }}>
+              <div style={{
+                width: 68, height: 68, borderRadius: '50%',
+                background: 'rgba(239,68,68,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '2px solid rgba(239,68,68,0.3)',
+                boxShadow: '0 0 0 6px rgba(239,68,68,0.05)',
+              }}>
+                <Trash2 size={28} style={{ color: '#ef4444' }} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.375rem', color: 'var(--foreground)' }}>
+                  Delete Your Account?
+                </h2>
+                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.6, margin: 0 }}>
+                  This will <strong style={{ color: '#ef4444' }}>permanently delete</strong> your account and all associated data. You will be logged out immediately.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem 2rem' }}>
+              {/* Warning checklist */}
+              <div style={{
+                padding: '1rem 1.125rem', borderRadius: 'var(--radius)',
+                background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)',
+                marginBottom: '1.25rem',
+              }}>
+                {[
+                  'All your profile data will be removed',
+                  'This action cannot be undone or reversed',
+                  'You will be immediately logged out',
+                ].map((item) => (
+                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--muted-foreground)', marginBottom: '0.4rem' }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              {/* Email confirmation input */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8375rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--foreground)' }}>
+                  Type your email address to confirm:
+                  <span style={{ fontWeight: 700, color: '#ef4444', marginLeft: '0.25rem' }}>{profile?.email}</span>
+                </label>
+                <input
+                  type="email"
+                  className="input"
+                  value={deleteConfirmEmail}
+                  onChange={e => setDeleteConfirmEmail(e.target.value)}
+                  placeholder={profile?.email || 'your@email.com'}
+                  disabled={deleteLoading}
+                  style={{
+                    borderColor: deleteConfirmEmail && deleteConfirmEmail.toLowerCase() !== (profile?.email || '').toLowerCase()
+                      ? 'var(--destructive)' : undefined,
+                  }}
+                />
+                {deleteConfirmEmail && deleteConfirmEmail.toLowerCase() !== (profile?.email || '').toLowerCase() && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--destructive)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.375rem' }}>
+                    <AlertCircle size={12} /> Email does not match
+                  </span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  className="btn"
+                  style={{ flex: 1, border: '1px solid var(--border)', fontSize: '0.9375rem', fontWeight: 600 }}
+                  onClick={() => setDeleteAccountModal(false)}
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: '#fff', fontSize: '0.9375rem', fontWeight: 600,
+                    border: 'none',
+                    boxShadow: '0 4px 15px rgba(239,68,68,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    opacity: (deleteConfirmEmail.toLowerCase() === (profile?.email || '').toLowerCase() && !deleteLoading) ? 1 : 0.5,
+                    cursor: (deleteConfirmEmail.toLowerCase() === (profile?.email || '').toLowerCase() && !deleteLoading) ? 'pointer' : 'not-allowed',
+                  }}
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading || deleteConfirmEmail.toLowerCase() !== (profile?.email || '').toLowerCase()}
+                >
+                  {deleteLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={16} />}
+                  {deleteLoading ? 'Deleting…' : 'Yes, Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
