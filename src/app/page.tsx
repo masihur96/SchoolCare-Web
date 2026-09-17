@@ -237,7 +237,7 @@ export default function LandingPage() {
                   <li><Check size={14} /> Mobile App</li>
                   <li><Check size={14} /> Support Included</li>
                 </ul>
-                <Link href="/register" className="lp-btn lp-btn-block" style={{ marginTop: 'auto', background: plan.popular ? 'linear-gradient(135deg, #7c3aed, #6366f1)' : 'rgba(255,255,255,0.05)' }}>
+                <Link href="/register" className="lp-btn lp-btn-block" style={{ marginTop: 'auto', background: plan.popular ? 'linear-gradient(135deg, #7c3aed, #6366f1)' : 'var(--glass-bg)', color: plan.popular ? '#fff' : 'var(--foreground)' }}>
                   Get Started
                 </Link>
               </div>
