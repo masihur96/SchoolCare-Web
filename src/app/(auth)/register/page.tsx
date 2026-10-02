@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+import { useLanguage } from '@/components/language-provider';
+import { LanguageToggle } from '@/components/language-toggle';
+
 type FormData = {
   name: string;
   email: string;
@@ -22,6 +25,7 @@ type FormData = {
 export default function RegisterPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
   const [step, setStep] = useState(1); // 1 = personal info, 2 = security
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -112,13 +116,13 @@ export default function RegisterPage() {
   };
 
   const perks = [
-    { icon: <Zap size={14} />, text: 'Setup in under 3 minutes' },
-    { icon: <ShieldCheck size={14} />, text: 'Enterprise-grade security' },
-    { icon: <BadgeCheck size={14} />, text: 'No credit card required' },
-    { icon: <Building2 size={14} />, text: 'Unlimited school branches' },
+    { icon: <Zap size={14} />, text: t('auth.reg.perk1') },
+    { icon: <ShieldCheck size={14} />, text: t('auth.reg.perk2') },
+    { icon: <BadgeCheck size={14} />, text: t('auth.reg.perk3') },
+    { icon: <Building2 size={14} />, text: t('auth.reg.perk4') },
   ];
 
-  const steps = ['Your details', 'Set password'];
+  const steps = [t('auth.reg.step1.title'), t('auth.reg.step2.title')];
 
   return (
     <div className="reg-root">
@@ -137,11 +141,12 @@ export default function RegisterPage() {
           <div className="reg-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
           <span>SchoolCare</span>
         </Link>
-        <div className="reg-nav-actions">
+        <div className="reg-nav-actions" style={{ display: 'flex', alignItems: 'center' }}>
+          <LanguageToggle />
           {mounted && (
             <button
               className="icon-btn glass-card"
-              style={{ marginRight: '16px', width: '36px', height: '36px' }}
+              style={{ margin: '0 16px', width: '36px', height: '36px' }}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle Theme"
             >
@@ -149,8 +154,8 @@ export default function RegisterPage() {
               <Moon size={18} className="moon-icon" />
             </button>
           )}
-          <span className="reg-nav-hint">Already have an account?</span>
-          <Link href="/login" className="reg-nav-login">Sign in <ArrowRight size={13} /></Link>
+          <span className="reg-nav-hint">{t('auth.reg.already')}</span>
+          <Link href="/login" className="reg-nav-login">{t('auth.reg.signin')} <ArrowRight size={13} /></Link>
         </div>
       </nav>
 
@@ -162,16 +167,17 @@ export default function RegisterPage() {
           <div className="reg-left-inner">
             <div className="reg-trust-badge">
               <Sparkles size={12} />
-              <span>Free forever · No credit card</span>
+              <span>{t('auth.reg.badge')}</span>
             </div>
 
             <h1 className="reg-headline">
-              Start managing your school <span className="reg-highlight">smarter today</span>
+              {t('auth.reg.title').split('smarter today')[0]}
+              {t('auth.reg.title').includes('smarter today') && <span className="reg-highlight">smarter today</span>}
+              {!t('auth.reg.title').includes('smarter today') && <span className="reg-highlight">{t('auth.reg.title')}</span>}
             </h1>
 
             <p className="reg-sub">
-              Join 500+ schools that trust SchoolCare to handle attendance, grades,
-              payroll, and analytics — all in one place.
+              {t('auth.reg.sub')}
             </p>
 
             {/* Perks */}
@@ -199,7 +205,7 @@ export default function RegisterPage() {
               </div>
               <div className="reg-social-text">
                 <div className="reg-social-stars">{'★★★★★'}</div>
-                <div className="reg-social-label">Loved by 120,000+ students & staff</div>
+                <div className="reg-social-label">{t('auth.reg.loved')}</div>
               </div>
             </div>
 
@@ -267,12 +273,10 @@ export default function RegisterPage() {
             </div>
 
             <h2 className="reg-card-title">
-              {step === 1 ? 'Create your account' : 'Secure your account'}
+              {step === 1 ? t('auth.reg.step1.title') : t('auth.reg.step2.title')}
             </h2>
             <p className="reg-card-subtitle">
-              {step === 1
-                ? 'Enter your details to get started with SchoolCare.'
-                : 'Choose a strong password to protect your account.'}
+              {step === 1 ? t('auth.reg.step1.sub') : t('auth.reg.step2.sub')}
             </p>
 
             {/* Error */}
@@ -302,7 +306,7 @@ export default function RegisterPage() {
                     autoComplete="name"
                     placeholder=" "
                   />
-                  <label htmlFor="name" className="reg-float-label">Full name</label>
+                  <label htmlFor="name" className="reg-float-label">{t('auth.reg.name')}</label>
                   <div className="reg-field-line" />
                 </div>
 
@@ -321,7 +325,7 @@ export default function RegisterPage() {
                     autoComplete="email"
                     placeholder=" "
                   />
-                  <label htmlFor="email" className="reg-float-label">Work email address</label>
+                  <label htmlFor="email" className="reg-float-label">{t('auth.reg.email')}</label>
                   <div className="reg-field-line" />
                 </div>
 
@@ -340,12 +344,12 @@ export default function RegisterPage() {
                     autoComplete="tel"
                     placeholder=" "
                   />
-                  <label htmlFor="phone" className="reg-float-label">Phone number</label>
+                  <label htmlFor="phone" className="reg-float-label">{t('auth.reg.phone')}</label>
                   <div className="reg-field-line" />
                 </div>
 
                 <button id="reg-next-btn" type="submit" className="reg-submit">
-                  <span>Continue</span>
+                  <span>{t('auth.reg.continue')}</span>
                   <ArrowRight size={16} />
                 </button>
               </form>
@@ -371,7 +375,7 @@ export default function RegisterPage() {
                     placeholder=" "
                     style={{ paddingRight: '44px' }}
                   />
-                  <label htmlFor="password" className="reg-float-label">Password</label>
+                  <label htmlFor="password" className="reg-float-label">{t('auth.login.password')}</label>
                   <div className="reg-field-line" />
                   <button
                     type="button"
@@ -387,9 +391,9 @@ export default function RegisterPage() {
                 {/* Password strength hints */}
                 <div className="reg-pw-hints">
                   {[
-                    { label: 'At least 8 characters', ok: formData.password.length >= 8 },
-                    { label: 'Contains a number', ok: /\d/.test(formData.password) },
-                    { label: 'Contains a letter', ok: /[a-zA-Z]/.test(formData.password) },
+                    { label: t('auth.reg.pwHint1'), ok: formData.password.length >= 8 },
+                    { label: t('auth.reg.pwHint2'), ok: /\d/.test(formData.password) },
+                    { label: t('auth.reg.pwHint3'), ok: /[a-zA-Z]/.test(formData.password) },
                   ].map((h, i) => (
                     <div key={i} className={`reg-pw-hint ${h.ok ? 'ok' : ''}`}>
                       <CheckCircle2 size={11} />
@@ -405,9 +409,9 @@ export default function RegisterPage() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <><span className="reg-spinner" /><span>Creating account…</span></>
+                    <><span className="reg-spinner" /><span>{t('auth.reg.loading')}</span></>
                   ) : (
-                    <><span>Create free account</span><ArrowRight size={16} /></>
+                    <><span>{t('auth.reg.submit')}</span><ArrowRight size={16} /></>
                   )}
                 </button>
 
@@ -416,16 +420,16 @@ export default function RegisterPage() {
                   className="reg-back-btn"
                   onClick={() => { setStep(1); setError(''); }}
                 >
-                  <ArrowLeft size={14} /> Back to details
+                  <ArrowLeft size={14} /> {t('auth.reg.back')}
                 </button>
               </form>
             )}
 
             {/* Footer */}
             <p className="reg-terms">
-              By creating an account, you agree to our{' '}
-              <Link href="/terms">Terms of Service</Link> and{' '}
-              <Link href="/privacy">Privacy Policy</Link>.
+              {t('auth.reg.terms1')}{' '}
+              <Link href="/terms">{t('footer.terms')}</Link> {t('auth.reg.terms2')}{' '}
+              <Link href="/privacy">{t('footer.privacy')}</Link>.
             </p>
           </div>
         </div>

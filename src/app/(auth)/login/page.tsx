@@ -10,9 +10,13 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+import { useLanguage } from '@/components/language-provider';
+import { LanguageToggle } from '@/components/language-toggle';
+
 export default function LoginPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -130,11 +134,12 @@ export default function LoginPage() {
           <li><Link href="/#about">About</Link></li>
         </ul>
 
-        <div className="login-v2-nav-actions">
+        <div className="login-v2-nav-actions" style={{ display: 'flex', alignItems: 'center' }}>
+          <LanguageToggle />
           {mounted && (
             <button
               className="icon-btn glass-card"
-              style={{ marginRight: '8px', width: '36px', height: '36px' }}
+              style={{ margin: '0 8px', width: '36px', height: '36px' }}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle Theme"
             >
@@ -142,9 +147,9 @@ export default function LoginPage() {
               <Moon size={18} className="moon-icon" />
             </button>
           )}
-          <Link href="/login" className="login-v2-nav-ghost">Sign in</Link>
+          <Link href="/login" className="login-v2-nav-ghost">{t('nav.signIn')}</Link>
           <Link href="/register" className="login-v2-nav-cta">
-            Get started <ArrowRight size={14} />
+            {t('nav.getStarted')} <ArrowRight size={14} />
           </Link>
         </div>
       </nav>
@@ -158,25 +163,26 @@ export default function LoginPage() {
           {/* Floating trust badge */}
           <div className="login-v2-trust-badge">
             <Sparkles size={12} />
-            <span>Trusted by 500+ Schools Worldwide</span>
+            <span>{t('auth.login.trusted')}</span>
           </div>
 
           <h1 className="login-v2-headline">
-            The Modern Platform for <span className="login-v2-highlight">School Excellence</span>
+            {t('auth.login.title').split('School Excellence')[0]} 
+            {t('auth.login.title').includes('School Excellence') && <span className="login-v2-highlight">School Excellence</span>}
+            {!t('auth.login.title').includes('School Excellence') && <span className="login-v2-highlight">{t('auth.login.title')}</span>}
           </h1>
 
           <p className="login-v2-subheadline">
-            Streamline operations, empower educators, and elevate student outcomes
-            — all from one unified dashboard.
+            {t('auth.login.sub')}
           </p>
 
           {/* Stats row */}
           <div className="login-v2-stats">
             {[
-              { value: '500+', label: 'Schools', icon: <GraduationCap size={14} /> },
-              { value: '120k+', label: 'Students', icon: <Users size={14} /> },
-              { value: '99.9%', label: 'Uptime', icon: <ShieldCheck size={14} /> },
-              { value: '< 3min', label: 'Setup', icon: <Clock size={14} /> },
+              { value: '500+', label: t('auth.login.stats.schools'), icon: <GraduationCap size={14} /> },
+              { value: '120k+', label: t('auth.login.stats.students'), icon: <Users size={14} /> },
+              { value: '99.9%', label: t('auth.login.stats.uptime'), icon: <ShieldCheck size={14} /> },
+              { value: '< 3min', label: t('auth.login.stats.setup'), icon: <Clock size={14} /> },
             ].map((s, i) => (
               <div key={i} className="login-v2-stat">
                 <div className="login-v2-stat-icon">{s.icon}</div>
@@ -249,9 +255,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <h2 className="login-v2-card-title">Welcome back</h2>
+            <h2 className="login-v2-card-title">{t('auth.login.welcome')}</h2>
             <p className="login-v2-card-subtitle">
-              Sign in to your school management account to continue.
+              {t('auth.login.welcomeSub')}
             </p>
 
             {/* Error message */}
@@ -279,7 +285,7 @@ export default function LoginPage() {
                   placeholder=" "
                 />
                 <label htmlFor="login-identifier" className="login-v2-float-label">
-                  Email or Phone number
+                  {t('auth.login.email')}
                 </label>
                 <div className="login-v2-field-line" />
               </div>
@@ -300,7 +306,7 @@ export default function LoginPage() {
                   placeholder=" "
                 />
                 <label htmlFor="login-password" className="login-v2-float-label">
-                  Password
+                  {t('auth.login.password')}
                 </label>
                 <div className="login-v2-field-line" />
                 <button
@@ -317,7 +323,7 @@ export default function LoginPage() {
               {/* Forgot password */}
               <div className="login-v2-forgot-row">
                 <Link href="/change-password" className="login-v2-forgot-link">
-                  Forgot password?
+                  {t('auth.login.forgot')}
                 </Link>
               </div>
 
@@ -331,11 +337,11 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <span className="login-v2-spinner" />
-                    <span>Signing in…</span>
+                    <span>{t('auth.login.loading')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign in to SchoolCare</span>
+                    <span>{t('auth.login.submit')}</span>
                     <ArrowRight size={16} />
                   </>
                 )}
@@ -344,12 +350,12 @@ export default function LoginPage() {
 
             {/* Divider */}
             <div className="login-v2-divider">
-              <span>New to SchoolCare?</span>
+              <span>{t('auth.login.new')}</span>
             </div>
 
             {/* Register CTA */}
             <Link href="/register" className="login-v2-register-btn">
-              Create a free account
+              {t('auth.login.create')}
             </Link>
 
             {/* Trust footer */}
