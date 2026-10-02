@@ -6,12 +6,16 @@ import {
   GraduationCap, ChevronRight, CheckCircle2, Shield,
   Users, BookOpen, Clock, Megaphone, Bell, CreditCard,
   Building2, ArrowRight, TrendingUp, Search, Calendar,
-  Smartphone, UserCheck, Check
+  Smartphone, UserCheck, Check, Star, Globe
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageToggle } from '@/components/language-toggle';
+import { useLanguage } from '@/components/language-provider';
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'admin' | 'teacher' | 'student'>('admin');
+  const { t } = useLanguage();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -72,37 +76,38 @@ export default function LandingPage() {
           <div className="lp-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
           <span>SchoolCare</span>
         </Link>
-        <div className="lp-nav-actions">
-          <Link href="/login" className="lp-nav-link">Sign in</Link>
-          <Link href="/register" className="lp-btn lp-btn-primary">Get Started <ChevronRight size={14} /></Link>
+        <div className="lp-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <LanguageToggle />
+          <ThemeToggle />
+          <Link href="/login" className="lp-nav-link">{t('nav.signIn')}</Link>
+          <Link href="/register" className="lp-btn lp-btn-primary">{t('nav.getStarted')} <ChevronRight size={14} /></Link>
         </div>
       </nav>
 
       {/* Hero Section */}
       <header className={`lp-hero ${mounted ? 'mounted' : ''}`}>
         <div className="lp-hero-badge">
-          <Shield size={12} /> The Future of School Management
+          <Shield size={12} /> {t('hero.badge')}
         </div>
         <h1 className="lp-hero-title">
-          Manage your institution <br />
-          <span className="lp-highlight">smarter, not harder.</span>
+          {t('hero.title1')} <br />
+          <span className="lp-highlight">{t('hero.title2')}</span>
         </h1>
         <p className="lp-hero-sub">
-          A complete ecosystem for administrators, teachers, students, and parents.
-          Automate attendance, grading, communication, and payroll in one premium platform.
+          {t('hero.sub')}
         </p>
         <div className="lp-hero-cta">
           <Link href="/register" className="lp-btn lp-btn-primary lp-btn-lg">
-            Create Free Account <ArrowRight size={16} />
+            {t('hero.cta1')} <ArrowRight size={16} />
           </Link>
           <Link href="#features" className="lp-btn lp-btn-outline lp-btn-lg">
-            Explore Features
+            {t('hero.cta2')}
           </Link>
         </div>
         <div className="lp-hero-trust">
-          <div className="lp-trust-item"><CheckCircle2 size={14} /> Free 7-day trial</div>
-          <div className="lp-trust-item"><CheckCircle2 size={14} /> No credit card required</div>
-          <div className="lp-trust-item"><CheckCircle2 size={14} /> Cancel anytime</div>
+          <div className="lp-trust-item"><CheckCircle2 size={14} /> {t('hero.trust1')}</div>
+          <div className="lp-trust-item"><CheckCircle2 size={14} /> {t('hero.trust2')}</div>
+          <div className="lp-trust-item"><CheckCircle2 size={14} /> {t('hero.trust3')}</div>
         </div>
       </header>
 
@@ -111,37 +116,35 @@ export default function LandingPage() {
         <div className="lp-container">
           <div className="lp-about-grid">
             <div className="lp-about-content">
-              <h2 className="lp-section-title">Built for the modern institution</h2>
-              <p className="lp-section-desc text-left">
-                SchoolCare was born out of a simple necessity: education management shouldn't be trapped in the past. 
-                We've combined enterprise-grade architecture with consumer-grade design to create a platform that everyone—from principles to parents—actually enjoys using.
+              <h2 className="lp-section-title">{t('about.title')}</h2>
+              <p className="lp-section-desc" style={{ textAlign: 'left' }}>
+                {t('about.desc')}
               </p>
               <div className="lp-perks-list">
                 <div className="lp-perk-item">
                   <div className="lp-perk-icon"><Smartphone size={16} /></div>
                   <div>
-                    <h4>Mobile App Included</h4>
-                    <p>Stay connected on iOS and Android wherever you are.</p>
+                    <h4>{t('about.perk1.title')}</h4>
+                    <p>{t('about.perk1.desc')}</p>
                   </div>
                 </div>
                 <div className="lp-perk-item">
                   <div className="lp-perk-icon"><Shield size={16} /></div>
                   <div>
-                    <h4>Bangla Support</h4>
-                    <p>Fully localized interface and support in Bengali.</p>
+                    <h4>{t('about.perk2.title')}</h4>
+                    <p>{t('about.perk2.desc')}</p>
                   </div>
                 </div>
                 <div className="lp-perk-item">
                   <div className="lp-perk-icon"><GraduationCap size={16} /></div>
                   <div>
-                    <h4>Free Training</h4>
-                    <p>Onboarding and training provided at zero extra cost.</p>
+                    <h4>{t('about.perk3.title')}</h4>
+                    <p>{t('about.perk3.desc')}</p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="lp-about-visual">
-              {/* Abstract dashboard representation */}
               <div className="lp-abstract-dash">
                 <div className="lp-abs-header">
                   <div className="lp-abs-dots"><span/><span/><span/></div>
@@ -178,9 +181,9 @@ export default function LandingPage() {
       <section className="lp-section" id="features">
         <div className="lp-container">
           <div className="lp-section-header">
-            <h2 className="lp-section-title">Complete control at every level</h2>
+            <h2 className="lp-section-title">{t('features.title')}</h2>
             <p className="lp-section-desc">
-              Dedicated interfaces designed specifically for the unique workflows of administrators, teachers, students, and parents.
+              {t('features.desc')}
             </p>
           </div>
 
@@ -212,9 +215,9 @@ export default function LandingPage() {
       <section className="lp-section" id="pricing">
         <div className="lp-container">
           <div className="lp-section-header">
-            <h2 className="lp-section-title">Fair pricing that scales with you</h2>
+            <h2 className="lp-section-title">{t('pricing.title')}</h2>
             <p className="lp-section-desc">
-              More students = more discount. Start small and watch your per-student cost drop as your institution grows.
+              {t('pricing.desc')}
             </p>
           </div>
 
@@ -243,16 +246,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-
-          <div className="lp-setup-fee-banner">
-            <div className="lp-setup-content">
-              <span className="lp-setup-label">One-time Setup Fee</span>
-              <span className="lp-setup-price">৳10,000</span>
-            </div>
-            <div className="lp-setup-desc">
-              Includes comprehensive initial setup, data migration assistance, and dedicated free training for your entire staff.
-            </div>
-          </div>
         </div>
       </section>
 
@@ -262,7 +255,7 @@ export default function LandingPage() {
           <div className="lp-footer-brand">
             <div className="lp-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
             <span>SchoolCare</span>
-            <div className="lp-footer-copy">© 2026 SchoolCare EMS. All rights reserved.</div>
+            <div className="lp-footer-copy">{t('footer.rights')}</div>
           </div>
           <div className="lp-footer-links">
             <Link href="/terms">Terms of Service</Link>
