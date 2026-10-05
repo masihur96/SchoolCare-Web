@@ -29,6 +29,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+    if (token) {
+      router.replace('/dashboard');
+    }
     const interval = setInterval(() => {
       setActiveTestimonial(prev => (prev + 1) % testimonials.length);
     }, 4000);

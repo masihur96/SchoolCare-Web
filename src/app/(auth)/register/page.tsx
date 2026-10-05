@@ -41,7 +41,13 @@ export default function RegisterPage() {
   const [mounted, setMounted] = useState(false);
   const [focused, setFocused] = useState<Record<string, boolean>>({});
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { 
+    setMounted(true); 
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+    if (token) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });

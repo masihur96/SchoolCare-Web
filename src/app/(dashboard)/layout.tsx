@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Navbar } from '@/components/layout/navbar';
+import { AuthGuard } from '@/components/auth-guard';
 
 export default function DashboardLayout({
   children,
@@ -8,14 +9,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="app-layout">
-      <Sidebar />
-      <div className="main-content">
-        <Navbar />
-        <main className="page-content animate-fade-in">
-          {children}
-        </main>
+    <AuthGuard>
+      <div className="app-layout">
+        <Sidebar />
+        <div className="main-content">
+          <Navbar />
+          <main className="page-content animate-fade-in">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }
