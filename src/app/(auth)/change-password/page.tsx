@@ -7,9 +7,11 @@ import {
   GraduationCap, Eye, EyeOff, Lock, ShieldCheck,
   CheckCircle2, ArrowLeft, KeyRound, Sparkles, ArrowRight,
 } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -54,7 +56,7 @@ export default function ChangePasswordPage() {
     setError('');
 
     if (form.newPassword !== form.confirmPassword) {
-      setError('New passwords do not match. Please try again.');
+      setError(t('auth.cp.noMatch'));
       return;
     }
     if (pwStrength < 2) {
@@ -101,16 +103,16 @@ export default function ChangePasswordPage() {
   };
 
   const hints = [
-    { label: 'At least 8 characters',        ok: form.newPassword.length >= 8 },
-    { label: 'One uppercase letter',          ok: /[A-Z]/.test(form.newPassword) },
-    { label: 'One number',                    ok: /[0-9]/.test(form.newPassword) },
-    { label: 'One special character',         ok: /[^A-Za-z0-9]/.test(form.newPassword) },
+    { label: t('auth.cp.tip1'),        ok: form.newPassword.length >= 8 },
+    { label: t('auth.cp.tip2'),          ok: /[A-Z]/.test(form.newPassword) },
+    { label: t('auth.cp.tip3'),                    ok: /[0-9]/.test(form.newPassword) },
+    { label: t('auth.cp.tip4'),         ok: /[^A-Za-z0-9]/.test(form.newPassword) },
   ];
 
   const fields = [
-    { id: 'currentPassword', label: 'Current password', showKey: 'current' as const, icon: <KeyRound size={15} /> },
-    { id: 'newPassword',     label: 'New password',     showKey: 'newPw'   as const, icon: <Lock size={15} /> },
-    { id: 'confirmPassword', label: 'Confirm new password', showKey: 'confirm' as const, icon: <ShieldCheck size={15} /> },
+    { id: 'currentPassword', label: t('auth.cp.currentPw'), showKey: 'current' as const, icon: <KeyRound size={15} /> },
+    { id: 'newPassword',     label: t('auth.cp.newPw'),     showKey: 'newPw'   as const, icon: <Lock size={15} /> },
+    { id: 'confirmPassword', label: t('auth.cp.confirmPw'), showKey: 'confirm' as const, icon: <ShieldCheck size={15} /> },
   ];
 
   return (
@@ -132,7 +134,7 @@ export default function ChangePasswordPage() {
         </Link>
         <Link href="/dashboard" className="cp-back-link">
           <ArrowLeft size={14} />
-          <span>Back to Dashboard</span>
+          <span>{t('auth.cp.back')}</span>
         </Link>
       </nav>
 
@@ -145,32 +147,31 @@ export default function ChangePasswordPage() {
 
             <div className="cp-trust-badge">
               <ShieldCheck size={13} />
-              <span>End-to-end encrypted · Zero knowledge</span>
+              <span>{t('auth.cp.encrypted')}</span>
             </div>
 
             <h1 className="cp-headline">
-              Keep your account <span className="cp-highlight">secure</span>
+              {t('auth.cp.title')}
             </h1>
 
             <p className="cp-sub">
-              A strong, unique password is your first line of defence.
-              We recommend changing it every 90 days.
+              {t('auth.cp.sub')}
             </p>
 
             {/* Security tips */}
             <div className="cp-tips-section">
-              <div className="cp-tips-title">Password best practices</div>
+              <div className="cp-tips-title">{t('auth.cp.tipsTitle')}</div>
               <div className="cp-tips">
                 {[
-                  { icon: <CheckCircle2 size={14} />, text: 'Use at least 12 characters' },
-                  { icon: <CheckCircle2 size={14} />, text: 'Mix uppercase, lowercase & numbers' },
-                  { icon: <CheckCircle2 size={14} />, text: 'Add special characters like @, #, !' },
-                  { icon: <CheckCircle2 size={14} />, text: 'Avoid reusing old passwords' },
-                  { icon: <CheckCircle2 size={14} />, text: 'Never share your password with anyone' },
-                ].map((t, i) => (
+                  { icon: <CheckCircle2 size={14} />, text: t('auth.cp.tip1') },
+                  { icon: <CheckCircle2 size={14} />, text: t('auth.cp.tip2') },
+                  { icon: <CheckCircle2 size={14} />, text: t('auth.cp.tip3') },
+                  { icon: <CheckCircle2 size={14} />, text: t('auth.cp.tip4') },
+                  { icon: <CheckCircle2 size={14} />, text: t('auth.cp.tip5') },
+                ].map((tip, i) => (
                   <div key={i} className="cp-tip">
-                    <span className="cp-tip-icon">{t.icon}</span>
-                    <span>{t.text}</span>
+                    <span className="cp-tip-icon">{tip.icon}</span>
+                    <span>{tip.text}</span>
                   </div>
                 ))}
               </div>
@@ -179,9 +180,9 @@ export default function ChangePasswordPage() {
             {/* Security badges */}
             <div className="cp-security-badges">
               {[
-                { icon: <ShieldCheck size={14} />, label: 'AES-256 Encrypted' },
-                { icon: <Sparkles size={14} />,    label: 'Zero-Knowledge' },
-                { icon: <KeyRound size={14} />,    label: 'bcrypt Hashed' },
+                { icon: <ShieldCheck size={14} />, label: t('auth.cp.badge1') },
+                { icon: <Sparkles size={14} />,    label: t('auth.cp.badge2') },
+                { icon: <KeyRound size={14} />,    label: t('auth.cp.badge3') },
               ].map((b, i) => (
                 <div key={i} className="cp-badge">
                   <span className="cp-badge-icon">{b.icon}</span>
@@ -206,7 +207,7 @@ export default function ChangePasswordPage() {
                 <span>SchoolCare</span>
               </div>
               <div className="cp-secure-pill">
-                <ShieldCheck size={11} /> Secure
+                <ShieldCheck size={11} /> {t('auth.cp.secure')}
               </div>
             </div>
 
@@ -216,9 +217,9 @@ export default function ChangePasswordPage() {
                 <div className="cp-success-icon">
                   <CheckCircle2 size={36} />
                 </div>
-                <h2 className="cp-success-title">Password updated!</h2>
+                <h2 className="cp-success-title">{t('auth.cp.successTitle')}</h2>
                 <p className="cp-success-sub">
-                  Your password has been changed successfully. Redirecting to your dashboard…
+                  {t('auth.cp.successSub')}
                 </p>
                 <div className="cp-redirect-bar">
                   <div className="cp-redirect-fill" />
@@ -226,9 +227,9 @@ export default function ChangePasswordPage() {
               </div>
             ) : (
               <>
-                <h2 className="cp-card-title">Change password</h2>
+                <h2 className="cp-card-title">{t('auth.cp.formTitle')}</h2>
                 <p className="cp-card-subtitle">
-                  Enter your current password, then choose a strong new one.
+                  {t('auth.cp.formSub')}
                 </p>
 
                 {error && (
@@ -308,8 +309,8 @@ export default function ChangePasswordPage() {
                   {form.confirmPassword.length > 0 && (
                     <div className={`cp-match ${form.newPassword === form.confirmPassword ? 'ok' : 'fail'}`}>
                       {form.newPassword === form.confirmPassword
-                        ? <><CheckCircle2 size={12} /> Passwords match</>
-                        : <><span className="cp-x">✕</span> Passwords do not match</>}
+                        ? <><CheckCircle2 size={12} /> {t('auth.cp.match')}</>
+                        : <><span className="cp-x">✕</span> {t('auth.cp.noMatch')}</>}
                     </div>
                   )}
 
@@ -320,16 +321,16 @@ export default function ChangePasswordPage() {
                     disabled={loading}
                   >
                     {loading ? (
-                      <><span className="cp-spinner" /><span>Updating password…</span></>
+                      <><span className="cp-spinner" /><span>{t('auth.cp.updating')}</span></>
                     ) : (
-                      <><ShieldCheck size={16} /><span>Update Password</span><ArrowRight size={15} /></>
+                      <><ShieldCheck size={16} /><span>{t('auth.cp.submit')}</span><ArrowRight size={15} /></>
                     )}
                   </button>
                 </form>
 
                 <div className="cp-footer">
                   <Link href="/dashboard" className="cp-footer-link">
-                    <ArrowLeft size={13} /> Back to Dashboard
+                    <ArrowLeft size={13} /> {t('auth.cp.back')}
                   </Link>
                 </div>
               </>

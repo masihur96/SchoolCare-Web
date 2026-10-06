@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Users, 
@@ -18,23 +18,26 @@ import {
   LogOut,
   UserCheck
 } from 'lucide-react';
-
-const navItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Students', href: '/students', icon: Users },
-  { name: 'Teachers', href: '/teachers', icon: GraduationCap },
-  { name: 'Classes & Subjects', href: '/classes', icon: BookOpen },
-  { name: 'Attendance', href: '/attendance', icon: CheckCircle },
-  { name: 'Teacher Attendance', href: '/teacher-attendance', icon: UserCheck },
-  { name: 'Routine', href: '/routine', icon: Calendar },
-  { name: 'Exams', href: '/exams', icon: FileText },
-  { name: 'Notices', href: '/notices', icon: BellRing },
-  { name: 'Settings', href: '/settings', icon: Settings },
-];
+import { useLanguage } from '@/components/language-provider';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useLanguage();
+
+  const navItems = [
+    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.students'), href: '/students', icon: Users },
+    { name: t('nav.teachers'), href: '/teachers', icon: GraduationCap },
+    { name: t('nav.classes'), href: '/classes', icon: BookOpen },
+    { name: t('nav.attendance'), href: '/attendance', icon: CheckCircle },
+    { name: t('nav.teacherAttendance'), href: '/teacher-attendance', icon: UserCheck },
+    { name: t('nav.routine'), href: '/routine', icon: Calendar },
+    { name: t('nav.exams'), href: '/exams', icon: FileText },
+    { name: t('nav.notices'), href: '/notices', icon: BellRing },
+    { name: t('nav.settings'), href: '/settings', icon: Settings },
+  ];
 
   return (
     <>
@@ -60,7 +63,7 @@ export function Sidebar() {
             const isActive = pathname.startsWith(item.href);
             return (
               <Link
-                key={item.name}
+                key={item.href}
                 href={item.href}
                 className={`nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setIsOpen(false)}
@@ -73,13 +76,20 @@ export function Sidebar() {
         </nav>
 
         <div className="sidebar-footer">
-          <Link
-            href="/login"
-            className="nav-item logout-item"
+          <button
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
+              sessionStorage.removeItem('access_token');
+              router.push('/login');
+            }}
+            className="nav-item logout-item w-full text-left bg-transparent border-none cursor-pointer"
+            style={{ fontFamily: 'inherit', fontSize: 'inherit' }}
           >
             <LogOut size={20} className="nav-icon" />
-            <span>Log Out</span>
-          </Link>
+            <span>{t('nav.logout')}</span>
+          </button>
         </div>
       </aside>
 

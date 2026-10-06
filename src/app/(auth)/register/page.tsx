@@ -221,13 +221,13 @@ export default function RegisterPage() {
                 <div className="reg-feature-dot green" />
                 <div className="reg-feature-dot yellow" />
                 <div className="reg-feature-dot red" />
-                <span className="reg-feature-card-title">Live Dashboard Preview</span>
+                <span className="reg-feature-card-title">{t('auth.reg.feature.title')}</span>
               </div>
               <div className="reg-feature-rows">
                 {[
-                  { label: 'Attendance Rate', value: '97.4%', color: '#34d399' },
-                  { label: 'Exams This Month', value: '14', color: '#818cf8' },
-                  { label: 'Staff On Leave', value: '2', color: '#fbbf24' },
+                  { label: t('auth.reg.feature.1'), value: '97.4%', color: '#34d399' },
+                  { label: t('auth.reg.feature.2'), value: '14', color: '#818cf8' },
+                  { label: t('auth.reg.feature.3'), value: '2', color: '#fbbf24' },
                 ].map((row, i) => (
                   <div key={i} className="reg-feature-row">
                     <span className="reg-feature-row-label">{row.label}</span>
@@ -252,7 +252,7 @@ export default function RegisterPage() {
                 <span>SchoolCare</span>
               </div>
               <div className="reg-free-badge">
-                <CheckCircle2 size={11} /> Free account
+                <CheckCircle2 size={11} /> {t('auth.reg.free')}
               </div>
             </div>
 

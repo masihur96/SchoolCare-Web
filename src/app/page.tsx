@@ -224,15 +224,15 @@ export default function LandingPage() {
         >
           <motion.div variants={fadeUpVariant} className="ad-stat-card">
             <div className="ad-stat-num">10k+</div>
-            <div className="ad-stat-label">Active Students</div>
+            <div className="ad-stat-label">{t('hero.stats.students')}</div>
           </motion.div>
           <motion.div variants={fadeUpVariant} className="ad-stat-card">
             <div className="ad-stat-num">50+</div>
-            <div className="ad-stat-label">Institutions</div>
+            <div className="ad-stat-label">{t('hero.stats.institutions')}</div>
           </motion.div>
           <motion.div variants={fadeUpVariant} className="ad-stat-card">
             <div className="ad-stat-num">99.9%</div>
-            <div className="ad-stat-label">Uptime Guarantee</div>
+            <div className="ad-stat-label">{t('hero.stats.uptime')}</div>
           </motion.div>
         </motion.div>
       </section>
@@ -347,9 +347,9 @@ export default function LandingPage() {
             className="lp-section-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
           >
             <div className="lp-hero-badge" style={{ marginBottom: '1rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <HeartHandshake size={14} /> <span>Trusted by Educators</span>
+              <HeartHandshake size={14} /> <span>{t('testimonials.trusted')}</span>
             </div>
-            <h2 className="lp-section-title">What our schools are saying</h2>
+            <h2 className="lp-section-title">{t('testimonials.title')}</h2>
           </motion.div>
 
           <motion.div 
@@ -361,34 +361,34 @@ export default function LandingPage() {
           >
             <motion.div variants={fadeUpVariant} className="ad-testimonial-card">
               <Quote size={40} className="ad-quote-icon" />
-              <p className="ad-quote-text">"SchoolCare has completely transformed how we manage our institution. The dynamic attendance and exam modules saved us countless hours of manual work."</p>
+              <p className="ad-quote-text">{t('testimonials.1.quote')}</p>
               <div className="ad-author">
                 <div className="ad-avatar">S</div>
                 <div className="ad-author-info">
-                  <h4>Sarah Jenkins</h4>
-                  <p>Principal, Lincoln High</p>
+                  <h4>{t('testimonials.1.name')}</h4>
+                  <p>{t('testimonials.1.role')}</p>
                 </div>
               </div>
             </motion.div>
             <motion.div variants={fadeUpVariant} className="ad-testimonial-card">
               <Quote size={40} className="ad-quote-icon" />
-              <p className="ad-quote-text">"The interface is so intuitive that our teachers adapted immediately. The mobile app makes grading and tracking incredibly seamless for everyone involved."</p>
+              <p className="ad-quote-text">{t('testimonials.2.quote')}</p>
               <div className="ad-author">
                 <div className="ad-avatar">M</div>
                 <div className="ad-author-info">
-                  <h4>Michael Rahman</h4>
-                  <p>Head of Administration</p>
+                  <h4>{t('testimonials.2.name')}</h4>
+                  <p>{t('testimonials.2.role')}</p>
                 </div>
               </div>
             </motion.div>
             <motion.div variants={fadeUpVariant} className="ad-testimonial-card">
               <Quote size={40} className="ad-quote-icon" />
-              <p className="ad-quote-text">"Parents are more engaged than ever. Real-time notifications and the dedicated portal keep everyone on the same page. Highly recommended."</p>
+              <p className="ad-quote-text">{t('testimonials.3.quote')}</p>
               <div className="ad-author">
                 <div className="ad-avatar">A</div>
                 <div className="ad-author-info">
-                  <h4>Ayesha Siddiqa</h4>
-                  <p>Coordinator, Excel Academy</p>
+                  <h4>{t('testimonials.3.name')}</h4>
+                  <p>{t('testimonials.3.role')}</p>
                 </div>
               </div>
             </motion.div>
@@ -504,10 +504,10 @@ export default function LandingPage() {
           className="ad-cta-banner"
         >
           <div className="ad-pill">
-            <Trophy size={14} color="#fbbf24" /> #1 School Management System
+            <Trophy size={14} color="#fbbf24" /> {t('cta.pill')}
           </div>
-          <h2 className="ad-cta-title">Ready to transform your institution?</h2>
-          <p className="ad-cta-sub">Join thousands of schools already using SchoolCare to automate their workflow and engage their community effectively.</p>
+          <h2 className="ad-cta-title">{t('cta.title')}</h2>
+          <p className="ad-cta-sub">{t('cta.sub')}</p>
           <Link href="/register" className="ad-btn-white">
             {t('nav.getStarted')} <ChevronRight size={18} />
           </Link>

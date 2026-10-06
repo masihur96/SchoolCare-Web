@@ -9,6 +9,7 @@ import {
   BookOpen, LayoutGrid, Tag, CreditCard, Rocket,
   ShieldCheck, Users, Clock,
 } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 type FormData = {
   schoolId: string;
@@ -38,6 +39,7 @@ const generateUUID = () => {
 
 export default function CreateSchoolPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState<FormData>({
     schoolId: generateUUID(),
     name: '',
@@ -53,11 +55,11 @@ export default function CreateSchoolPage() {
   const [focused, setFocused] = useState<Record<string, boolean>>({});
 
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([
-    { id: 'school',   label: 'Create Institution',    description: 'Registering your school profile',       icon: <Building2 size={14} />,   status: 'idle' },
-    { id: 'classes',  label: 'Set Up Classes',         description: 'Creating 5 default class levels',       icon: <LayoutGrid size={14} />,  status: 'idle' },
-    { id: 'sections', label: 'Add Sections',           description: 'Adding Section A to each class',        icon: <BookOpen size={14} />,    status: 'idle' },
-    { id: 'subjects', label: 'Load Subjects',          description: 'Assigning Math, Science & English',     icon: <Tag size={14} />,         status: 'idle' },
-    { id: 'pricing',  label: 'Activate Free Plan',     description: 'Assigning 1-year free subscription',    icon: <CreditCard size={14} />,  status: 'idle' },
+    { id: 'school',   label: t('auth.cs.prog1.label') || 'Create Institution',    description: t('auth.cs.prog1.desc') || 'Registering your school profile',       icon: <Building2 size={14} />,   status: 'idle' },
+    { id: 'classes',  label: t('auth.cs.prog2.label') || 'Set Up Classes',         description: t('auth.cs.prog2.desc') || 'Creating 5 default class levels',       icon: <LayoutGrid size={14} />,  status: 'idle' },
+    { id: 'sections', label: t('auth.cs.prog3.label') || 'Add Sections',           description: t('auth.cs.prog3.desc') || 'Adding Section A to each class',        icon: <BookOpen size={14} />,    status: 'idle' },
+    { id: 'subjects', label: t('auth.cs.prog4.label') || 'Load Subjects',          description: t('auth.cs.prog4.desc') || 'Assigning Math, Science & English',     icon: <Tag size={14} />,         status: 'idle' },
+    { id: 'pricing',  label: t('auth.cs.prog5.label') || 'Activate Free Plan',     description: t('auth.cs.prog5.desc') || 'Assigning 1-year free subscription',    icon: <CreditCard size={14} />,  status: 'idle' },
   ]);
 
   useEffect(() => { setMounted(true); }, []);
@@ -194,10 +196,10 @@ export default function CreateSchoolPage() {
   };
 
   const fields = [
-    { id: 'name',    label: 'School name',       type: 'text',  icon: <Building2 size={15} />, placeholder: 'Greenwood High School' },
-    { id: 'address', label: 'Full address',       type: 'text',  icon: <MapPin size={15} />,    placeholder: '123 Education Lane, City' },
-    { id: 'phone',   label: 'Contact phone',      type: 'tel',   icon: <Phone size={15} />,     placeholder: '+1 234 567 8900' },
-    { id: 'email',   label: 'Contact email',      type: 'email', icon: <Mail size={15} />,      placeholder: 'contact@school.com' },
+    { id: 'name',    label: t('auth.cs.name') || 'School name',       type: 'text',  icon: <Building2 size={15} />, placeholder: 'Greenwood High School' },
+    { id: 'address', label: t('auth.cs.address') || 'Full address',       type: 'text',  icon: <MapPin size={15} />,    placeholder: '123 Education Lane, City' },
+    { id: 'phone',   label: t('auth.cs.phone') || 'Contact phone',      type: 'tel',   icon: <Phone size={15} />,     placeholder: '+1 234 567 8900' },
+    { id: 'email',   label: t('auth.cs.email') || 'Contact email',      type: 'email', icon: <Mail size={15} />,      placeholder: 'contact@school.com' },
   ];
 
   return (
@@ -220,15 +222,15 @@ export default function CreateSchoolPage() {
         <div className="cs-nav-right">
           <div className="cs-nav-step-pill">
             <CheckCircle2 size={13} className="cs-pill-check" />
-            <span>Account created</span>
+            <span>{t('auth.cs.step1') || 'Account created'}</span>
           </div>
           <div className="cs-nav-step-pill active">
             <div className="cs-pill-dot" />
-            <span>Set up school</span>
+            <span>{t('auth.cs.step2') || 'Set up school'}</span>
           </div>
           <div className="cs-nav-step-pill muted">
             <Circle size={12} />
-            <span>Go to dashboard</span>
+            <span>{t('auth.cs.step3') || 'Go to dashboard'}</span>
           </div>
         </div>
       </nav>
@@ -242,27 +244,26 @@ export default function CreateSchoolPage() {
 
             <div className="cs-trust-badge">
               <Sparkles size={12} />
-              <span>One-time setup · Takes under 2 minutes</span>
+              <span>{t('auth.cs.badge') || 'One-time setup · Takes under 2 minutes'}</span>
             </div>
 
             <h1 className="cs-headline">
-              Set up your <span className="cs-highlight">institution</span> in minutes
+              {t('auth.cs.title') || 'Set up your institution in minutes'}
             </h1>
 
             <p className="cs-sub">
-              We'll automatically configure classes, sections, subjects,
-              and a free 1-year subscription the moment you hit submit.
+              {t('auth.cs.sub') || "We'll automatically configure classes, sections, subjects, and a free 1-year subscription the moment you hit submit."}
             </p>
 
             {/* What gets created */}
             <div className="cs-what-section">
-              <div className="cs-what-title">What we set up for you</div>
+              <div className="cs-what-title">{t('auth.cs.whatTitle') || 'What we set up for you'}</div>
               <div className="cs-what-items">
                 {[
-                  { icon: <LayoutGrid size={14} />, label: '5 default class levels', color: '#818cf8' },
-                  { icon: <BookOpen size={14} />,   label: 'Section A per class',     color: '#34d399' },
-                  { icon: <Tag size={14} />,        label: 'Math, Science & English', color: '#fbbf24' },
-                  { icon: <CreditCard size={14} />, label: '1-year free subscription',color: '#f472b6' },
+                  { icon: <LayoutGrid size={14} />, label: t('auth.cs.what1') || '5 default class levels', color: '#818cf8' },
+                  { icon: <BookOpen size={14} />,   label: t('auth.cs.what2') || 'Section A per class',     color: '#34d399' },
+                  { icon: <Tag size={14} />,        label: t('auth.cs.what3') || 'Math, Science & English', color: '#fbbf24' },
+                  { icon: <CreditCard size={14} />, label: t('auth.cs.what4') || '1-year free subscription',color: '#f472b6' },
                 ].map((item, i) => (
                   <div key={i} className="cs-what-item">
                     <div className="cs-what-icon" style={{ color: item.color }}>{item.icon}</div>
@@ -275,9 +276,9 @@ export default function CreateSchoolPage() {
             {/* Quick stats */}
             <div className="cs-stats-row">
               {[
-                { icon: <Users size={14} />,  value: '500+',   label: 'Schools' },
-                { icon: <Clock size={14} />,  value: '< 2min', label: 'Setup time' },
-                { icon: <ShieldCheck size={14} />, value: '100%', label: 'Secure' },
+                { icon: <Users size={14} />,  value: '500+',   label: t('auth.cs.stat1') || 'Schools' },
+                { icon: <Clock size={14} />,  value: '< 2min', label: t('auth.cs.stat2') || 'Setup time' },
+                { icon: <ShieldCheck size={14} />, value: '100%', label: t('auth.cs.stat3') || 'Secure' },
               ].map((s, i) => (
                 <div key={i} className="cs-stat">
                   <div className="cs-stat-icon">{s.icon}</div>
@@ -302,7 +303,7 @@ export default function CreateSchoolPage() {
                 </div>
                 <span>SchoolCare</span>
               </div>
-              <div className="cs-step-label-pill">Step 3 of 3</div>
+              <div className="cs-step-label-pill">{t('auth.cs.stepCount') || 'Step 3 of 3'}</div>
             </div>
 
             {/* ── SUCCESS STATE ── */}
@@ -311,9 +312,9 @@ export default function CreateSchoolPage() {
                 <div className="cs-success-icon-wrap">
                   <Rocket size={32} className="cs-success-rocket" />
                 </div>
-                <h2 className="cs-success-title">You're all set!</h2>
+                <h2 className="cs-success-title">{t('auth.cs.successTitle') || "You're all set!"}</h2>
                 <p className="cs-success-sub">
-                  Your school has been configured. Redirecting to your dashboard…
+                  {t('auth.cs.successSub') || "Your school has been configured. Redirecting to your dashboard…"}
                 </p>
                 <div className="cs-redirect-bar">
                   <div className="cs-redirect-fill" />
@@ -322,9 +323,9 @@ export default function CreateSchoolPage() {
             ) : loading ? (
               /* ── LOADING / PROGRESS STATE ── */
               <div className="cs-progress-state">
-                <h2 className="cs-card-title">Setting up your school</h2>
+                <h2 className="cs-card-title">{t('auth.cs.loadingTitle') || 'Setting up your school'}</h2>
                 <p className="cs-card-subtitle">
-                  This usually takes less than 30 seconds. Please don't close this tab.
+                  {t('auth.cs.loadingSub') || "This usually takes less than 30 seconds. Please don't close this tab."}
                 </p>
 
                 <div className="cs-steps-list">
@@ -357,9 +358,9 @@ export default function CreateSchoolPage() {
             ) : (
               /* ── FORM STATE ── */
               <>
-                <h2 className="cs-card-title">Create your school</h2>
+                <h2 className="cs-card-title">{t('auth.cs.formTitle') || 'Create your school'}</h2>
                 <p className="cs-card-subtitle">
-                  Enter your institution details. Everything else gets set up automatically.
+                  {t('auth.cs.formSub') || 'Enter your institution details. Everything else gets set up automatically.'}
                 </p>
 
                 {error && (
@@ -392,7 +393,7 @@ export default function CreateSchoolPage() {
 
                   <button id="cs-submit-btn" type="submit" className="cs-submit">
                     <Rocket size={16} />
-                    <span>Create School &amp; Finish Setup</span>
+                    <span>{t('auth.cs.submit') || 'Create School & Finish Setup'}</span>
                     <ArrowRight size={16} />
                   </button>
                 </form>
@@ -400,7 +401,7 @@ export default function CreateSchoolPage() {
                 {/* What happens next hint */}
                 <div className="cs-hint-row">
                   <CheckCircle2 size={13} className="cs-hint-check" />
-                  <span>Classes, sections, subjects & subscription are set up automatically</span>
+                  <span>{t('auth.cs.hint') || 'Classes, sections, subjects & subscription are set up automatically'}</span>
                 </div>
               </>
             )}

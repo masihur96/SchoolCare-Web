@@ -64,10 +64,10 @@ export default function LoginPage() {
   ];
 
   const features = [
-    { icon: <Users size={15} />, text: 'Smart Attendance Tracking', color: '#818cf8' },
-    { icon: <BookOpen size={15} />, text: 'Exam & Grade Analytics', color: '#34d399' },
-    { icon: <Award size={15} />, text: 'Staff & Payroll System', color: '#f472b6' },
-    { icon: <TrendingUp size={15} />, text: 'Performance Insights', color: '#fbbf24' },
+    { icon: <Users size={15} />, text: t('auth.login.features.1'), color: '#818cf8' },
+    { icon: <BookOpen size={15} />, text: t('auth.login.features.2'), color: '#34d399' },
+    { icon: <Award size={15} />, text: t('auth.login.features.3'), color: '#f472b6' },
+    { icon: <TrendingUp size={15} />, text: t('auth.login.features.4'), color: '#fbbf24' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -366,17 +366,17 @@ export default function LoginPage() {
             <div className="login-v2-card-footer">
               <div className="login-v2-footer-item">
                 <ShieldCheck size={12} />
-                <span>Enterprise Security</span>
+                <span>{t('auth.login.footer.1')}</span>
               </div>
               <div className="login-v2-footer-sep" />
               <div className="login-v2-footer-item">
                 <Clock size={12} />
-                <span>99.9% Uptime SLA</span>
+                <span>{t('auth.login.footer.2')}</span>
               </div>
               <div className="login-v2-footer-sep" />
               <div className="login-v2-footer-item">
                 <CheckCircle2 size={12} />
-                <span>GDPR Compliant</span>
+                <span>{t('auth.login.footer.3')}</span>
               </div>
             </div>
           </div>

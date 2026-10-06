@@ -11,6 +11,7 @@ import {
   BellRing, Settings, UserCheck, Loader2, Clock,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { LanguageToggle } from '@/components/language-toggle';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -457,7 +458,8 @@ export function Navbar() {
             )}
           </div>
 
-          {/* ── Theme toggle ── */}
+          {/* ── Language & Theme toggle ── */}
+          <LanguageToggle />
           <button
             className="icon-btn glass-card"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
