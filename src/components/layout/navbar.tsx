@@ -8,7 +8,7 @@ import {
   Bell, Search, Sun, Moon, X, CheckCheck, RefreshCw,
   Info, AlertTriangle, BookOpen, GraduationCap, Megaphone,
   LayoutDashboard, Users, Calendar, CheckCircle, FileText,
-  BellRing, Settings, UserCheck, Loader2, Clock,
+  BellRing, Settings, UserCheck, Loader2, Clock, Mail, Phone,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { LanguageToggle } from '@/components/language-toggle';
@@ -24,6 +24,23 @@ interface Notification {
   read?: boolean;
   createdAt?: string;
   created_at?: string;
+}
+
+interface School {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  avatar: string | null;
+}
+
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar: string | null;
+  school: School | null;
 }
 
 interface SearchResult {
@@ -250,6 +267,29 @@ export function Navbar() {
   const panelRef = useRef<HTMLDivElement>(null);
   const bellRef  = useRef<HTMLButtonElement>(null);
 
+  // ── Profile state ──
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // ── Fetch Profile ──
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch('https://smart-school-backend-production.up.railway.app/auth/profile', {
+          headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setProfile(json.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch profile', e);
+      }
+    }
+    fetchProfile();
+  }, []);
+
   // ── Search: close on outside click ──
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -352,112 +392,41 @@ export function Navbar() {
   return (
     <>
       <header className="navbar glass">
+        <div className="navbar-left-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {profile?.school?.avatar ? (
+            <img 
+              src={profile.school.avatar} 
+              alt="School Logo" 
+              style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} 
+            />
+          ) : (
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <GraduationCap size={20} />
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+            <h1 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+              {profile?.school?.name || 'SchoolCare Academy'}
+            </h1>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Mail size={12} /> {profile?.school?.email || 'info@schoolcare.edu'}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Phone size={12} /> {profile?.school?.phone || '+1 (555) 123-4567'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className="navbar-actions" style={{ marginLeft: 'auto' }}>
 
-          {/* ── Search ── */}
+          {/* ── Search (Hidden per user request) ── */}
+          {/*
           <div ref={searchRef} className="sr-wrap">
-            <div className={`sr-bar glass-card${searchOpen ? ' sr-bar-open' : ''}`}>
-              {searchLoading
-                ? <Loader2 size={17} className="sr-icon sr-spin" />
-                : <Search size={17} className="sr-icon" />
-              }
-              <input
-                ref={inputRef}
-                id="global-search-input"
-                type="text"
-                placeholder="Search pages, notices, exams…"
-                className="search-input sr-input"
-                value={query}
-                autoComplete="off"
-                onChange={(e) => { setQuery(e.target.value); setActiveIdx(-1); }}
-                onFocus={() => setSearchOpen(true)}
-                onKeyDown={handleKeyDown}
-                aria-label="Global search"
-                aria-expanded={searchOpen}
-                aria-autocomplete="list"
-              />
-              {query && (
-                <button
-                  className="sr-clear"
-                  onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-                  aria-label="Clear search"
-                >
-                  <X size={14} />
-                </button>
-              )}
-              {!query && <kbd className="sr-kbd">⌘K</kbd>}
-            </div>
-
-            {/* ── Dropdown ── */}
-            {searchOpen && (
-              <div className="sr-dropdown glass" role="listbox" aria-label="Search results">
-                {/* header */}
-                <div className="sr-drop-head">
-                  {query
-                    ? <span>{flatResults.length} result{flatResults.length !== 1 ? 's' : ''} for "<strong>{query}</strong>"</span>
-                    : <span>Quick navigation</span>
-                  }
-                  <kbd className="sr-kbd-esc">esc</kbd>
-                </div>
-                <div className="sr-drop-divider" />
-
-                {flatResults.length === 0 && !searchLoading && (
-                  <div className="sr-empty">
-                    <Search size={24} />
-                    <p>No results found</p>
-                    <span>Try a different keyword</span>
-                  </div>
-                )}
-
-                {searchLoading && query && (
-                  <div className="sr-loading-row">
-                    <Loader2 size={16} className="sr-spin" />
-                    <span>Searching…</span>
-                  </div>
-                )}
-
-                <ul ref={listRef} className="sr-list">
-                  {Object.entries(grouped).map(([kind, items]) => (
-                    <React.Fragment key={kind}>
-                      <li className="sr-group-label">{KIND_LABEL[kind] ?? kind}</li>
-                      {items.map((r) => {
-                        const globalIdx = flatResults.indexOf(r);
-                        const Icon = r.icon;
-                        const isActive = globalIdx === activeIdx;
-                        return (
-                          <li
-                            key={r.id}
-                            role="option"
-                            aria-selected={isActive}
-                            className={`sr-item${isActive ? ' sr-item-active' : ''}`}
-                            style={{ '--sr-color': r.color } as React.CSSProperties}
-                            onMouseEnter={() => setActiveIdx(globalIdx)}
-                            onMouseDown={(e) => { e.preventDefault(); navigate(r.href); }}
-                          >
-                            <span className="sr-item-icon" style={{ background: `${r.color}18`, color: r.color }}>
-                              <Icon size={15} />
-                            </span>
-                            <span className="sr-item-body">
-                              <span className="sr-item-title">{highlight(r.title, query)}</span>
-                              {r.subtitle && <span className="sr-item-sub">{r.subtitle}</span>}
-                            </span>
-                            {isActive && <span className="sr-enter-hint">↵</span>}
-                          </li>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
-                </ul>
-
-                <div className="sr-drop-footer">
-                  <span><kbd>↑↓</kbd> navigate</span>
-                  <span><kbd>↵</kbd> select</span>
-                  <span><kbd>esc</kbd> close</span>
-                </div>
-              </div>
-            )}
+             ...
           </div>
-
+          */}
           {/* ── Language & Theme toggle ── */}
           <LanguageToggle />
           <button
@@ -574,10 +543,16 @@ export function Navbar() {
 
           {/* ── User ── */}
           <div className="user-profile glass-card">
-            <div className="avatar">A</div>
+            {profile?.avatar ? (
+              <img src={profile.avatar} alt="Avatar" className="avatar" style={{ objectFit: 'cover' }} />
+            ) : (
+              <div className="avatar">{profile?.name ? profile.name.charAt(0).toUpperCase() : 'A'}</div>
+            )}
             <div className="user-info">
-              <span className="user-name">Admin</span>
-              <span className="user-role">Super Admin</span>
+              <span className="user-name">{profile?.name || 'Admin'}</span>
+              <span className="user-role" style={{ textTransform: 'capitalize' }}>
+                {profile?.role || 'Super Admin'}
+              </span>
             </div>
           </div>
         </div>

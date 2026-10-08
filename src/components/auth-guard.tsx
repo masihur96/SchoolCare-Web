@@ -3,11 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { setupFetchInterceptor } from '@/lib/fetchInterceptor';
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
+    setupFetchInterceptor();
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     
     if (!token) {
