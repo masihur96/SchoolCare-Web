@@ -41,6 +41,7 @@ interface UserProfile {
   role: string;
   avatar: string | null;
   school: School | null;
+  schoolId?: string;
 }
 
 interface SearchResult {
@@ -270,6 +271,70 @@ export function Navbar() {
   // ── Profile state ──
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
+  // ── Marquee state ──
+  const [marquees, setMarquees] = useState<any[]>([]);
+  const [marqueeModalOpen, setMarqueeModalOpen] = useState(false);
+  const [marqueeText, setMarqueeText] = useState('');
+  const [marqueeType, setMarqueeType] = useState('STUDENT');
+  const [marqueeLoading, setMarqueeLoading] = useState(false);
+
+  // ── Fetch Marquees ──
+  useEffect(() => {
+    async function fetchMarquees() {
+      if (!profile?.schoolId) return;
+      try {
+        const token = getToken();
+        const res = await fetch(`https://smart-school-backend-production.up.railway.app/general/marquee/${profile.schoolId}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setMarquees(json.data || []);
+        }
+      } catch (e) {
+        console.error('Failed to fetch marquees', e);
+      }
+    }
+    fetchMarquees();
+  }, [profile?.schoolId]);
+
+  const handleCreateMarquee = async () => {
+    if (!marqueeText.trim() || !profile?.schoolId) return;
+    setMarqueeLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch('https://smart-school-backend-production.up.railway.app/general/marquee', {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          Accept: '*/*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: marqueeText,
+          type: marqueeType,
+          schoolId: profile.schoolId
+        })
+      });
+      if (res.ok) {
+        setMarqueeModalOpen(false);
+        setMarqueeText('');
+        // Re-fetch
+        const fetchRes = await fetch(`https://smart-school-backend-production.up.railway.app/general/marquee/${profile.schoolId}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }
+        });
+        if (fetchRes.ok) {
+          const json = await fetchRes.json();
+          setMarquees(json.data || []);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to create marquee', e);
+    } finally {
+      setMarqueeLoading(false);
+    }
+  };
+
   // ── Fetch Profile ──
   useEffect(() => {
     async function fetchProfile() {
@@ -418,6 +483,29 @@ export function Navbar() {
             </div>
           </div>
         </div>
+
+        {/* ── Marquee UI ── */}
+        {profile?.schoolId && (
+          <div className="marquee-wrapper">
+            <div className="marquee-content">
+              {marquees.length > 0 
+                ? marquees.map(m => {
+                    const typeStr = m.type ? m.type.charAt(0).toUpperCase() + m.type.slice(1).toLowerCase() : 'General';
+                    return `${typeStr}: ${m.text}`;
+                  }).join('  \u2022  ') 
+                : 'Welcome to our school!'}
+            </div>
+            {profile?.role === 'admin' && (
+              <button 
+                className="marquee-action-btn" 
+                onClick={() => setMarqueeModalOpen(true)}
+                title="Manage Marquee"
+              >
+                <Megaphone size={16} />
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="navbar-actions" style={{ marginLeft: 'auto' }}>
 
@@ -936,6 +1024,74 @@ export function Navbar() {
           .nb-panel { width: calc(100vw - 24px); right: -8px; }
         }
       `}</style>
+
+      {/* ── Marquee Modal ── */}
+      {marqueeModalOpen && (
+        <div className="marquee-modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div className="marquee-modal-content glass-card" style={{
+            width: '90%', maxWidth: '400px', padding: '1.5rem',
+            background: 'var(--card)', borderRadius: '12px',
+            border: '1px solid var(--border)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>Create Marquee Text</h3>
+            
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Text content</label>
+            <textarea 
+              value={marqueeText}
+              onChange={e => setMarqueeText(e.target.value)}
+              placeholder="E.g. Welcome to our school!"
+              style={{
+                width: '100%', padding: '0.75rem', borderRadius: '8px',
+                border: '1px solid var(--border)', background: 'var(--background)',
+                color: 'var(--foreground)', marginBottom: '1rem', minHeight: '80px',
+                resize: 'vertical'
+              }}
+            />
+            
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Type</label>
+            <select
+              value={marqueeType}
+              onChange={e => setMarqueeType(e.target.value)}
+              style={{
+                width: '100%', padding: '0.75rem', borderRadius: '8px',
+                border: '1px solid var(--border)', background: 'var(--background)',
+                color: 'var(--foreground)', marginBottom: '1.5rem'
+              }}
+            >
+              <option value="STUDENT">STUDENT</option>
+              <option value="TEACHER">TEACHER</option>
+              <option value="GENERAL">GENERAL</option>
+            </select>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button 
+                onClick={() => setMarqueeModalOpen(false)}
+                style={{
+                  padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--foreground)', cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCreateMarquee}
+                disabled={marqueeLoading || !marqueeText.trim()}
+                style={{
+                  padding: '0.5rem 1rem', borderRadius: '6px', border: 'none',
+                  background: 'var(--primary)', color: 'white', cursor: 'pointer',
+                  opacity: (marqueeLoading || !marqueeText.trim()) ? 0.7 : 1
+                }}
+              >
+                {marqueeLoading ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
