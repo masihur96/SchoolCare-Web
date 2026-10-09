@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Users, BookOpen, BellRing, Calendar, CheckCircle,
   FileText, Settings, Menu, X, GraduationCap, LogOut, UserCheck,
   ClipboardList, BrainCircuit, Activity, Clock, MessageSquare, Book,
-  BarChart2, PieChart, ChevronLeft, ChevronRight, MessageCircle
+  BarChart2, PieChart, ChevronLeft, ChevronRight, MessageCircle,
+  MoreVertical, User, Key
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -17,6 +18,52 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false); // Mobile toggle
   const [isCollapsed, setIsCollapsed] = useState(false); // Desktop toggle
   const { t } = useLanguage();
+
+  const [profile, setProfile] = useState<any>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function getToken() {
+      if (typeof window === 'undefined') return '';
+      return (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token') ||
+        sessionStorage.getItem('access_token') ||
+        ''
+      );
+    }
+
+    async function fetchProfile() {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch('https://smart-school-backend-production.up.railway.app/auth/profile', {
+          headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setProfile(json.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch profile', e);
+      }
+    }
+    fetchProfile();
+  }, []);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const navItems = [
     { name: t('nav.dashboard') || 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -106,17 +153,78 @@ export function Sidebar() {
           )}
 
           {/* Bottom Actions */}
-          <div className="nd-bottom-actions">
-            <button
-              onClick={handleLogout}
-              className="nd-nav-item nd-logout-item"
-              title={isCollapsed ? t('nav.logout') || 'Logout' : undefined}
+          <div className="nd-bottom-actions" ref={profileRef} style={{ position: 'relative' }}>
+            <div 
+              className={`nd-sidebar-profile ${isCollapsed ? 'collapsed' : ''}`}
+              onClick={() => !isCollapsed && setIsProfileOpen(!isProfileOpen)}
             >
-              <div className="nd-nav-icon-wrapper">
-                <LogOut size={18} className="nd-nav-icon" />
+              <div className="nd-profile-avatar">
+                {profile?.avatar ? (
+                  <img src={profile.avatar} alt="Avatar" />
+                ) : (
+                  <span>{profile?.name ? profile.name.charAt(0).toUpperCase() : 'U'}</span>
+                )}
               </div>
-              {!isCollapsed && <span className="nd-nav-text">{t('nav.logout') || 'Logout'}</span>}
-            </button>
+              
+              {!isCollapsed && (
+                <>
+                  <div className="nd-profile-info">
+                    <span className="nd-profile-name">{profile?.name || 'User'}</span>
+                    <span className="nd-profile-role">{profile?.role === 'admin' ? 'Super Admin' : (profile?.role || 'Staff')}</span>
+                  </div>
+                  <button 
+                    className="nd-profile-more-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsProfileOpen(!isProfileOpen);
+                    }}
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Popover */}
+            {isProfileOpen && !isCollapsed && (
+              <div className="nd-profile-popover">
+                <div className="nd-popover-header">
+                  <div className="nd-profile-avatar">
+                    {profile?.avatar ? (
+                      <img src={profile.avatar} alt="Avatar" />
+                    ) : (
+                      <span>{profile?.name ? profile.name.charAt(0).toUpperCase() : 'U'}</span>
+                    )}
+                  </div>
+                  <div className="nd-profile-info">
+                    <span className="nd-profile-name">{profile?.name || 'User'}</span>
+                    <span className="nd-profile-email">{profile?.email || 'user@example.com'}</span>
+                  </div>
+                </div>
+                
+                <div className="nd-popover-divider"></div>
+                
+                <div className="nd-popover-menu">
+                  <Link href="/profile" className="nd-popover-item" onClick={() => setIsProfileOpen(false)}>
+                    <User size={16} />
+                    <span>Profile</span>
+                  </Link>
+                  <Link href="/change-password" className="nd-popover-item" onClick={() => setIsProfileOpen(false)}>
+                    <Key size={16} />
+                    <span>Change Password</span>
+                  </Link>
+                </div>
+                
+                <div className="nd-popover-divider"></div>
+                
+                <div className="nd-popover-menu">
+                  <button onClick={handleLogout} className="nd-popover-item nd-popover-logout">
+                    <LogOut size={16} />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* Collapse Toggle */}
             <button
@@ -375,6 +483,145 @@ export function Sidebar() {
 
         .nd-sidebar.collapsed .nd-collapse-btn {
           width: 100%;
+        }
+        
+        /* User Profile */
+        .nd-sidebar-profile {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.5rem;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: background 0.2s;
+          flex: 1;
+        }
+        .nd-sidebar-profile:hover {
+          background: #f8fafc;
+        }
+        .nd-sidebar-profile.collapsed {
+          justify-content: center;
+          padding: 0.5rem 0;
+        }
+        .nd-profile-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        .nd-profile-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .nd-profile-info {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          overflow: hidden;
+        }
+        .nd-profile-name {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #1e293b;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .nd-profile-role, .nd-profile-email {
+          font-size: 0.75rem;
+          color: #64748b;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-transform: capitalize;
+        }
+        .nd-profile-more-btn {
+          background: none;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+          padding: 0.25rem;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .nd-profile-more-btn:hover {
+          background: #e2e8f0;
+          color: #475569;
+        }
+        
+        .nd-profile-popover {
+          position: absolute;
+          bottom: calc(100% + 0.5rem);
+          left: 0;
+          width: 240px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          z-index: 100;
+          overflow: hidden;
+          animation: popover-up 0.2s ease-out;
+        }
+        @keyframes popover-up {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .nd-popover-header {
+          padding: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        
+        .nd-popover-divider {
+          height: 1px;
+          background: #f1f5f9;
+          width: 100%;
+        }
+        
+        .nd-popover-menu {
+          padding: 0.5rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        
+        .nd-popover-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.5rem 0.75rem;
+          border-radius: 8px;
+          color: #475569;
+          text-decoration: none;
+          font-size: 0.85rem;
+          font-weight: 500;
+          transition: all 0.2s;
+          border: none;
+          background: none;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+        }
+        .nd-popover-item:hover {
+          background: #f8fafc;
+          color: #0f172a;
+        }
+        .nd-popover-logout {
+          color: #ef4444;
+        }
+        .nd-popover-logout:hover {
+          background: #fef2f2;
+          color: #dc2626;
         }
 
         /* Mobile specific */

@@ -6,7 +6,7 @@ import {
   Users, GraduationCap, BookOpen, ClipboardList,
   Calendar, Clock, ChevronRight, ChevronLeft,
   FileText, Megaphone, Loader2, BarChart2, Brain,
-  Sparkles, UserCheck, Settings2,
+  Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight,
   BookCopy, LayoutGrid, ClipboardCheck, Star
 } from 'lucide-react';
@@ -84,6 +84,95 @@ function DonutChart({ pct, color, size = 100 }: { pct: number; color: string; si
   );
 }
 
+// ─── Area Chart ───────────────────────────────────────────────────────────────
+function AreaChart({ data }: { data: { label: string, value: number, subLabel?: string, subColor?: string }[] }) {
+  const w = 600;
+  const h = 240;
+  const padX = 30;
+  const padY = 40;
+
+  // Render grid if no data but we want to show empty state, though we should always have data
+  if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>No data</div>;
+
+  const maxVal = 100; // Force 0-100% scale
+  const getX = (i: number) => padX + (i / (data.length - 1 || 1)) * (w - padX * 2);
+  const getY = (v: number) => h - padY - (v / maxVal) * (h - padY * 2 - 20); // Extra 20px for top padding
+
+  // Helper for smooth curve
+  const getCurve = () => {
+    let dStr = `M ${getX(0)},${getY(data[0].value)}`;
+    for (let i = 0; i < data.length - 1; i++) {
+      const x0 = getX(i); const y0 = getY(data[i].value);
+      const x1 = getX(i + 1); const y1 = getY(data[i + 1].value);
+      const cp1x = x0 + (x1 - x0) / 2; const cp1y = y0;
+      const cp2x = x1 - (x1 - x0) / 2; const cp2y = y1;
+      dStr += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x1},${y1}`;
+    }
+    return dStr;
+  };
+
+  const path = getCurve();
+  const area = `${path} L ${getX(data.length - 1)},${h - padY} L ${getX(0)},${h - padY} Z`;
+
+  return (
+    <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
+      <svg width={Math.max(w, data.length * 40)} height={h} viewBox={`0 0 ${Math.max(w, data.length * 40)} ${h}`} preserveAspectRatio="none" style={{ minWidth: '100%' }}>
+        <defs>
+          <linearGradient id="gradPurple" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Y-Axis Labels & Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+          const y = getY(pct * 100);
+          return (
+            <g key={pct}>
+              <text x={padX - 5} y={y + 4} fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">{pct * 100}%</text>
+              <line x1={padX + 5} y1={y} x2={Math.max(w, data.length * 40) - padX} y2={y} stroke="#f1f5f9" strokeDasharray="4 4" />
+            </g>
+          );
+        })}
+
+        {/* Path & Area */}
+        <path d={area} fill="url(#gradPurple)" />
+        <path d={path} fill="none" stroke="#a855f7" strokeWidth="3" />
+        
+        {/* Nodes and X-Axis Labels */}
+        {data.map((d, i) => {
+          const x = getX(i);
+          const y = getY(d.value);
+          const [dayName, dayNum] = d.label.split(' ');
+          
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r="5" fill="#fff" stroke="#a855f7" strokeWidth="2" />
+              {dayNum ? (
+                <>
+                  <text x={x} y={h - 22} fontSize="10" fill="#94a3b8" textAnchor="middle">{dayName}</text>
+                  <text x={x} y={h - 10} fontSize="11" fill="#64748b" textAnchor="middle" fontWeight="bold">
+                    {dayNum}
+                  </text>
+                </>
+              ) : (
+                <text x={x} y={h - 15} fontSize="11" fill="#64748b" textAnchor="middle" fontWeight="bold">
+                  {d.label}
+                </text>
+              )}
+              {d.subLabel && (
+                <text x={x} y={h - 0} fontSize="10" fill={d.subColor || '#94a3b8'} textAnchor="middle" fontWeight="bold">
+                  {d.subLabel}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 // ─── Mini Bar Chart ───────────────────────────────────────────────────────────
 function MiniBarChart({ data }: { data: { label: string; avg: number; top: number }[] }) {
   return (
@@ -151,6 +240,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [attendanceView, setAttendanceView] = useState<'month' | 'year'>('month');
   const today = new Date();
 
   async function fetchProfile(): Promise<UserProfile | null> {
@@ -168,7 +258,9 @@ export default function DashboardPage() {
     async function init() {
       await fetchProfile();
       try {
-        const res = await fetch('https://smart-school-backend-production.up.railway.app/dashboard/admin',
+        const mm = today.getMonth() + 1;
+        const yyyy = today.getFullYear();
+        const res = await fetch(`https://smart-school-backend-production.up.railway.app/dashboard/admin?month=${mm}&year=${yyyy}`,
           { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
@@ -265,10 +357,89 @@ export default function DashboardPage() {
     );
   }
 
+  const studentStats = attendanceView === 'month' && (d.attendStudent as any)?.monthlySummary
+    ? {
+        rate: Math.round((d.attendStudent as any).monthlySummary.attendanceRate) || 0,
+        total: (d.attendStudent as any).monthlySummary.totalStudents || 0,
+        present: (d.attendStudent as any).monthlySummary.totalPresent || 0,
+        absent: (d.attendStudent as any).monthlySummary.totalAbsent || 0,
+      }
+    : {
+        rate: Math.round(d.attendStudent?.attendanceRate) || 0,
+        total: d.attendStudent?.totalStudents || 0,
+        present: d.attendStudent?.present || 0,
+        absent: d.attendStudent?.absent || 0,
+      };
+
+  const teacherStats = attendanceView === 'month' && (d.attendTeacher as any)?.monthlySummary
+    ? {
+        rate: Math.round((d.attendTeacher as any).monthlySummary.attendanceRate) || 0,
+        total: (d.attendTeacher as any).monthlySummary.totalTeachers || 0,
+        present: (d.attendTeacher as any).monthlySummary.totalPresent || 0,
+        absent: (d.attendTeacher as any).monthlySummary.totalAbsent || 0,
+      }
+    : {
+        rate: Math.round(d.attendTeacher?.attendanceRate) || 0,
+        total: d.attendTeacher?.totalTeachers || 0,
+        present: d.attendTeacher?.present || 0,
+        absent: d.attendTeacher?.absent || 0,
+      };
+
+  const getDayName = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' });
+  const _dailyData = ((d.attendStudent as any)?.data || []).map((record: any) => {
+    const total = record.present + record.absent + (record.leave || 0) + (record.late || 0);
+    const rate = total > 0 ? Math.round((record.present / total) * 100) : 0;
+    return {
+      label: `${getDayName(record.date)} ${new Date(record.date).getDate()}`,
+      value: rate,
+      subLabel: `${rate}%`,
+      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444'
+    };
+  });
+
+  const generateMonthlyDays = () => {
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    return Array.from({ length: daysInMonth }).map((_, i) => {
+      const dd = new Date(today.getFullYear(), today.getMonth(), i + 1);
+      return {
+        label: `${dd.toLocaleDateString('en-US', { weekday: 'short' })} ${dd.getDate()}`,
+        value: 0,
+        subLabel: '-',
+        subColor: '#94a3b8'
+      };
+    });
+  };
+
+  const dummyYearlyData = [
+    { label: 'Jan', value: 0 }, { label: 'Feb', value: 0 }, { label: 'Mar', value: 0 },
+    { label: 'Apr', value: 0 }, { label: 'May', value: 48 }, { label: 'Jun', value: 74 },
+    { label: 'Jul', value: 46 }, { label: 'Aug', value: 82 }, { label: 'Sep', value: 85 },
+    { label: 'Oct', value: 78 }, { label: 'Nov', value: 0 }, { label: 'Dec', value: 0 }
+  ];
+
+  const _dailyTeacherData = ((d.attendTeacher as any)?.data || (d.attendTeacher as any)?.recentRecords || []).map((record: any) => {
+    const total = record.present + record.absent + (record.leave || 0) + (record.late || 0);
+    const rate = total > 0 ? Math.round((record.present / total) * 100) : 0;
+    return {
+      label: `${getDayName(record.date)} ${new Date(record.date).getDate()}`,
+      value: rate,
+      subLabel: `${rate}%`,
+      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444'
+    };
+  });
+
+  const studentChartData = attendanceView === 'month' 
+    ? (_dailyData.length > 0 ? _dailyData : generateMonthlyDays())
+    : dummyYearlyData;
+
+  const teacherChartData = attendanceView === 'month'
+    ? (_dailyTeacherData.length > 0 ? _dailyTeacherData : generateMonthlyDays())
+    : dummyYearlyData;
+
   return (
     <div className="nd-root">
       {/* ── Page Title ── */}
-      <h1 className="nd-page-title">Dashboard Overview</h1>
+      {/* <h1 className="nd-page-title">Dashboard Overview</h1> */ }
 
       {/* ── Two-column layout: main + right panel ── */}
       <div className="nd-layout">
@@ -276,52 +447,121 @@ export default function DashboardPage() {
         {/* ══ Main Column ══ */}
         <div className="nd-main">
 
-          {/* ── Hero Banner ── */}
-          <div className="nd-hero">
-            <div className="nd-hero-left">
-              <div className="nd-hero-avatar">
-                <GraduationCap size={52} color="#6366f1" strokeWidth={1.5} />
-              </div>
-              <div className="nd-hero-text">
-                <h2 className="nd-hero-greeting">{greeting}, {name}! {emoji}</h2>
-                <p className="nd-hero-sub">Empower minds. Inspire futures.</p>
-                <p className="nd-hero-info">
-                  You have <strong>{d.attendTeacher.totalTeachers ?? 24} teachers</strong> and{' '}
-                  <Link href="/students" className="nd-hero-link">{d.attendStudent.totalStudents ?? 128} students</Link> enrolled.
-                </p>
-                <Link href="/students" className="nd-hero-btn">
-                  View Students <ArrowRight size={14} />
-                </Link>
-              </div>
-            </div>
-            <div className="nd-hero-right">
-              <div className="nd-ai-card">
-                <div className="nd-ai-icon-wrap" style={{ background: '#eef2ff' }}>
-                  <Brain size={18} color="#6366f1" />
+                    {/* ── Attendance Overview ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.25rem' }}>
+            
+            {/* Student Attendance Chart Card */}
+            <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ background: '#f3e8ff', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <BarChart3 size={24} color="#a855f7" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                      {attendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                    </h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      Student Attendance
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="nd-ai-title">AI Lesson Planner</p>
-                  <p className="nd-ai-sub">Create smart lesson plans in seconds with AI.</p>
-                </div>
-                <button className="nd-ai-btn" style={{ borderColor: '#6366f1', color: '#6366f1' }}>
-                  Create Plan <ChevronRight size={12} />
+                
+                <button 
+                  onClick={() => setAttendanceView(attendanceView === 'month' ? 'year' : 'month')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                >
+                  <ArrowLeftRight size={14} /> {attendanceView === 'month' ? 'Yearly' : 'Daily'}
                 </button>
               </div>
-              <div className="nd-ai-card">
-                <div className="nd-ai-icon-wrap" style={{ background: '#fdf4ff' }}>
-                  <Sparkles size={18} color="#a855f7" />
-                </div>
-                <div>
-                  <p className="nd-ai-title">AI Content Generator</p>
-                  <p className="nd-ai-sub">Generate worksheets, quizzes and study materials instantly.</p>
-                </div>
-                <button className="nd-ai-btn" style={{ borderColor: '#a855f7', color: '#a855f7' }}>
-                  Generate <ChevronRight size={12} />
-                </button>
-              </div>
-            </div>
-          </div>
 
+              {attendanceView === 'month' && (
+                <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendStudent as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendStudent as any)?.monthlySummary?.daysInMonth || 31}d</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Recorded</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendStudent as any)?.monthlySummary?.totalPresent || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Present</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendStudent as any)?.monthlySummary?.totalAbsent || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Absent</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendStudent as any)?.monthlySummary?.totalLeave || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Leave</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendStudent as any)?.monthlySummary?.totalLate || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Late</p>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ height: '240px', marginTop: '1rem' }}>
+                <AreaChart data={studentChartData} />
+              </div>
+            </div>
+
+            {/* Teacher Attendance Chart Card */}
+            <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ background: '#f3e8ff', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <BarChart3 size={24} color="#a855f7" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                      {attendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                    </h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      Teacher Attendance
+                    </p>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setAttendanceView(attendanceView === 'month' ? 'year' : 'month')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                >
+                  <ArrowLeftRight size={14} /> {attendanceView === 'month' ? 'Yearly' : 'Daily'}
+                </button>
+              </div>
+
+              {attendanceView === 'month' && (
+                <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendTeacher as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendTeacher as any)?.monthlySummary?.daysInMonth || 31}d</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Recorded</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendTeacher as any)?.monthlySummary?.totalPresent || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Present</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendTeacher as any)?.monthlySummary?.totalAbsent || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Absent</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLeave || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Leave</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLate || 0}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Late</p>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ height: '240px', marginTop: '1rem' }}>
+                <AreaChart data={teacherChartData} />
+              </div>
+            </div>
+
+          </div>
+          
           {/* ── Stat Cards ── */}
           <div className="nd-stats-row">
             {[

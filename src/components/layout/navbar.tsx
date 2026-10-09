@@ -630,19 +630,7 @@ export function Navbar() {
           </div>
 
           {/* ── User ── */}
-          <div className="user-profile glass-card">
-            {profile?.avatar ? (
-              <img src={profile.avatar} alt="Avatar" className="avatar" style={{ objectFit: 'cover' }} />
-            ) : (
-              <div className="avatar">{profile?.name ? profile.name.charAt(0).toUpperCase() : 'A'}</div>
-            )}
-            <div className="user-info">
-              <span className="user-name">{profile?.name || 'Admin'}</span>
-              <span className="user-role" style={{ textTransform: 'capitalize' }}>
-                {profile?.role || 'Super Admin'}
-              </span>
-            </div>
-          </div>
+          {/* User profile moved to sidebar */}
         </div>
       </header>
 
