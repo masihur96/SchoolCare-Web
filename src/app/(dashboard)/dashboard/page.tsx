@@ -85,7 +85,7 @@ function DonutChart({ pct, color, size = 100 }: { pct: number; color: string; si
 }
 
 // ─── Area Chart ───────────────────────────────────────────────────────────────
-function AreaChart({ data }: { data: { label: string, value: number, subLabel?: string, subColor?: string, stats?: { present: number, absent: number, leave: number, late: number, total: number } }[] }) {
+function AreaChart({ data, height = 320 }: { data: { label: string, value: number, subLabel?: string, subColor?: string, stats?: { present: number, absent: number, leave: number, late: number, total: number } }[], height?: number }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +98,7 @@ function AreaChart({ data }: { data: { label: string, value: number, subLabel?: 
   }, [data]);
 
   const w = 600;
-  const h = 240;
+  const h = height;
   const padX = 30;
   const padY = 40;
 
@@ -290,6 +290,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [studentAttendanceView, setStudentAttendanceView] = useState<'month' | 'year'>('month');
   const [teacherAttendanceView, setTeacherAttendanceView] = useState<'month' | 'year'>('month');
+  const [teacherAttendanceData, setTeacherAttendanceData] = useState<any[]>([]);
   const today = new Date();
 
   async function fetchProfile(): Promise<UserProfile | null> {
@@ -311,9 +312,20 @@ export default function DashboardPage() {
         const yyyy = today.getFullYear();
         const res = await fetch(`https://smart-school-backend-production.up.railway.app/dashboard/admin?month=${mm}&year=${yyyy}`,
           { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        setData(json.data);
+        if (res.ok) {
+          const json = await res.json();
+          setData(json.data);
+        }
+
+        const daysInMonth = new Date(yyyy, mm, 0).getDate();
+        const startD = `01-${mm.toString().padStart(2, '0')}-${yyyy}`;
+        const endD = `${daysInMonth.toString().padStart(2, '0')}-${mm.toString().padStart(2, '0')}-${yyyy}`;
+        const tRes = await fetch(`https://smart-school-backend-production.up.railway.app/admin/teacher-attendance?startDate=${startD}&endDate=${endD}`,
+          { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
+        if (tRes.ok) {
+          const tJson = await tRes.json();
+          setTeacherAttendanceData(tJson.data || []);
+        }
       } catch { /* use dummy data */ }
       finally { setLoading(false); }
     }
@@ -490,12 +502,40 @@ export default function DashboardPage() {
     };
   });
 
+  let computedDailyTeacherData: any[] = [];
+  if (teacherAttendanceData && teacherAttendanceData.length > 0) {
+    const grouped = teacherAttendanceData.reduce((acc, curr) => {
+      if (!curr.date) return acc;
+      const dStr = curr.date.split('T')[0];
+      if (!acc[dStr]) acc[dStr] = new Set();
+      acc[dStr].add(curr.teacherId);
+      return acc;
+    }, {} as Record<string, Set<string>>);
+    
+    computedDailyTeacherData = Object.entries(grouped).map(([dateStr, teacherSet]) => {
+      const presentCount = teacherSet.size;
+      const totalCount = d.attendTeacher?.totalTeachers || 24;
+      const absentCount = Math.max(0, totalCount - presentCount);
+      const total = presentCount + absentCount;
+      const rate = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+      
+      return {
+        label: `${getDayName(dateStr)} ${new Date(dateStr).getDate()}`,
+        value: rate,
+        subLabel: `${rate}%`,
+        subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444',
+        stats: { present: presentCount, absent: absentCount, leave: 0, late: 0, total: total },
+        dateStr
+      };
+    }).sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+  }
+
   const studentChartData = studentAttendanceView === 'month' 
     ? (_dailyData.length > 0 ? _dailyData : generateMonthlyDays())
     : dummyYearlyData;
 
   const teacherChartData = teacherAttendanceView === 'month'
-    ? (_dailyTeacherData.length > 0 ? _dailyTeacherData : generateMonthlyDays())
+    ? (computedDailyTeacherData.length > 0 ? computedDailyTeacherData : (_dailyTeacherData.length > 0 ? _dailyTeacherData : generateMonthlyDays()))
     : dummyYearlyData;
 
   return (
@@ -562,8 +602,8 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div style={{ height: '240px', marginTop: '1rem' }}>
-                <AreaChart data={studentChartData} />
+              <div style={{ height: '320px', marginTop: '3rem' }}>
+                <AreaChart data={studentChartData} height={320} />
               </div>
             </div>
 
@@ -617,8 +657,8 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div style={{ height: '240px', marginTop: '1rem' }}>
-                <AreaChart data={teacherChartData} />
+              <div style={{ height: '320px', marginTop: '3rem' }}>
+                <AreaChart data={teacherChartData} height={320} />
               </div>
             </div>
 
