@@ -316,21 +316,39 @@ export default function DashboardPage() {
           const json = await res.json();
           setData(json.data);
         }
+      } catch { /* use dummy data */ }
+      finally { setLoading(false); }
+    }
+    init();
+  }, []);
 
-        const daysInMonth = new Date(yyyy, mm, 0).getDate();
-        const startD = `01-${mm.toString().padStart(2, '0')}-${yyyy}`;
-        const endD = `${daysInMonth.toString().padStart(2, '0')}-${mm.toString().padStart(2, '0')}-${yyyy}`;
+  useEffect(() => {
+    async function fetchTeacherData() {
+      const yyyy = today.getFullYear();
+      let startD = '';
+      let endD = '';
+      
+      if (teacherAttendanceView === 'month') {
+        const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+        const daysInMonth = new Date(yyyy, today.getMonth() + 1, 0).getDate();
+        startD = `${yyyy}-${mm}-01`;
+        endD = `${yyyy}-${mm}-${daysInMonth.toString().padStart(2, '0')}`;
+      } else {
+        startD = `${yyyy}-01-01`;
+        endD = `${yyyy}-12-31`;
+      }
+
+      try {
         const tRes = await fetch(`https://smart-school-backend-production.up.railway.app/admin/teacher-attendance?startDate=${startD}&endDate=${endD}`,
           { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
         if (tRes.ok) {
           const tJson = await tRes.json();
           setTeacherAttendanceData(tJson.data || []);
         }
-      } catch { /* use dummy data */ }
-      finally { setLoading(false); }
+      } catch (err) {}
     }
-    init();
-  }, []);
+    fetchTeacherData();
+  }, [teacherAttendanceView]);
 
   // ── Dummy fallback data ────────────────────────────────────────────────────
   const dummy: DashboardData = {
@@ -503,8 +521,8 @@ export default function DashboardPage() {
   });
 
   let computedDailyTeacherData: any[] = [];
-  if (teacherAttendanceData && teacherAttendanceData.length > 0) {
-    const grouped = teacherAttendanceData.reduce((acc, curr) => {
+  if (teacherAttendanceData) {
+    const grouped = (teacherAttendanceData || []).reduce((acc, curr) => {
       if (!curr.date) return acc;
       const dStr = curr.date.split('T')[0];
       if (!acc[dStr]) acc[dStr] = new Set();
@@ -512,22 +530,65 @@ export default function DashboardPage() {
       return acc;
     }, {} as Record<string, Set<string>>);
     
-    computedDailyTeacherData = Object.entries(grouped).map(([dateStr, teacherSet]) => {
-      const presentCount = teacherSet.size;
+    computedDailyTeacherData = Array.from({ length: today.getDate() }).map((_, i) => {
+      const iterDate = new Date(today.getFullYear(), today.getMonth(), i + 1);
+      const dateStr = `${iterDate.getFullYear()}-${(iterDate.getMonth()+1).toString().padStart(2,'0')}-${iterDate.getDate().toString().padStart(2,'0')}`;
+      
+      const presentCount = grouped[dateStr] ? grouped[dateStr].size : 0;
       const totalCount = d.attendTeacher?.totalTeachers || 24;
       const absentCount = Math.max(0, totalCount - presentCount);
       const total = presentCount + absentCount;
       const rate = total > 0 ? Math.round((presentCount / total) * 100) : 0;
       
       return {
-        label: `${getDayName(dateStr)} ${new Date(dateStr).getDate()}`,
+        label: `${getDayName(dateStr)} ${iterDate.getDate()}`,
         value: rate,
         subLabel: `${rate}%`,
         subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444',
         stats: { present: presentCount, absent: absentCount, leave: 0, late: 0, total: total },
         dateStr
       };
-    }).sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+    }).filter(item => item.stats.present > 0);
+  }
+
+  let computedYearlyTeacherData: any[] = [];
+  if (teacherAttendanceData && teacherAttendanceView === 'year') {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    computedYearlyTeacherData = months.map((monthName, index) => {
+      const mm = (index + 1).toString().padStart(2, '0');
+      const recordsInMonth = (teacherAttendanceData || []).filter(curr => curr.date && curr.date.startsWith(`${today.getFullYear()}-${mm}`));
+      
+      const groupedByDate = recordsInMonth.reduce((acc, curr) => {
+        const dStr = curr.date.split('T')[0];
+        if (!acc[dStr]) acc[dStr] = new Set();
+        acc[dStr].add(curr.teacherId);
+        return acc;
+      }, {} as Record<string, Set<string>>);
+
+      const daysRecorded = Object.keys(groupedByDate).length;
+      let averageRate = 0;
+      const totalCount = d.attendTeacher?.totalTeachers || 24;
+
+      if (daysRecorded > 0) {
+        let sumRates = 0;
+        Object.values(groupedByDate).forEach(set => {
+          sumRates += (set.size / totalCount) * 100;
+        });
+        averageRate = Math.round(sumRates / daysRecorded);
+      }
+      
+      const presentCount = Object.values(groupedByDate).reduce((sum, set) => sum + set.size, 0);
+      const absentCount = (daysRecorded * totalCount) - presentCount;
+      const totalPossible = daysRecorded * totalCount;
+      
+      return {
+        label: monthName,
+        value: averageRate,
+        subLabel: averageRate > 0 ? `${averageRate}%` : '-',
+        subColor: averageRate >= 80 ? '#10b981' : averageRate >= 60 ? '#f59e0b' : '#ef4444',
+        stats: { present: presentCount, absent: absentCount, leave: 0, late: 0, total: totalPossible }
+      };
+    });
   }
 
   const studentChartData = studentAttendanceView === 'month' 
@@ -536,7 +597,7 @@ export default function DashboardPage() {
 
   const teacherChartData = teacherAttendanceView === 'month'
     ? (computedDailyTeacherData.length > 0 ? computedDailyTeacherData : (_dailyTeacherData.length > 0 ? _dailyTeacherData : generateMonthlyDays()))
-    : dummyYearlyData;
+    : (computedYearlyTeacherData.length > 0 ? computedYearlyTeacherData : dummyYearlyData);
 
   return (
     <div className="nd-root">
