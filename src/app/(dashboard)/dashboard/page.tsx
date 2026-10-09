@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   Users, GraduationCap, BookOpen, ClipboardList,
@@ -85,20 +85,29 @@ function DonutChart({ pct, color, size = 100 }: { pct: number; color: string; si
 }
 
 // ─── Area Chart ───────────────────────────────────────────────────────────────
-function AreaChart({ data }: { data: { label: string, value: number, subLabel?: string, subColor?: string }[] }) {
+function AreaChart({ data }: { data: { label: string, value: number, subLabel?: string, subColor?: string, stats?: { present: number, absent: number, leave: number, late: number, total: number } }[] }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+      }, 0);
+    }
+  }, [data]);
+
   const w = 600;
   const h = 240;
   const padX = 30;
   const padY = 40;
 
-  // Render grid if no data but we want to show empty state, though we should always have data
   if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>No data</div>;
 
-  const maxVal = 100; // Force 0-100% scale
+  const maxVal = 100;
   const getX = (i: number) => padX + (i / (data.length - 1 || 1)) * (w - padX * 2);
-  const getY = (v: number) => h - padY - (v / maxVal) * (h - padY * 2 - 20); // Extra 20px for top padding
+  const getY = (v: number) => h - padY - (v / maxVal) * (h - padY * 2 - 20);
 
-  // Helper for smooth curve
   const getCurve = () => {
     let dStr = `M ${getX(0)},${getY(data[0].value)}`;
     for (let i = 0; i < data.length - 1; i++) {
@@ -115,8 +124,8 @@ function AreaChart({ data }: { data: { label: string, value: number, subLabel?: 
   const area = `${path} L ${getX(data.length - 1)},${h - padY} L ${getX(0)},${h - padY} Z`;
 
   return (
-    <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
-      <svg width={Math.max(w, data.length * 40)} height={h} viewBox={`0 0 ${Math.max(w, data.length * 40)} ${h}`} preserveAspectRatio="none" style={{ minWidth: '100%' }}>
+    <div ref={scrollRef} style={{ width: '100%', overflowX: 'auto', overflowY: 'visible', position: 'relative' }}>
+      <svg width={Math.max(w, data.length * 40)} height={h} viewBox={`0 0 ${Math.max(w, data.length * 40)} ${h}`} preserveAspectRatio="none" style={{ minWidth: '100%', overflow: 'visible' }}>
         <defs>
           <linearGradient id="gradPurple" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#a855f7" stopOpacity="0.4" />
@@ -124,7 +133,6 @@ function AreaChart({ data }: { data: { label: string, value: number, subLabel?: 
           </linearGradient>
         </defs>
 
-        {/* Y-Axis Labels & Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map(pct => {
           const y = getY(pct * 100);
           return (
@@ -135,28 +143,35 @@ function AreaChart({ data }: { data: { label: string, value: number, subLabel?: 
           );
         })}
 
-        {/* Path & Area */}
         <path d={area} fill="url(#gradPurple)" />
         <path d={path} fill="none" stroke="#a855f7" strokeWidth="3" />
         
-        {/* Nodes and X-Axis Labels */}
         {data.map((d, i) => {
           const x = getX(i);
           const y = getY(d.value);
           const [dayName, dayNum] = d.label.split(' ');
+          const isHovered = hoverIndex === i;
           
           return (
-            <g key={i}>
-              <circle cx={x} cy={y} r="5" fill="#fff" stroke="#a855f7" strokeWidth="2" />
+            <g 
+              key={i}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              {/* Invisible interactive area */}
+              <rect x={x - 20} y={0} width={40} height={h} fill="transparent" />
+              
+              <circle cx={x} cy={y} r={isHovered ? 7 : 5} fill="#fff" stroke="#a855f7" strokeWidth={isHovered ? 3 : 2} style={{ transition: 'all 0.2s' }} />
               {dayNum ? (
                 <>
-                  <text x={x} y={h - 22} fontSize="10" fill="#94a3b8" textAnchor="middle">{dayName}</text>
-                  <text x={x} y={h - 10} fontSize="11" fill="#64748b" textAnchor="middle" fontWeight="bold">
+                  <text x={x} y={h - 22} fontSize="10" fill={isHovered ? "#64748b" : "#94a3b8"} textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>{dayName}</text>
+                  <text x={x} y={h - 10} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
                     {dayNum}
                   </text>
                 </>
               ) : (
-                <text x={x} y={h - 15} fontSize="11" fill="#64748b" textAnchor="middle" fontWeight="bold">
+                <text x={x} y={h - 15} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
                   {d.label}
                 </text>
               )}
@@ -169,6 +184,39 @@ function AreaChart({ data }: { data: { label: string, value: number, subLabel?: 
           );
         })}
       </svg>
+      
+      {hoverIndex !== null && data[hoverIndex]?.stats && (
+        <div style={{
+          position: 'absolute',
+          left: Math.min(getX(hoverIndex) + 15, Math.max(w, data.length * 40) - 150),
+          top: Math.max(10, getY(data[hoverIndex].value) - 80),
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '0.75rem',
+          padding: '0.75rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          pointerEvents: 'none',
+          zIndex: 10,
+          minWidth: '130px'
+        }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+            {data[hoverIndex].label.replace(' ', ', ')} - {data[hoverIndex].value}%
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', fontSize: '0.75rem' }}>
+            <span style={{ color: '#10b981' }}>Present:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.present / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.present})</span>
+            
+            <span style={{ color: '#ef4444' }}>Absent:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.absent / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.absent})</span>
+            
+            <span style={{ color: '#f59e0b' }}>Leave:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.leave / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.leave})</span>
+            
+            <span style={{ color: '#8b5cf6' }}>Late:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.late / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.late})</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -240,7 +288,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [attendanceView, setAttendanceView] = useState<'month' | 'year'>('month');
+  const [studentAttendanceView, setStudentAttendanceView] = useState<'month' | 'year'>('month');
+  const [teacherAttendanceView, setTeacherAttendanceView] = useState<'month' | 'year'>('month');
   const today = new Date();
 
   async function fetchProfile(): Promise<UserProfile | null> {
@@ -357,7 +406,7 @@ export default function DashboardPage() {
     );
   }
 
-  const studentStats = attendanceView === 'month' && (d.attendStudent as any)?.monthlySummary
+  const studentStats = studentAttendanceView === 'month' && (d.attendStudent as any)?.monthlySummary
     ? {
         rate: Math.round((d.attendStudent as any).monthlySummary.attendanceRate) || 0,
         total: (d.attendStudent as any).monthlySummary.totalStudents || 0,
@@ -371,7 +420,7 @@ export default function DashboardPage() {
         absent: d.attendStudent?.absent || 0,
       };
 
-  const teacherStats = attendanceView === 'month' && (d.attendTeacher as any)?.monthlySummary
+  const teacherStats = teacherAttendanceView === 'month' && (d.attendTeacher as any)?.monthlySummary
     ? {
         rate: Math.round((d.attendTeacher as any).monthlySummary.attendanceRate) || 0,
         total: (d.attendTeacher as any).monthlySummary.totalTeachers || 0,
@@ -386,14 +435,17 @@ export default function DashboardPage() {
       };
 
   const getDayName = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' });
-  const _dailyData = ((d.attendStudent as any)?.data || []).map((record: any) => {
+  const _dailyData = ((d.attendStudent as any)?.dailyAttendance || (d.attendStudent as any)?.data || [])
+    .filter((record: any) => record.hasData !== false && record.recorded !== false)
+    .map((record: any) => {
     const total = record.present + record.absent + (record.leave || 0) + (record.late || 0);
     const rate = total > 0 ? Math.round((record.present / total) * 100) : 0;
     return {
       label: `${getDayName(record.date)} ${new Date(record.date).getDate()}`,
       value: rate,
       subLabel: `${rate}%`,
-      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444'
+      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444',
+      stats: { present: record.present || 0, absent: record.absent || 0, leave: record.leave || 0, late: record.late || 0, total: total || 1 }
     };
   });
 
@@ -410,29 +462,39 @@ export default function DashboardPage() {
     });
   };
 
+    const generateDummyYearlyStats = (value: number) => {
+    const total = 100;
+    const present = Math.round(total * (value / 100));
+    const absent = total - present;
+    return { present, absent, leave: 0, late: 0, total };
+  };
+
   const dummyYearlyData = [
     { label: 'Jan', value: 0 }, { label: 'Feb', value: 0 }, { label: 'Mar', value: 0 },
     { label: 'Apr', value: 0 }, { label: 'May', value: 48 }, { label: 'Jun', value: 74 },
     { label: 'Jul', value: 46 }, { label: 'Aug', value: 82 }, { label: 'Sep', value: 85 },
     { label: 'Oct', value: 78 }, { label: 'Nov', value: 0 }, { label: 'Dec', value: 0 }
-  ];
+  ].map(d => ({ ...d, subLabel: d.value > 0 ? `${d.value}%` : '-', subColor: d.value >= 80 ? '#10b981' : d.value >= 60 ? '#f59e0b' : '#ef4444', stats: generateDummyYearlyStats(d.value) }));
 
-  const _dailyTeacherData = ((d.attendTeacher as any)?.data || (d.attendTeacher as any)?.recentRecords || []).map((record: any) => {
+  const _dailyTeacherData = ((d.attendTeacher as any)?.dailyAttendance || (d.attendTeacher as any)?.data || (d.attendTeacher as any)?.recentRecords || [])
+    .filter((record: any) => record.hasData !== false && record.recorded !== false)
+    .map((record: any) => {
     const total = record.present + record.absent + (record.leave || 0) + (record.late || 0);
     const rate = total > 0 ? Math.round((record.present / total) * 100) : 0;
     return {
       label: `${getDayName(record.date)} ${new Date(record.date).getDate()}`,
       value: rate,
       subLabel: `${rate}%`,
-      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444'
+      subColor: rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444',
+      stats: { present: record.present || 0, absent: record.absent || 0, leave: record.leave || 0, late: record.late || 0, total: total || 1 }
     };
   });
 
-  const studentChartData = attendanceView === 'month' 
+  const studentChartData = studentAttendanceView === 'month' 
     ? (_dailyData.length > 0 ? _dailyData : generateMonthlyDays())
     : dummyYearlyData;
 
-  const teacherChartData = attendanceView === 'month'
+  const teacherChartData = teacherAttendanceView === 'month'
     ? (_dailyTeacherData.length > 0 ? _dailyTeacherData : generateMonthlyDays())
     : dummyYearlyData;
 
@@ -459,7 +521,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {attendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                      {studentAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
                       Student Attendance
@@ -468,14 +530,14 @@ export default function DashboardPage() {
                 </div>
                 
                 <button 
-                  onClick={() => setAttendanceView(attendanceView === 'month' ? 'year' : 'month')}
+                  onClick={() => setStudentAttendanceView(studentAttendanceView === 'month' ? 'year' : 'month')}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                 >
-                  <ArrowLeftRight size={14} /> {attendanceView === 'month' ? 'Yearly' : 'Daily'}
+                  <ArrowLeftRight size={14} /> {studentAttendanceView === 'month' ? 'Monthly' : 'Daily'}
                 </button>
               </div>
 
-              {attendanceView === 'month' && (
+              {true && (
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendStudent as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendStudent as any)?.monthlySummary?.daysInMonth || 31}d</p>
@@ -514,7 +576,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {attendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                      {teacherAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
                       Teacher Attendance
@@ -523,14 +585,14 @@ export default function DashboardPage() {
                 </div>
                 
                 <button 
-                  onClick={() => setAttendanceView(attendanceView === 'month' ? 'year' : 'month')}
+                  onClick={() => setTeacherAttendanceView(teacherAttendanceView === 'month' ? 'year' : 'month')}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                 >
-                  <ArrowLeftRight size={14} /> {attendanceView === 'month' ? 'Yearly' : 'Daily'}
+                  <ArrowLeftRight size={14} /> {teacherAttendanceView === 'month' ? 'Monthly' : 'Daily'}
                 </button>
               </div>
 
-              {attendanceView === 'month' && (
+              {true && (
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendTeacher as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendTeacher as any)?.monthlySummary?.daysInMonth || 31}d</p>
