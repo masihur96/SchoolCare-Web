@@ -8,8 +8,14 @@ import {
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight,
-  BookCopy, LayoutGrid, ClipboardCheck, Star
+  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const TeacherMap = dynamic(() => import('@/components/TeacherMap'), {
+  ssr: false,
+  loading: () => <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '0.75rem' }}>Loading map...</div>
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AttendanceInfo {
@@ -290,6 +296,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [studentAttendanceView, setStudentAttendanceView] = useState<'month' | 'year'>('month');
   const [teacherAttendanceView, setTeacherAttendanceView] = useState<'month' | 'year'>('month');
+  const [showTeacherMap, setShowTeacherMap] = useState(false);
   const [teacherAttendanceData, setTeacherAttendanceData] = useState<any[]>([]);
   const today = new Date();
 
@@ -571,13 +578,13 @@ export default function DashboardPage() {
 
       if (daysRecorded > 0) {
         let sumRates = 0;
-        Object.values(groupedByDate).forEach(set => {
+        Object.values(groupedByDate).forEach((set: any) => {
           sumRates += (set.size / totalCount) * 100;
         });
         averageRate = Math.round(sumRates / daysRecorded);
       }
       
-      const presentCount = Object.values(groupedByDate).reduce((sum, set) => sum + set.size, 0);
+      const presentCount = Object.values(groupedByDate).reduce((sum: number, set: any) => sum + set.size, 0);
       const absentCount = (daysRecorded * totalCount) - presentCount;
       const totalPossible = daysRecorded * totalCount;
       
@@ -685,12 +692,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 
-                <button 
-                  onClick={() => setTeacherAttendanceView(teacherAttendanceView === 'month' ? 'year' : 'month')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
-                >
-                  <ArrowLeftRight size={14} /> {teacherAttendanceView === 'month' ? 'Monthly' : 'Daily'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setShowTeacherMap(!showTeacherMap)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: showTeacherMap ? '#a855f7' : '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                  >
+                    <MapPin size={14} /> {showTeacherMap ? 'Hide Map' : 'Map'}
+                  </button>
+                  <button 
+                    onClick={() => setTeacherAttendanceView(teacherAttendanceView === 'month' ? 'year' : 'month')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                  >
+                    <ArrowLeftRight size={14} /> {teacherAttendanceView === 'month' ? 'Monthly' : 'Daily'}
+                  </button>
+                </div>
               </div>
 
               {true && (
@@ -719,7 +734,11 @@ export default function DashboardPage() {
               )}
 
               <div style={{ height: '320px', marginTop: '3rem' }}>
-                <AreaChart data={teacherChartData} height={320} />
+                {showTeacherMap ? (
+                  <TeacherMap data={teacherAttendanceData} />
+                ) : (
+                  <AreaChart data={teacherChartData} height={320} />
+                )}
               </div>
             </div>
 
