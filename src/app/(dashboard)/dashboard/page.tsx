@@ -747,10 +747,10 @@ export default function DashboardPage() {
           {/* ── Stat Cards ── */}
           <div className="nd-stats-row">
             {[
-              { label: "Today's Classes",       value: d.currentExam.length + 3,       sub: 'Next: Physics – 10A · 09:30 AM',   icon: BookOpen,      color: '#6366f1', bg: '#eef2ff', spark: [2,3,2,4,3,3,4] },
-              { label: 'Student Count',          value: d.attendStudent.totalStudents ?? 128, sub: `Across ${d.currentExam.length+3} classes`, icon: Users, color: '#10b981', bg: '#f0fdf4', spark: [100,115,110,125,120,128,128] },
-              { label: 'Assignments to Grade',   value: hwStats.pending,                sub: 'Due within 3 days',                icon: ClipboardList, color: '#f59e0b', bg: '#fffbeb', spark: [5,8,6,10,9,8,8] },
-              { label: 'Pending Leave Requests', value: 2,                              sub: 'Requires your approval',           icon: UserCheck,     color: '#ec4899', bg: '#fdf2f8', spark: [1,2,1,3,2,2,2] },
+              { label: 'All Student',            value: d.attendStudent?.totalStudents ?? 0, sub: 'Total registered students', icon: Users, color: '#6366f1', bg: '#eef2ff', spark: [100, 110, 115, 120, 125, 128, 128] },
+              { label: 'All Teacher',            value: d.attendTeacher?.totalTeachers ?? 0, sub: 'Total registered teachers', icon: Users, color: '#10b981', bg: '#f0fdf4', spark: [20, 21, 22, 23, 23, 24, 24] },
+              { label: 'Attend Student',         value: d.attendStudent?.present ?? 0,       sub: 'Students present today',    icon: UserCheck, color: '#f59e0b', bg: '#fffbeb', spark: [90, 95, 100, 105, 110, 112, 115] },
+              { label: 'Attend Teacher',         value: d.attendTeacher?.present ?? 0,       sub: 'Teachers present today',    icon: UserCheck, color: '#ec4899', bg: '#fdf2f8', spark: [18, 19, 20, 20, 21, 21, 21] },
             ].map((s, i) => (
               <div key={i} className="nd-stat-card">
                 <div className="nd-stat-top">
