@@ -8,7 +8,7 @@ import {
   FileText, Settings, Menu, X, GraduationCap, LogOut, UserCheck,
   ClipboardList, BrainCircuit, Activity, Clock, MessageSquare, Book,
   BarChart2, PieChart, ChevronLeft, ChevronRight, MessageCircle,
-  MoreVertical, User, Key
+  MoreVertical, User, Key, Video
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -79,8 +79,10 @@ export function Sidebar() {
     { name: 'Communication', href: '/notices', icon: MessageSquare },
     { name: 'Library', href: '/library', icon: Book, dummy: true },
     { name: 'Reports & Analytics', href: '/reports', icon: BarChart2, dummy: true },
+    { name: 'Teachers', href: '/teachers', icon: GraduationCap },
     { name: 'Leave Management', href: '/teacher-attendance', icon: UserCheck },
     { name: 'Fees (View)', href: '/fees', icon: PieChart, dummy: true },
+    { name: 'Online Class', href: '/online-class', icon: Video },
     { name: t('nav.settings') || 'Settings', href: '/settings', icon: Settings },
   ];
 

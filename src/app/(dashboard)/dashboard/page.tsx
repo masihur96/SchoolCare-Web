@@ -8,7 +8,7 @@ import {
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight,
-  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin
+  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -424,13 +424,13 @@ export default function DashboardPage() {
   ];
 
   const quickLinks = [
-    { icon: Users,         label: 'Students',   href: '/students',          color: '#6366f1', bg: '#eef2ff' },
-    { icon: LayoutGrid,    label: 'Timetable',  href: '/routine',           color: '#10b981', bg: '#f0fdf4' },
-    { icon: BookCopy,      label: 'Homework',   href: '/notices',           color: '#8b5cf6', bg: '#f5f3ff' },
-    { icon: UserCheck,     label: 'Attendance', href: '/attendance',        color: '#f59e0b', bg: '#fffbeb' },
-    { icon: FileText,      label: 'Exams',      href: '/exams',             color: '#ec4899', bg: '#fdf2f8' },
-    { icon: BarChart2,     label: 'Reports',    href: '/dashboard',         color: '#06b6d4', bg: '#ecfeff' },
-    { icon: Brain,         label: 'AI Tools',   href: '/dashboard',         color: '#6366f1', bg: '#eef2ff' },
+    { icon: Users,         label: 'Students',     href: '/students',          color: '#6366f1', bg: '#eef2ff' },
+    { icon: GraduationCap, label: 'Teacher',      href: '/teachers',          color: '#3b82f6', bg: '#eff6ff' },
+    { icon: LayoutGrid,    label: 'Timetable',    href: '/routine',           color: '#10b981', bg: '#f0fdf4' },
+    { icon: BookCopy,      label: 'Homework',     href: '/notices',           color: '#8b5cf6', bg: '#f5f3ff' },
+    { icon: UserCheck,     label: 'Attendance',   href: '/attendance',        color: '#f59e0b', bg: '#fffbeb' },
+    { icon: FileText,      label: 'Exams',        href: '/exams',             color: '#ec4899', bg: '#fdf2f8' },
+    { icon: Video,         label: 'Online Class', href: '/online-class',      color: '#14b8a6', bg: '#ccfbf1' },
   ];
 
   if (loading) {
@@ -776,13 +776,14 @@ export default function DashboardPage() {
               <h3>Quick Links</h3>
               <button className="nd-text-btn"><Settings2 size={13} /> Customize</button>
             </div>
-            <div className="nd-ql-row">
+            <div className="nd-ql-grid">
               {quickLinks.map((ql, i) => (
-                <Link key={i} href={ql.href} className="nd-ql-item">
-                  <div className="nd-ql-icon" style={{ background: ql.bg }}>
-                    <ql.icon size={22} color={ql.color} />
+                <Link key={i} href={ql.href} className="nd-ql-item-modern">
+                  <div className="nd-ql-icon-modern" style={{ background: ql.bg, color: ql.color }}>
+                    <ql.icon size={18} />
                   </div>
-                  <span>{ql.label}</span>
+                  <span className="nd-ql-label-modern">{ql.label}</span>
+                  <ChevronRight size={14} className="nd-ql-chevron" />
                 </Link>
               ))}
             </div>
@@ -1029,11 +1030,13 @@ export default function DashboardPage() {
         .nd-stat-icon { width: 42px; height: 42px; border-radius: 0.7rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* ── Quick Links ── */
-        .nd-ql-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-        .nd-ql-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; text-decoration: none; color: var(--foreground); font-size: 0.75rem; font-weight: 600; min-width: 58px; transition: transform 0.15s; }
-        .nd-ql-item:hover { transform: translateY(-2px); }
-        .nd-ql-icon { width: 48px; height: 48px; border-radius: 0.8rem; display: flex; align-items: center; justify-content: center; transition: box-shadow 0.15s; }
-        .nd-ql-item:hover .nd-ql-icon { box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+        .nd-ql-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem; }
+        .nd-ql-item-modern { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; color: var(--foreground); font-size: 0.8rem; font-weight: 600; padding: 0.6rem 0.8rem; border: 1px solid var(--border, #e2e8f0); border-radius: 0.5rem; background: var(--card); transition: all 0.2s ease; }
+        .nd-ql-item-modern:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.03); transform: translateY(-1px); }
+        .nd-ql-icon-modern { width: 32px; height: 32px; border-radius: 0.4rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .nd-ql-label-modern { flex: 1; }
+        .nd-ql-chevron { color: #94a3b8; opacity: 0; transform: translateX(-4px); transition: all 0.2s ease; }
+        .nd-ql-item-modern:hover .nd-ql-chevron { opacity: 1; transform: translateX(0); }
 
         /* ── 3-col ── */
         .nd-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.1rem; }
