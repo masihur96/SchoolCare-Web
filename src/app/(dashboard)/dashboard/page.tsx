@@ -8,7 +8,7 @@ import {
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight,
-  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video
+  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video, Link as LinkIcon
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -27,10 +27,12 @@ interface AttendanceInfo {
   leave?: number;
   recorded?: number;
   attendanceRate: number;
+  recentRecords?: any[];
+  data?: any[];
 }
 interface Notice { id: string; title: string; content: string; targetAudience: string; isImportent: boolean; postedBy: string; createdAt: string; }
 interface Homework { id: string; title: string; description: string; dueDate: string; classInfo?: { name: string }; subjectInfo?: { name: string }; sectionInfo?: { name: string }; }
-interface ExamAssignment { id: string; class: { name: string }; subject: { name: string }; examiner: { name: string }; date: string; syllabus: string; }
+interface ExamAssignment { id: string; class: { name: string }; subject: { name: string }; examiner: { name: string }; date: string; syllabus?: string; start_time?: string; end_time?: string; }
 interface Exam { id: string; exam_name: string; description: string; start_date: string; end_date: string; isPublished: boolean; status: string; assignments: ExamAssignment[]; }
 interface DashboardData {
   attendTeacher: AttendanceInfo;
@@ -38,6 +40,7 @@ interface DashboardData {
   recentNotice: Notice[];
   recentHomework: Homework[];
   currentExam: Exam[];
+  upcomingMeeting?: any[];
 }
 interface UserProfile { id: string; name: string; email: string; role: string; schoolId: string; phone: string; avatar: string | null; designation: string | null; }
 
@@ -51,6 +54,38 @@ function getGreeting(name: string) {
   const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const emoji = h < 12 ? '☀️' : h < 17 ? '👋' : '🌙';
   return { greeting: g, emoji, name: name.split(' ')[0] };
+}
+
+function getSchoolId() {
+  try {
+    const token = getToken();
+    if (!token) return '29f05edb-8e0b-434c-a471-aa776308a1c1';
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.schoolId || '29f05edb-8e0b-434c-a471-aa776308a1c1';
+  } catch {
+    return '29f05edb-8e0b-434c-a471-aa776308a1c1';
+  }
+}
+
+function formatRoutineTime(timeString?: string) {
+  if (!timeString) return '';
+  const [hours, minutes] = timeString.split(':');
+  const h = parseInt(hours, 10);
+  if (isNaN(h)) return timeString;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const formattedH = h % 12 || 12;
+  return `${formattedH}:${minutes || '00'} ${ampm}`;
+}
+
+function isRoutineActiveNow(startTime?: string, endTime?: string) {
+  if (!startTime || !endTime) return false;
+  const now = new Date();
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  const startMinutes = sh * 60 + (sm || 0);
+  const endMinutes = eh * 60 + (em || 0);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
 }
 
 function getMonthName(m: number) {
@@ -296,8 +331,29 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [studentAttendanceView, setStudentAttendanceView] = useState<'month' | 'year'>('month');
   const [teacherAttendanceView, setTeacherAttendanceView] = useState<'month' | 'year'>('month');
+  const [hwFilterClass, setHwFilterClass] = useState('All');
+  const [studentClassFilter, setStudentClassFilter] = useState('All');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('All');
+  const [hoveredTeacher, setHoveredTeacher] = useState<{
+    data: any;
+    x: number;
+    y: number;
+    fitsAbove: boolean;
+  } | null>(null);
+  const [hoveredStudent, setHoveredStudent] = useState<{
+    data: any;
+    x: number;
+    y: number;
+    fitsAbove: boolean;
+  } | null>(null);
   const [showTeacherMap, setShowTeacherMap] = useState(false);
   const [teacherAttendanceData, setTeacherAttendanceData] = useState<any[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [routines, setRoutines] = useState<any[]>([]);
+  const [schedClassFilter, setSchedClassFilter] = useState('All');
+  const [schedSectionFilter, setSchedSectionFilter] = useState('All');
+  const [schedTeacherFilter, setSchedTeacherFilter] = useState('All');
+  const [schedSubjectFilter, setSchedSubjectFilter] = useState('All');
   const today = new Date();
 
   async function fetchProfile(): Promise<UserProfile | null> {
@@ -324,7 +380,27 @@ export default function DashboardPage() {
           setData(json.data);
         }
       } catch { /* use dummy data */ }
-      finally { setLoading(false); }
+
+      try {
+        const mRes = await fetch('https://smart-school-backend-production.up.railway.app/online-classes',
+          { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
+        if (mRes.ok) {
+          const mJson = await mRes.json();
+          setMeetings(mJson.data || []);
+        }
+      } catch {}
+
+      try {
+        const sId = getSchoolId();
+        const rRes = await fetch(`https://smart-school-backend-production.up.railway.app/general/routine?schoolId=${sId}`,
+          { headers: { Authorization: `Bearer ${getToken()}`, Accept: '*/*' } });
+        if (rRes.ok) {
+          const rJson = await rRes.json();
+          setRoutines(rJson.data || []);
+        }
+      } catch {}
+
+      setLoading(false);
     }
     init();
   }, []);
@@ -397,41 +473,47 @@ export default function DashboardPage() {
     { label: '12A', avg: 82, top: 95 },
   ];
 
-  const riskStudents = [
-    { name: 'Rohan Mehta (10A)', risk: 'High Risk', color: '#ef4444', bg: '#fef2f2', reason: 'Declining in Physics & Maths' },
-    { name: 'Aisha Khan (11B)', risk: 'Medium Risk', color: '#f59e0b', bg: '#fffbeb', reason: 'Low assignment submission' },
-    { name: 'Karan Verma (9C)', risk: 'Low Risk', color: '#10b981', bg: '#f0fdf4', reason: 'Needs improvement in Tests' },
-  ];
 
-  const notifications = [
-    { icon: ClipboardCheck, color: '#6366f1', title: 'New assignment submitted', sub: 'Arjun Singh submitted Physics Worksheet', time: '10 min ago', unread: true },
-    { icon: UserCheck, color: '#10b981', title: 'Leave request received', sub: '2 leave requests need your approval', time: '1 hr ago', unread: true },
-    { icon: Star, color: '#f59e0b', title: 'Grades are ready to publish', sub: 'Chemistry Quiz results are ready', time: '2 hr ago', unread: false },
-    { icon: Calendar, color: '#8b5cf6', title: 'Timetable updated', sub: 'New schedule published for Class 10A', time: '3 hr ago', unread: false },
-  ];
 
-  const schedule = [
-    { start: '08:30 AM', end: '09:15 AM', subject: 'Class 9C – Physics', room: 'Room 204', active: false },
-    { start: '09:30 AM', end: '10:15 AM', subject: 'Class 10A – Physics', room: 'Room 205', active: true },
-    { start: '11:15 AM', end: '12:00 PM', subject: 'Class 11B – Physics', room: 'Lab 1', active: false },
-    { start: '02:00 PM', end: '02:45 PM', subject: 'Class 12A – Physics', room: 'Room 206', active: false },
-  ];
+  const todayDayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const todayRoutines = routines.filter(
+    (r: any) => r.day && r.day.toLowerCase() === todayDayName.toLowerCase()
+  );
 
-  const reminders = [
-    { icon: BookOpen, color: '#6366f1', bg: '#eef2ff', title: 'Upcoming Lecture', sub: 'Class 10A · Physics in 15 mins' },
-    { icon: ClipboardList, color: '#f59e0b', bg: '#fffbeb', title: 'Pending Evaluations', sub: '12 assignments to grade' },
-    { icon: Clock, color: '#10b981', bg: '#f0fdf4', title: 'Next Free Slot', sub: 'Today 12:00 PM – 02:00 PM' },
-  ];
+  const availableClasses: string[] = Array.from(
+    new Set(todayRoutines.map((r: any) => r.classEntity?.name).filter(Boolean))
+  ).sort() as string[];
 
-  const quickLinks = [
-    { icon: Users,         label: 'Students',     href: '/students',          color: '#6366f1', bg: '#eef2ff' },
-    { icon: GraduationCap, label: 'Teacher',      href: '/teachers',          color: '#3b82f6', bg: '#eff6ff' },
-    { icon: LayoutGrid,    label: 'Timetable',    href: '/routine',           color: '#10b981', bg: '#f0fdf4' },
-    { icon: BookCopy,      label: 'Homework',     href: '/notices',           color: '#8b5cf6', bg: '#f5f3ff' },
-    { icon: UserCheck,     label: 'Attendance',   href: '/attendance',        color: '#f59e0b', bg: '#fffbeb' },
-    { icon: FileText,      label: 'Exams',        href: '/exams',             color: '#ec4899', bg: '#fdf2f8' },
-    { icon: Video,         label: 'Online Class', href: '/online-class',      color: '#14b8a6', bg: '#ccfbf1' },
-  ];
+  const availableSections: string[] = Array.from(
+    new Set(
+      todayRoutines
+        .filter((r: any) => schedClassFilter === 'All' || r.classEntity?.name === schedClassFilter)
+        .map((r: any) => r.sectionEntity?.name)
+        .filter(Boolean)
+    )
+  ).sort() as string[];
+
+  const availableTeachers: string[] = Array.from(
+    new Set(todayRoutines.map((r: any) => r.teacherEntity?.name).filter(Boolean))
+  ).sort() as string[];
+
+  const availableSubjects: string[] = Array.from(
+    new Set(todayRoutines.map((r: any) => r.subjectEntity?.name).filter(Boolean))
+  ).sort() as string[];
+
+  const filteredTodayRoutines = todayRoutines
+    .filter((r: any) => {
+      if (schedClassFilter !== 'All' && r.classEntity?.name !== schedClassFilter) return false;
+      if (schedSectionFilter !== 'All' && r.sectionEntity?.name !== schedSectionFilter) return false;
+      if (schedTeacherFilter !== 'All' && r.teacherEntity?.name !== schedTeacherFilter) return false;
+      if (schedSubjectFilter !== 'All' && r.subjectEntity?.name !== schedSubjectFilter) return false;
+      return true;
+    })
+    .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+
+
+
 
   if (loading) {
     return (
@@ -744,174 +826,663 @@ export default function DashboardPage() {
 
           </div>
           
-          {/* ── Stat Cards ── */}
-          <div className="nd-stats-row">
-            {[
-              { label: 'All Student',            value: d.attendStudent?.totalStudents ?? 0, sub: 'Total registered students', icon: Users, color: '#6366f1', bg: '#eef2ff', spark: [100, 110, 115, 120, 125, 128, 128] },
-              { label: 'All Teacher',            value: d.attendTeacher?.totalTeachers ?? 0, sub: 'Total registered teachers', icon: Users, color: '#10b981', bg: '#f0fdf4', spark: [20, 21, 22, 23, 23, 24, 24] },
-              { label: 'Attend Student',         value: d.attendStudent?.present ?? 0,       sub: 'Students present today',    icon: UserCheck, color: '#f59e0b', bg: '#fffbeb', spark: [90, 95, 100, 105, 110, 112, 115] },
-              { label: 'Attend Teacher',         value: d.attendTeacher?.present ?? 0,       sub: 'Teachers present today',    icon: UserCheck, color: '#ec4899', bg: '#fdf2f8', spark: [18, 19, 20, 20, 21, 21, 21] },
-            ].map((s, i) => (
-              <div key={i} className="nd-stat-card">
-                <div className="nd-stat-top">
-                  <div style={{ flex: 1 }}>
-                    <p className="nd-stat-label">{s.label}</p>
-                    <p className="nd-stat-value">{s.value}</p>
-                    <p className="nd-stat-sub">{s.sub}</p>
-                  </div>
-                  <div className="nd-stat-icon" style={{ background: s.bg }}>
-                    <s.icon size={20} color={s.color} />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                  <Sparkline values={s.spark} color={s.color} />
-                </div>
+          {/* ── Today's Schedule ── */}
+          <div className="nd-section-card" style={{ marginBottom: '1.25rem' }}>
+            <div className="nd-section-head" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={18} color="#6366f1" />
+                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Today's Schedule</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '999px' }}>
+                  {filteredTodayRoutines.length}
+                </span>
               </div>
-            ))}
+              <Link href="/routine" className="nd-text-btn" style={{ fontSize: '0.78rem' }}>
+                <Calendar size={14} /> View Timetable
+              </Link>
+            </div>
+
+            {/* Filter controls */}
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedClassFilter}
+                onChange={(e) => {
+                  setSchedClassFilter(e.target.value);
+                  setSchedSectionFilter('All');
+                }}
+              >
+                <option value="All">All Classes</option>
+                {availableClasses.map((c, i) => (
+                  <option key={i} value={c}>{c}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedSectionFilter}
+                onChange={(e) => setSchedSectionFilter(e.target.value)}
+              >
+                <option value="All">All Sections</option>
+                {availableSections.map((s, i) => (
+                  <option key={i} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedTeacherFilter}
+                onChange={(e) => setSchedTeacherFilter(e.target.value)}
+              >
+                <option value="All">All Teachers</option>
+                {availableTeachers.map((t, i) => (
+                  <option key={i} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedSubjectFilter}
+                onChange={(e) => setSchedSubjectFilter(e.target.value)}
+              >
+                <option value="All">All Subjects</option>
+                {availableSubjects.map((sub, i) => (
+                  <option key={i} value={sub}>{sub}</option>
+                ))}
+              </select>
+
+              {(schedClassFilter !== 'All' || schedSectionFilter !== 'All' || schedTeacherFilter !== 'All' || schedSubjectFilter !== 'All') && (
+                <button
+                  onClick={() => {
+                    setSchedClassFilter('All');
+                    setSchedSectionFilter('All');
+                    setSchedTeacherFilter('All');
+                    setSchedSubjectFilter('All');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#6366f1',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    padding: '0.2rem 0.5rem',
+                    textDecoration: 'underline',
+                    fontWeight: 600
+                  }}
+                >
+                  Reset filters ({filteredTodayRoutines.length} of {todayRoutines.length})
+                </button>
+              )}
+            </div>
+
+            {/* Routines Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+              {filteredTodayRoutines.length > 0 ? (
+                filteredTodayRoutines.map((r: any, i: number) => {
+                  const isActive = isRoutineActiveNow(r.startTime, r.endTime);
+                  return (
+                    <div
+                      key={r.id || i}
+                      style={{
+                        border: isActive ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                        borderRadius: '0.65rem',
+                        padding: '0.75rem 0.85rem',
+                        background: isActive ? '#f5f3ff' : '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'border-color 0.15s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.subjectEntity?.name || 'Class'}
+                          </h4>
+                          <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.classEntity?.name || 'Class'}{r.sectionEntity?.name ? ` (${r.sectionEntity.name})` : ''}
+                          </p>
+                        </div>
+                        {isActive ? (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#6366f1', color: '#ffffff', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>
+                            Now
+                          </span>
+                        ) : r.roomNumber ? (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                            {r.roomNumber}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={12} color={isActive ? '#6366f1' : '#94a3b8'} />
+                          <span style={{ fontWeight: isActive ? 600 : 500, color: isActive ? '#6366f1' : '#475569' }}>
+                            {formatRoutineTime(r.startTime)} – {formatRoutineTime(r.endTime)}
+                          </span>
+                        </div>
+                        {r.teacherEntity?.name && (
+                          <span style={{ color: '#334155', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.teacherEntity.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b', fontSize: '0.8rem' }}>
+                  {todayRoutines.length === 0 ? `No classes scheduled for today (${todayDayName}).` : 'No classes match the selected filters.'}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* ── Quick Links ── */}
-          <div className="nd-section-card">
-            <div className="nd-section-head">
-              <h3>Quick Links</h3>
-              <button className="nd-text-btn"><Settings2 size={13} /> Customize</button>
-            </div>
-            <div className="nd-ql-grid">
-              {quickLinks.map((ql, i) => (
-                <Link key={i} href={ql.href} className="nd-ql-item-modern">
-                  <div className="nd-ql-icon-modern" style={{ background: ql.bg, color: ql.color }}>
-                    <ql.icon size={18} />
-                  </div>
-                  <span className="nd-ql-label-modern">{ql.label}</span>
-                  <ChevronRight size={14} className="nd-ql-chevron" />
-                </Link>
-              ))}
-            </div>
-          </div>
+
 
           {/* ── 3-col grid ── */}
           <div className="nd-3col">
 
-            {/* Upcoming Activities */}
+            {/* Today Attend Teacher */}
+            <div className="nd-section-card" style={{ position: 'relative' }}>
+              <div className="nd-section-head">
+                <h3>Today Attend Teacher</h3>
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="nd-progress-labels">
+                  <span>Present: {d.attendTeacher?.present ?? 0} / {d.attendTeacher?.totalTeachers ?? 0}</span>
+                  <span>{d.attendTeacher?.attendanceRate ?? 0}%</span>
+                </div>
+                <div className="nd-progress-container">
+                  <div className="nd-progress-bar" style={{ width: `${d.attendTeacher?.attendanceRate ?? 0}%`, background: '#10b981' }} />
+                </div>
+              </div>
+              <div className="nd-avatar-grid" onScroll={() => setHoveredTeacher(null)}>
+                {d.attendTeacher?.recentRecords?.map((r: any, i: number) => {
+                  const t = r.teacher;
+                  if (!t) return null;
+                  return (
+                    <div 
+                      key={i} 
+                      className="nd-avatar-item"
+                      onMouseEnter={(e) => {
+                        const card = e.currentTarget.closest('.nd-section-card') as HTMLElement;
+                        if (!card) return;
+                        const cRect = card.getBoundingClientRect();
+                        const iRect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.max(105, Math.min(cRect.width - 105, (iRect.left - cRect.left) + iRect.width / 2));
+                        const y = iRect.top - cRect.top;
+                        const fitsAbove = y > 180;
+                        setHoveredTeacher({
+                          data: { ...r, teacher: t },
+                          x,
+                          y: fitsAbove ? y - 8 : (iRect.bottom - cRect.top) + 8,
+                          fitsAbove,
+                        });
+                      }}
+                      onMouseLeave={() => setHoveredTeacher(null)}
+                      onClick={(e) => {
+                        const card = e.currentTarget.closest('.nd-section-card') as HTMLElement;
+                        if (!card) return;
+                        const cRect = card.getBoundingClientRect();
+                        const iRect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.max(105, Math.min(cRect.width - 105, (iRect.left - cRect.left) + iRect.width / 2));
+                        const y = iRect.top - cRect.top;
+                        const fitsAbove = y > 180;
+                        setHoveredTeacher(prev => (prev?.data?.teacher?.id === t.id ? null : {
+                          data: { ...r, teacher: t },
+                          x,
+                          y: fitsAbove ? y - 8 : (iRect.bottom - cRect.top) + 8,
+                          fitsAbove,
+                        }));
+                      }}
+                    >
+                      <div style={{ position: 'relative' }}>
+                        {t.avatar ? (
+                          <img src={t.avatar} alt={t.name} className="nd-avatar-circle" style={{ objectFit: 'cover' }} />
+                        ) : (
+                          <div className="nd-avatar-circle" style={{ background: '#10b981' }}>{t.name?.charAt(0) || 'T'}</div>
+                        )}
+                        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: '#10b981', border: '2px solid white' }} />
+                      </div>
+                      <span className="nd-avatar-name">{t.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {hoveredTeacher && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: hoveredTeacher.y,
+                    left: hoveredTeacher.x,
+                    transform: hoveredTeacher.fitsAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    padding: '0.75rem',
+                    borderRadius: '0.6rem',
+                    width: '200px',
+                    zIndex: 60,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      [hoveredTeacher.fitsAbove ? 'top' : 'bottom']: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      borderWidth: '6px',
+                      borderStyle: 'solid',
+                      borderColor: hoveredTeacher.fitsAbove
+                        ? '#ffffff transparent transparent transparent'
+                        : 'transparent transparent #ffffff transparent',
+                    }}
+                  />
+                  {hoveredTeacher.data.teacher?.avatar ? (
+                    <img src={hoveredTeacher.data.teacher.avatar} alt={hoveredTeacher.data.teacher.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 600 }}>
+                      {hoveredTeacher.data.teacher?.name?.charAt(0) || 'T'}
+                    </div>
+                  )}
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b', textAlign: 'center' }}>{hoveredTeacher.data.teacher?.name}</span>
+                  <div style={{ width: '100%', fontSize: '0.68rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    {hoveredTeacher.data.status && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Status</span>
+                        <span style={{ textTransform: 'capitalize' }}>{hoveredTeacher.data.status}</span>
+                      </div>
+                    )}
+                    {hoveredTeacher.data.teacher?.phone && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Phone</span>
+                        <span>{hoveredTeacher.data.teacher.phone}</span>
+                      </div>
+                    )}
+                    {hoveredTeacher.data.teacher?.email && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Email</span>
+                        <span>{hoveredTeacher.data.teacher.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Today Attend Student */}
+            <div className="nd-section-card" style={{ position: 'relative' }}>
+              <div className="nd-section-head" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
+                <h3>Today Attend Student</h3>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <select className="nd-hw-filter" value={studentClassFilter} onChange={(e) => setStudentClassFilter(e.target.value)}>
+                    <option value="All">All Classes</option>
+                    {Array.from(new Set(d.attendStudent?.data?.map((s: any) => s.class?.name).filter(Boolean))).map((cls: any, i: number) => (
+                      <option key={i} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                  <select className="nd-hw-filter" value={studentStatusFilter} onChange={(e) => setStudentStatusFilter(e.target.value)}>
+                    <option value="All">All Status</option>
+                    <option value="present">Attend</option>
+                    <option value="absent">Absent</option>
+                    <option value="late">Late</option>
+                    <option value="leave">Leave</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="nd-progress-labels">
+                  <span>Present: {d.attendStudent?.present ?? 0} / {d.attendStudent?.totalStudents ?? 0}</span>
+                  <span>{d.attendStudent?.attendanceRate ?? 0}%</span>
+                </div>
+                <div className="nd-progress-container">
+                  <div className="nd-progress-bar" style={{ width: `${d.attendStudent?.attendanceRate ?? 0}%`, background: '#6366f1' }} />
+                </div>
+              </div>
+              <div className="nd-avatar-grid" onScroll={() => setHoveredStudent(null)}>
+                {d.attendStudent?.data
+                  ?.filter((s: any) => {
+                    if (studentClassFilter !== 'All' && s.class?.name !== studentClassFilter) return false;
+                    if (studentStatusFilter !== 'All' && s.status !== studentStatusFilter) return false;
+                    return true;
+                  })
+                  .map((s: any, i: number) => {
+                    const st = s.student;
+                    if (!st) return null;
+                    const statusColor = s.status === 'present' ? '#10b981' : s.status === 'absent' ? '#ef4444' : s.status === 'late' ? '#f59e0b' : '#3b82f6';
+                    return (
+                      <div 
+                        key={i} 
+                        className="nd-avatar-item"
+                        onMouseEnter={(e) => {
+                          const card = e.currentTarget.closest('.nd-section-card') as HTMLElement;
+                          if (!card) return;
+                          const cRect = card.getBoundingClientRect();
+                          const iRect = e.currentTarget.getBoundingClientRect();
+                          const x = Math.max(105, Math.min(cRect.width - 105, (iRect.left - cRect.left) + iRect.width / 2));
+                          const y = iRect.top - cRect.top;
+                          const fitsAbove = y > 180;
+                          setHoveredStudent({
+                            data: s,
+                            x,
+                            y: fitsAbove ? y - 8 : (iRect.bottom - cRect.top) + 8,
+                            fitsAbove,
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredStudent(null)}
+                        onClick={(e) => {
+                          const card = e.currentTarget.closest('.nd-section-card') as HTMLElement;
+                          if (!card) return;
+                          const cRect = card.getBoundingClientRect();
+                          const iRect = e.currentTarget.getBoundingClientRect();
+                          const x = Math.max(105, Math.min(cRect.width - 105, (iRect.left - cRect.left) + iRect.width / 2));
+                          const y = iRect.top - cRect.top;
+                          const fitsAbove = y > 180;
+                          setHoveredStudent(prev => (prev?.data?.id === s.id ? null : {
+                            data: s,
+                            x,
+                            y: fitsAbove ? y - 8 : (iRect.bottom - cRect.top) + 8,
+                            fitsAbove,
+                          }));
+                        }}
+                      >
+                        <div style={{ position: 'relative' }}>
+                          {st.avatar ? (
+                            <img src={st.avatar} alt={st.name} className="nd-avatar-circle" style={{ objectFit: 'cover' }} />
+                          ) : (
+                            <div className="nd-avatar-circle" style={{ background: '#6366f1' }}>{st.name?.charAt(0) || 'S'}</div>
+                          )}
+                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: statusColor, border: '2px solid white' }} />
+                        </div>
+                        <span className="nd-avatar-name">{st.name}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {hoveredStudent && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: hoveredStudent.y,
+                    left: hoveredStudent.x,
+                    transform: hoveredStudent.fitsAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    padding: '0.75rem',
+                    borderRadius: '0.6rem',
+                    width: '200px',
+                    zIndex: 60,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      [hoveredStudent.fitsAbove ? 'top' : 'bottom']: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      borderWidth: '6px',
+                      borderStyle: 'solid',
+                      borderColor: hoveredStudent.fitsAbove
+                        ? '#ffffff transparent transparent transparent'
+                        : 'transparent transparent #ffffff transparent',
+                    }}
+                  />
+                  {hoveredStudent.data.student?.avatar ? (
+                    <img src={hoveredStudent.data.student.avatar} alt={hoveredStudent.data.student.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#6366f1', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 600 }}>
+                      {hoveredStudent.data.student?.name?.charAt(0) || 'S'}
+                    </div>
+                  )}
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b', textAlign: 'center' }}>{hoveredStudent.data.student?.name}</span>
+                  <div style={{ width: '100%', fontSize: '0.68rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    {hoveredStudent.data.class?.name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Class</span>
+                        <span>{hoveredStudent.data.class.name}</span>
+                      </div>
+                    )}
+                    {hoveredStudent.data.section?.name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Section</span>
+                        <span>{hoveredStudent.data.section.name}</span>
+                      </div>
+                    )}
+                    {hoveredStudent.data.subject?.name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Subject</span>
+                        <span>{hoveredStudent.data.subject.name}</span>
+                      </div>
+                    )}
+                    {hoveredStudent.data.status && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Status</span>
+                        <span style={{ textTransform: 'capitalize' }}>{hoveredStudent.data.status}</span>
+                      </div>
+                    )}
+                    {hoveredStudent.data.student?.phone && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Phone</span>
+                        <span>{hoveredStudent.data.student.phone}</span>
+                      </div>
+                    )}
+                    {hoveredStudent.data.student?.email && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Email</span>
+                        <span>{hoveredStudent.data.student.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Today Home Work */}
             <div className="nd-section-card">
               <div className="nd-section-head">
-                <h3>Upcoming Activities</h3>
-                <button className="nd-text-btn">View All</button>
+                <h3>Today Home Work</h3>
+                <select 
+                  className="nd-hw-filter" 
+                  value={hwFilterClass} 
+                  onChange={(e) => setHwFilterClass(e.target.value)}
+                >
+                  <option value="All">All Classes</option>
+                  {Array.from(new Set(d.recentHomework?.map(h => h.classInfo?.name).filter(Boolean))).map((cls, i) => (
+                    <option key={i} value={cls}>{cls}</option>
+                  ))}
+                </select>
               </div>
-              <div className="nd-act-list">
-                {upcomingActivities.map((a, i) => (
-                  <div key={i} className="nd-act-item">
-                    <div className="nd-act-date" style={{ background: a.color + '18', color: a.color }}>
-                      <span className="nd-act-mon">{a.month}</span>
-                      <span className="nd-act-day">{a.day}</span>
-                    </div>
-                    <div>
-                      <p className="nd-act-title">{a.title}</p>
-                      <p className="nd-act-sub">{a.sub}</p>
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="nd-progress-labels">
+                  <span>Submitted: {hwStats.submitted} / {hwStats.total}</span>
+                  <span>{hwPct}%</span>
+                </div>
+                <div className="nd-progress-container">
+                  <div className="nd-progress-bar" style={{ width: `${hwPct}%`, background: '#f59e0b' }} />
+                </div>
+              </div>
+              <div className="nd-hw-list">
+                {(hwFilterClass === 'All' ? d.recentHomework : d.recentHomework?.filter(h => h.classInfo?.name === hwFilterClass))?.map((hw, i) => (
+                  <div key={i} className="nd-hw-item">
+                    <h4 className="nd-hw-title">{hw.title}</h4>
+                    {hw.description && <p className="nd-hw-desc">{hw.description}</p>}
+                    <div className="nd-hw-meta">
+                      {hw.classInfo?.name && <span className="nd-hw-badge">{hw.classInfo.name}</span>}
+                      {hw.subjectInfo?.name && <span className="nd-hw-badge">{hw.subjectInfo.name}</span>}
                     </div>
                   </div>
                 ))}
-              </div>
-              <button className="nd-outline-btn">
-                <Calendar size={13} /> View Full Calendar
-              </button>
-            </div>
-
-            {/* Homework Submissions */}
-            <div className="nd-section-card">
-              <div className="nd-section-head">
-                <h3>Homework Submissions</h3>
-                <button className="nd-text-btn">View All</button>
-              </div>
-              <div className="nd-hw-body">
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <DonutChart pct={hwPct} color="#6366f1" size={100} />
-                  <div className="nd-hw-center">
-                    <span className="nd-hw-pct">{hwPct}%</span>
-                    <span className="nd-hw-pct-sub">Submitted</span>
-                  </div>
-                </div>
-                <div className="nd-hw-stats">
-                  {[
-                    { label: 'Total Assigned', val: hwStats.total,     color: '#475569' },
-                    { label: 'Submitted',       val: hwStats.submitted, color: '#10b981' },
-                    { label: 'Pending',         val: hwStats.pending,   color: '#f59e0b' },
-                    { label: 'Overdue',         val: hwStats.overdue,   color: '#ef4444' },
-                  ].map((s, i) => (
-                    <div key={i} className="nd-hw-row">
-                      <span className="nd-hw-lbl">{s.label}</span>
-                      <span style={{ color: s.color, fontWeight: 700, fontSize: '0.9rem' }}>{s.val}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Student Performance Overview */}
-            <div className="nd-section-card">
-              <div className="nd-section-head">
-                <h3>Student Performance</h3>
-                <button className="nd-text-btn">This Month ▾</button>
-              </div>
-              <MiniBarChart data={perfData} />
-              <div className="nd-legend">
-                <span className="nd-legend-dot" style={{ background: '#6366f1' }} />
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Class Avg %</span>
-                <span className="nd-legend-dot" style={{ background: '#c7d2fe', marginLeft: '8px' }} />
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Top Score %</span>
+                {(!d.recentHomework || d.recentHomework.length === 0) && (
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1rem 0' }}>No homework assigned today.</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* ── 2-col grid ── */}
+          {/* ── 2-col grid: Upcoming Meetings & Upcoming Exams ── */}
           <div className="nd-2col">
 
-            {/* AI Student Risk Alerts */}
+            {/* Upcoming Meeting */}
             <div className="nd-section-card">
               <div className="nd-section-head">
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <AlertTriangle size={14} color="#ef4444" /> AI Student Risk Alerts
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Video size={16} color="#0f766e" /> Upcoming Meetings
                 </h3>
-                <button className="nd-text-btn">View All</button>
+                <Link href="/online-class" className="nd-text-btn">View All</Link>
               </div>
-              <div className="nd-risk-list">
-                {riskStudents.map((s, i) => (
-                  <div key={i} className="nd-risk-item">
-                    <div className="nd-risk-avatar">{s.name.charAt(0)}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p className="nd-risk-name">{s.name}</p>
-                      <p className="nd-risk-reason">{s.reason}</p>
-                    </div>
-                    <span className="nd-risk-badge" style={{ background: s.bg, color: s.color, border: `1px solid ${s.color}30` }}>{s.risk}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
+                {((d.upcomingMeeting && d.upcomingMeeting.length > 0) ? d.upcomingMeeting : meetings).length > 0 ? (
+                  ((d.upcomingMeeting && d.upcomingMeeting.length > 0) ? d.upcomingMeeting : meetings).map((m: any, i: number) => {
+                    const dStr = m.date ? new Date(m.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+                    return (
+                      <div key={m.id || i} style={{ border: '1px solid #e2e8f0', borderRadius: '0.65rem', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {m.title || 'Online Session'}
+                            </h4>
+                            {m.class && (
+                              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                                Class {m.class.name} {m.section ? `(${m.section.name})` : ''} {m.subject ? `· ${m.subject.name}` : ''}
+                              </p>
+                            )}
+                          </div>
+                          {m.meetLink && (
+                            <a
+                              href={m.meetLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#f0fdfa',
+                                color: '#0f766e',
+                                border: '1px solid #ccfbf1',
+                                borderRadius: '6px',
+                                padding: '0.3rem 0.65rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                textDecoration: 'none',
+                                flexShrink: 0
+                              }}
+                            >
+                              <LinkIcon size={12} />
+                              Join
+                            </a>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.7rem', color: '#64748b', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} color="#94a3b8" />
+                            <span>{dStr}</span>
+                          </div>
+                          {(m.startTime || m.start_time) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={13} color="#94a3b8" />
+                              <span>{m.startTime || m.start_time} {m.endTime || m.end_time ? `– ${m.endTime || m.end_time}` : ''}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {m.host && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '4px', borderTop: '1px dashed #e2e8f0' }}>
+                            {m.host.avatar ? (
+                              <img src={m.host.avatar} alt="Host" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#ccfbf1', color: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700 }}>
+                                {m.host.name?.charAt(0) || 'H'}
+                              </div>
+                            )}
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Host: <strong style={{ color: '#334155' }}>{m.host.name}</strong></span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>No upcoming meetings scheduled.</p>
+                )}
               </div>
             </div>
 
-            {/* Notifications */}
+            {/* Upcoming Exam */}
             <div className="nd-section-card">
               <div className="nd-section-head">
-                <h3>Notifications</h3>
-                <button className="nd-text-btn">View All</button>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={16} color="#6366f1" /> Upcoming Exams
+                </h3>
+                <Link href="/exams" className="nd-text-btn">View All</Link>
               </div>
-              <div className="nd-notif-list">
-                {notifications.map((n, i) => (
-                  <div key={i} className="nd-notif-item">
-                    <div className="nd-notif-icon" style={{ background: n.color + '18' }}>
-                      <n.icon size={15} color={n.color} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p className="nd-notif-title">{n.title}</p>
-                      <p className="nd-notif-sub">{n.sub}</p>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                      <span className="nd-notif-time">{n.time}</span>
-                      {n.unread && <span className="nd-notif-dot" />}
-                    </div>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
+                {d.currentExam && d.currentExam.length > 0 ? (
+                  d.currentExam.map((exam, i) => {
+                    const start = exam.start_date ? new Date(exam.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+                    const end = exam.end_date ? new Date(exam.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                    return (
+                      <div key={exam.id || i} style={{ border: '1px solid #e2e8f0', borderRadius: '0.65rem', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <div>
+                            <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                              {exam.exam_name}
+                            </h4>
+                            <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                              {start} – {end}
+                            </p>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '999px', background: '#e0e7ff', color: '#4338ca', flexShrink: 0 }}>
+                            {exam.assignments?.length ? `${exam.assignments.length} Papers` : 'Upcoming'}
+                          </span>
+                        </div>
+
+                        {exam.description && (
+                          <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                            {exam.description}
+                          </p>
+                        )}
+
+                        {exam.assignments && exam.assignments.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '2px' }}>
+                            {exam.assignments.slice(0, 4).map((a, ai) => (
+                              <span key={ai} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 6px', color: '#64748b' }}>
+                                {a.class?.name ? `${a.class.name}: ` : ''}{a.subject?.name}
+                              </span>
+                            ))}
+                            {exam.assignments.length > 4 && (
+                              <span style={{ fontSize: '0.65rem', color: '#6366f1', alignSelf: 'center', fontWeight: 600 }}>
+                                +{exam.assignments.length - 4} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>No upcoming exams scheduled.</p>
+                )}
               </div>
             </div>
+
           </div>
         </div>
 
@@ -924,50 +1495,78 @@ export default function DashboardPage() {
             <CalendarWidget today={today} />
           </div>
 
-          {/* Today's Schedule */}
-          <div className="nd-section-card">
-            <div className="nd-section-head">
-              <h3>Today's Schedule</h3>
-              <button className="nd-text-btn" style={{ fontSize: '0.7rem' }}>View Timetable</button>
-            </div>
-            <div className="nd-sch-list">
-              {schedule.map((s, i) => (
-                <div key={i} className={`nd-sch-item${s.active ? ' active' : ''}`}>
-                  <div className="nd-sch-time">
-                    <span>{s.start}</span>
-                    <span>{s.end}</span>
-                  </div>
-                  <div className="nd-sch-bar" style={{ background: s.active ? '#6366f1' : '#e2e8f0' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="nd-sch-subj">{s.subject}</p>
-                    <p className="nd-sch-room">{s.room}</p>
-                  </div>
-                  {s.active && <span className="nd-sch-now">Now</span>}
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Smart Reminders */}
+
+          {/* Recent Notices */}
           <div className="nd-section-card">
             <div className="nd-section-head">
-              <h3>Smart Reminders</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Megaphone size={16} color="#f59e0b" /> Recent Notices
+              </h3>
+              <Link href="/notices" className="nd-text-btn">View All</Link>
             </div>
-            <div className="nd-rem-list">
-              {reminders.map((r, i) => (
-                <div key={i} className="nd-rem-item">
-                  <div className="nd-rem-icon" style={{ background: r.bg }}>
-                    <r.icon size={15} color={r.color} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p className="nd-rem-title">{r.title}</p>
-                    <p className="nd-rem-sub">{r.sub}</p>
-                  </div>
-                  <ChevronRight size={15} color="#94a3b8" />
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '360px', overflowY: 'auto' }}>
+              {d.recentNotice && d.recentNotice.length > 0 ? (
+                d.recentNotice.map((n, i) => {
+                  const dStr = n.createdAt
+                    ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                    : '';
+                  return (
+                    <div
+                      key={n.id || i}
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.65rem',
+                        padding: '0.75rem',
+                        background: '#f8fafc',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.4rem' }}>
+                        <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', margin: 0, lineHeight: 1.3 }}>
+                          {n.title}
+                        </h4>
+                        {(n.isImportent || (n as any).isImportant) && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                            Important
+                          </span>
+                        )}
+                      </div>
+                      {n.content && (
+                        <p style={{
+                          fontSize: '0.72rem',
+                          color: '#475569',
+                          margin: 0,
+                          lineHeight: 1.45,
+                          whiteSpace: 'pre-line',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}>
+                          {n.content}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', color: '#94a3b8', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
+                        <span>By {n.postedBy || 'Admin'}</span>
+                        {dStr && <span>{dStr}</span>}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1.5rem 0' }}>No recent notices.</p>
+              )}
             </div>
-            <button className="nd-outline-btn" style={{ marginTop: '0.5rem' }}>View All Reminders</button>
+            <Link
+              href="/notices"
+              className="nd-outline-btn"
+              style={{ marginTop: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}
+            >
+              View All Notices
+            </Link>
           </div>
         </div>
       </div>
@@ -1043,26 +1642,27 @@ export default function DashboardPage() {
         @media (max-width: 960px) { .nd-3col { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 580px) { .nd-3col { grid-template-columns: 1fr; } }
 
-        /* Activities */
-        .nd-act-list { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 0.9rem; }
-        .nd-act-item { display: flex; gap: 0.8rem; align-items: center; }
-        .nd-act-date { min-width: 44px; height: 44px; border-radius: 0.6rem; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-        .nd-act-mon { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
-        .nd-act-day { font-size: 1.05rem; line-height: 1; }
-        .nd-act-title { font-size: 0.8rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.1rem; }
-        .nd-act-sub { font-size: 0.7rem; color: #94a3b8; }
-
-        /* Homework */
-        .nd-hw-body { display: flex; gap: 1rem; align-items: center; }
-        .nd-hw-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .nd-hw-pct { font-size: 1.15rem; font-weight: 800; color: #6366f1; }
-        .nd-hw-pct-sub { font-size: 0.62rem; color: #94a3b8; font-weight: 500; }
-        .nd-hw-stats { flex: 1; display: flex; flex-direction: column; gap: 0.55rem; }
-        .nd-hw-row { display: flex; justify-content: space-between; align-items: center; }
-        .nd-hw-lbl { font-size: 0.78rem; color: #64748b; }
-
-        /* Performance */
-        .nd-legend { display: flex; align-items: center; gap: 4px; margin-top: 0.5rem; }
+        /* Linear Progress & Avatars */
+        .nd-progress-container { width: 100%; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-bottom: 1rem; }
+        .nd-progress-bar { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+        .nd-progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.4rem; }
+        .nd-avatar-row { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
+        .nd-avatar-row::-webkit-scrollbar { display: none; }
+        .nd-avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 0.8rem 0.5rem; max-height: 220px; overflow-y: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
+        .nd-avatar-grid::-webkit-scrollbar { display: none; }
+        .nd-avatar-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 48px; position: relative; cursor: pointer; }
+        .nd-avatar-circle { width: 40px; height: 40px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 600; flex-shrink: 0; }
+        .nd-avatar-name { font-size: 0.65rem; color: #64748b; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        
+        /* Homework List */
+        .nd-hw-filter { padding: 0.2rem 0.4rem; border-radius: 0.4rem; border: 1px solid #e2e8f0; font-size: 0.7rem; color: #64748b; background: white; outline: none; }
+        .nd-hw-list { display: flex; flex-direction: column; gap: 0.6rem; max-height: 200px; overflow-y: auto; scrollbar-width: none; }
+        .nd-hw-list::-webkit-scrollbar { display: none; }
+        .nd-hw-item { padding: 0.6rem; border: 1px solid #f1f5f9; border-radius: 0.5rem; background: #fafaf9; }
+        .nd-hw-title { font-size: 0.8rem; font-weight: 600; color: #1e293b; margin-bottom: 0.2rem; }
+        .nd-hw-desc { font-size: 0.7rem; color: #64748b; margin-bottom: 0.4rem; line-height: 1.3; }
+        .nd-hw-meta { display: flex; gap: 0.4rem; font-size: 0.65rem; font-weight: 500; }
+        .nd-hw-badge { background: #e2e8f0; color: #475569; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
         .nd-legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
         /* ── 2-col ── */
