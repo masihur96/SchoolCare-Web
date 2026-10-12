@@ -31,6 +31,11 @@ interface SubjectEntity {
   schoolId: string;
 }
 
+interface TeacherEntity {
+  id: string;
+  name: string;
+}
+
 interface SchoolEntity {
   id?: string;
   name: string;
@@ -58,22 +63,26 @@ export default function AttendancePage() {
   const [classesData, setClassesData] = useState<ClassEntity[]>([]);
   const [sectionsData, setSectionsData] = useState<SectionEntity[]>([]);
   const [subjectsData, setSubjectsData] = useState<SubjectEntity[]>([]);
+  const [teachersData, setTeachersData] = useState<TeacherEntity[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolEntity | null>(null);
   
   const [loading, setLoading] = useState(true);
   
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(50);
   const [total, setTotal] = useState(0);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterStudentId, setFilterStudentId] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
+  const [filterTeacher, setFilterTeacher] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   
   const today = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(today);
@@ -107,11 +116,12 @@ export default function AttendancePage() {
         'accept': '*/*',
         'Authorization': `Bearer ${getApiToken()}`
       };
-      const [classesRes, sectionsRes, subjectsRes, schoolsRes] = await Promise.all([
+      const [classesRes, sectionsRes, subjectsRes, schoolsRes, teachersRes] = await Promise.all([
         fetch(`${API_BASE_URL}/admin/classes`, { headers }),
         fetch(`${API_BASE_URL}/admin/sections?schoolId=${userSchoolId}`, { headers }),
         fetch(`${API_BASE_URL}/admin/subjects`, { headers }),
-        fetch(`${API_BASE_URL}/admin/schools`, { headers })
+        fetch(`${API_BASE_URL}/admin/schools`, { headers }),
+        fetch(`${API_BASE_URL}/admin/users?role=teacher&limit=1000&schoolId=${userSchoolId}`, { headers }).catch(() => null)
       ]);
       const classesJson = await classesRes.json();
       const sectionsJson = await sectionsRes.json();
@@ -126,6 +136,12 @@ export default function AttendancePage() {
       setClassesData(classes.filter(c => c.schoolId === userSchoolId));
       setSectionsData(sections);
       setSubjectsData(subjects.filter(s => s.schoolId === userSchoolId));
+      
+      if (teachersRes && teachersRes.ok) {
+        const teachersJson = await teachersRes.json();
+        const teachers: TeacherEntity[] = Array.isArray(teachersJson) ? teachersJson : teachersJson.data?.data || teachersJson.data || [];
+        setTeachersData(Array.isArray(teachers) ? teachers : []);
+      }
       
       const userSchool = schools.find(s => s.schoolId === userSchoolId || s.id === userSchoolId);
       if (userSchool) {
@@ -150,19 +166,23 @@ export default function AttendancePage() {
       });
 
       if (debouncedSearch) queryParams.append('studentName', debouncedSearch);
+      if (filterStudentId) queryParams.append('studentId', filterStudentId);
       if (filterClass) queryParams.append('classId', filterClass);
       if (filterSection) queryParams.append('sectionId', filterSection);
       if (filterSubject) queryParams.append('subjectId', filterSubject);
+      if (filterTeacher) queryParams.append('teacherId', filterTeacher);
       if (filterStatus) queryParams.append('status', filterStatus);
+      if (filterDate) queryParams.append('date', filterDate);
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
 
       const response = await fetch(`${API_BASE_URL}/admin/attendance/period?${queryParams.toString()}`, { headers });
       const json = await response.json();
 
-      if (json.statusCode === 200) {
-        setRecords(json.data?.data || []);
-        setTotal(json.data?.total || 0);
+      if (json.statusCode === 200 || json.data) {
+        const list = json.data?.data || json.data || json || [];
+        setRecords(Array.isArray(list) ? list : []);
+        setTotal(json.data?.total || json.total || (Array.isArray(list) ? list.length : 0));
       } else {
         setRecords([]);
         setTotal(0);
@@ -172,7 +192,7 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, filterClass, filterSection, filterSubject, filterStatus, startDate, endDate]);
+  }, [page, limit, debouncedSearch, filterStudentId, filterClass, filterSection, filterSubject, filterTeacher, filterStatus, filterDate, startDate, endDate]);
 
   useEffect(() => {
     fetchFiltersData();
@@ -299,9 +319,9 @@ export default function AttendancePage() {
       <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Attendance Overview
+            Student Attendance
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>View and export daily attendance for students</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>View, track, and export period-wise student attendance</p>
         </div>
         <button className="btn btn-primary gap-2" onClick={exportToPDF} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
           <Download size={18} /> Export PDF
@@ -322,7 +342,22 @@ export default function AttendancePage() {
               />
             </div>
             
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <select
+                className="input"
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                style={{ height: '40px', padding: '0 0.75rem', fontSize: '0.875rem' }}
+                title="Records per page"
+              >
+                <option value={10}>10 / page</option>
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
               <button className="btn" onClick={() => setShowFilters(!showFilters)} style={{ border: '1px solid var(--border)', gap: '0.5rem', background: showFilters ? 'var(--primary)' : 'var(--card)', color: showFilters ? 'var(--primary-foreground)' : 'var(--foreground)' }}>
                 <Filter size={18} /> Filters
               </button>
@@ -352,6 +387,19 @@ export default function AttendancePage() {
                   value={endDate} 
                   onChange={(e) => {
                     setEndDate(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{ height: '40px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Specific Date</label>
+                <input 
+                  type="date" 
+                  className="input" 
+                  value={filterDate} 
+                  onChange={(e) => {
+                    setFilterDate(e.target.value);
                     setPage(1);
                   }}
                   style={{ height: '40px' }}
@@ -411,6 +459,23 @@ export default function AttendancePage() {
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Teacher</label>
+                <select 
+                  className="input" 
+                  value={filterTeacher} 
+                  onChange={(e) => {
+                    setFilterTeacher(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{ height: '40px' }}
+                >
+                  <option value="">All Teachers</option>
+                  {teachersData.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Status</label>
                 <select 
                   className="input" 
@@ -427,6 +492,20 @@ export default function AttendancePage() {
                   <option value="late">Late</option>
                   <option value="excused">Excused</option>
                 </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Student ID</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. uuid-student-001"
+                  className="input" 
+                  value={filterStudentId} 
+                  onChange={(e) => {
+                    setFilterStudentId(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{ height: '40px' }}
+                />
               </div>
             </div>
           )}

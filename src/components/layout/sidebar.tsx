@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, BookOpen, BellRing, Calendar, CheckCircle,
-  FileText, Settings, Menu, X, GraduationCap, LogOut, UserCheck,
-  ClipboardList, BrainCircuit, Activity, Clock, MessageSquare, Book,
-  BarChart2, PieChart, ChevronLeft, ChevronRight, MessageCircle,
-  MoreVertical, User, Key, Video
+  Settings, Menu, X, GraduationCap, LogOut, UserCheck,
+  Activity, Clock, MessageSquare, Book,
+  BookMarked, PieChart, ChevronLeft, ChevronRight, MessageCircle,
+  MoreVertical, User, Key, Video, Send
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -67,21 +67,19 @@ export function Sidebar() {
 
   const navItems = [
     { name: t('nav.dashboard') || 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'My Classes', href: '/classes', icon: BookOpen },
+    { name: 'Class and Sections', href: '/classes', icon: BookOpen },
     { name: t('nav.students') || 'Students', href: '/students', icon: Users },
-    { name: t('nav.attendance') || 'Attendance', href: '/attendance', icon: CheckCircle },
-    { name: 'Lesson Plans', href: '/lesson-plans', icon: ClipboardList, dummy: true },
-    { name: 'Assignments', href: '/assignments', icon: FileText, dummy: true },
-    { name: 'AI Quiz Builder', href: '/quiz-builder', icon: BrainCircuit, dummy: true },
-    { name: 'Results & Grades', href: '/exams', icon: Activity },
-    { name: 'Timetable', href: '/routine', icon: Calendar },
+    { name: 'Student Attendance', href: '/attendance', icon: CheckCircle },
+    { name: 'Exam and Result', href: '/exams', icon: Activity },
+    { name: 'Class Routine', href: '/routine', icon: Calendar },
     { name: 'Homework', href: '/homework', icon: Clock, dummy: true },
-    { name: 'Communication', href: '/notices', icon: MessageSquare },
-    { name: 'Library', href: '/library', icon: Book, dummy: true },
-    { name: 'Reports & Analytics', href: '/reports', icon: BarChart2, dummy: true },
+    { name: 'Notice', href: '/notices', icon: MessageSquare },
+    { name: 'Bulk SMS', href: '/bulk-sms', icon: Send },
+    { name: 'Library', href: '/library', icon: Book },
+    { name: 'Academic Book', href: '/academic-books', icon: BookMarked },
     { name: 'Teachers', href: '/teachers', icon: GraduationCap },
-    { name: 'Leave Management', href: '/teacher-attendance', icon: UserCheck },
-    { name: 'Fees (View)', href: '/fees', icon: PieChart, dummy: true },
+    { name: 'Teacher Attendance', href: '/teacher-attendance', icon: UserCheck },
+    { name: 'Expense Tracking', href: '/fees', icon: PieChart },
     { name: 'Online Class', href: '/online-class', icon: Video },
     { name: t('nav.settings') || 'Settings', href: '/settings', icon: Settings },
   ];

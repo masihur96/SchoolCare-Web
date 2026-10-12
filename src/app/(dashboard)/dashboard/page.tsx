@@ -7,7 +7,7 @@ import {
   Calendar, Clock, ChevronRight, ChevronLeft,
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
-  AlertTriangle, ArrowRight,
+  AlertTriangle, ArrowRight, Award,
   BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video, Link as LinkIcon
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -354,6 +354,11 @@ export default function DashboardPage() {
   const [schedSectionFilter, setSchedSectionFilter] = useState('All');
   const [schedTeacherFilter, setSchedTeacherFilter] = useState('All');
   const [schedSubjectFilter, setSchedSubjectFilter] = useState('All');
+  const [studentPerf, setStudentPerf] = useState<any[]>([]);
+  const [teacherPerf, setTeacherPerf] = useState<any[]>([]);
+  const [perfLoading, setPerfLoading] = useState(true);
+  const [hoveredPerfStudent, setHoveredPerfStudent] = useState<any | null>(null);
+  const [hoveredPerfTeacher, setHoveredPerfTeacher] = useState<any | null>(null);
   const today = new Date();
 
   async function fetchProfile(): Promise<UserProfile | null> {
@@ -432,6 +437,30 @@ export default function DashboardPage() {
     }
     fetchTeacherData();
   }, [teacherAttendanceView]);
+
+  useEffect(() => {
+    const fetchPerf = async () => {
+      setPerfLoading(true);
+      try {
+        const mm = today.getMonth() + 1;
+        const yyyy = today.getFullYear();
+        const headers = { accept: '*/*', Authorization: `Bearer ${getToken()}` };
+        const [sRes, tRes] = await Promise.all([
+          fetch(`https://smart-school-backend-production.up.railway.app/performance/student?month=${mm}&year=${yyyy}`, { headers }),
+          fetch(`https://smart-school-backend-production.up.railway.app/performance/teacher?month=${mm}&year=${yyyy}`, { headers }),
+        ]);
+        const sJson = await sRes.json();
+        const tJson = await tRes.json();
+        const sData = Array.isArray(sJson) ? sJson : Array.isArray(sJson.data) ? sJson.data : sJson.data ? [sJson.data] : [];
+        const tData = Array.isArray(tJson) ? tJson : Array.isArray(tJson.data) ? tJson.data : tJson.data ? [tJson.data] : [];
+        setStudentPerf(sData);
+        setTeacherPerf(tData);
+      } catch (e) { console.error(e); }
+      finally { setPerfLoading(false); }
+    };
+    fetchPerf();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Dummy fallback data ────────────────────────────────────────────────────
   const dummy: DashboardData = {
@@ -1496,6 +1525,220 @@ export default function DashboardPage() {
           </div>
 
 
+          {/* ── Student Performance Card ── */}
+          <div className="nd-section-card">
+            <div className="nd-section-head" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                <GraduationCap size={15} color="#6366f1" /> Student Performance
+              </h3>
+              <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
+                {getMonthName(today.getMonth())} {today.getFullYear()}
+              </span>
+            </div>
+            {perfLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
+                <Loader2 size={20} style={{ animation: 'nd-spin 1s linear infinite', color: '#6366f1' }} />
+              </div>
+            ) : studentPerf.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>No student data</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
+                {[...studentPerf]
+                  .sort((a, b) => {
+                    const avgA = ((a.attendance?.percentage ?? 0) + (a.exams?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 3;
+                    const avgB = ((b.attendance?.percentage ?? 0) + (b.exams?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 3;
+                    return avgA - avgB;
+                  })
+                  .map((s: any, i: number) => {
+                    const att = s.attendance?.percentage ?? 0;
+                    const exam = s.exams?.percentage ?? 0;
+                    const hw = s.homework?.percentage ?? 0;
+                    const avg = Math.round((att + exam + hw) / 3);
+                    const clr = (v: number) => v >= 80 ? '#10b981' : v >= 60 ? '#f59e0b' : '#ef4444';
+                    const initials = (s.name || 'S').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                    const isHovered = hoveredPerfStudent === i;
+                    return (
+                      <div key={i}
+                        onMouseEnter={() => setHoveredPerfStudent(i)}
+                        onMouseLeave={() => setHoveredPerfStudent(null)}
+                        style={{
+                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? '#eef2ff' : '#f8fafc',
+                          border: `1px solid ${isHovered ? '#c7d2fe' : '#e2e8f0'}`, cursor: 'pointer',
+                          transition: 'all 0.2s', position: 'relative',
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+                          {/* Avatar */}
+                          <div style={{
+                            width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: `linear-gradient(135deg, ${clr(avg)}, ${clr(avg)}99)`, color: '#fff',
+                            fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
+                          }}>{initials}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.name || 'Student'}
+                            </div>
+                            <div style={{ fontSize: '0.64rem', color: '#94a3b8' }}>
+                              {s.class?.name || ''}{s.section?.name ? ` · ${s.section.name}` : ''}{s.rollNumber ? ` · Roll ${s.rollNumber}` : ''}
+                            </div>
+                          </div>
+                          {/* Overall badge */}
+                          <div style={{
+                            fontSize: '0.68rem', fontWeight: 700, color: clr(avg), background: `${clr(avg)}18`,
+                            borderRadius: '6px', padding: '2px 6px',
+                          }}>{avg}%</div>
+                        </div>
+                        {/* Mini bars */}
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          {[['Att', att], ['Exam', exam], ['HW', hw]].map(([label, val]) => (
+                            <div key={label as string} style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{label}</span>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: clr(val as number) }}>{Math.round(val as number)}%</span>
+                              </div>
+                              <div style={{ height: '3.5px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.min(val as number, 100)}%`, background: clr(val as number), borderRadius: '2px', transition: 'width 0.5s' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Hover tooltip */}
+                        {isHovered && (
+                          <div style={{
+                            position: 'absolute', left: 0, right: 0, top: '100%', marginTop: '4px', zIndex: 50,
+                            background: '#fff', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                            border: '1px solid #e2e8f0',
+                          }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.4rem' }}>
+                              {s.name} — Details
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Attendance</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(att), textAlign: 'right' }}>
+                                {s.attendance?.presentDays ?? '–'}/{s.attendance?.totalWorkingDays ?? '–'} days ({Math.round(att)}%)
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Exams</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(exam), textAlign: 'right' }}>
+                                {s.exams?.totalMarksObtained ?? '–'}/{s.exams?.totalMaximumMarks ?? '–'} ({Math.round(exam)}%)
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Homework</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(hw), textAlign: 'right' }}>
+                                {s.homework?.totalDone ?? '–'}/{s.homework?.totalAssigned ?? '–'} done ({Math.round(hw)}%)
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Teacher Performance Card ── */}
+          <div className="nd-section-card">
+            <div className="nd-section-head" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Award size={15} color="#10b981" /> Teacher Performance
+              </h3>
+              <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
+                {getMonthName(today.getMonth())} {today.getFullYear()}
+              </span>
+            </div>
+            {perfLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
+                <Loader2 size={20} style={{ animation: 'nd-spin 1s linear infinite', color: '#10b981' }} />
+              </div>
+            ) : teacherPerf.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>No teacher data</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
+                {[...teacherPerf]
+                  .sort((a, b) => {
+                    const avgA = ((a.attendance?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 2;
+                    const avgB = ((b.attendance?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 2;
+                    return avgA - avgB;
+                  })
+                  .map((t: any, i: number) => {
+                    const att = t.attendance?.percentage ?? 0;
+                    const hw = t.homework?.percentage ?? 0;
+                    const avg = Math.round((att + hw) / 2);
+                    const clr = (v: number) => v >= 80 ? '#10b981' : v >= 60 ? '#f59e0b' : '#ef4444';
+                    const initials = (t.name || 'T').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                    const isHovered = hoveredPerfTeacher === i;
+                    return (
+                      <div key={i}
+                        onMouseEnter={() => setHoveredPerfTeacher(i)}
+                        onMouseLeave={() => setHoveredPerfTeacher(null)}
+                        style={{
+                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? '#ecfdf5' : '#f8fafc',
+                          border: `1px solid ${isHovered ? '#a7f3d0' : '#e2e8f0'}`, cursor: 'pointer',
+                          transition: 'all 0.2s', position: 'relative',
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+                          {/* Avatar */}
+                          <div style={{
+                            width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: `linear-gradient(135deg, ${clr(avg)}, ${clr(avg)}99)`, color: '#fff',
+                            fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
+                          }}>{initials}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {t.name || 'Teacher'}
+                            </div>
+                            {t.designation && (
+                              <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                                {t.designation}
+                              </div>
+                            )}
+                          </div>
+                          {/* Overall badge */}
+                          <div style={{
+                            fontSize: '0.68rem', fontWeight: 700, color: clr(avg), background: `${clr(avg)}18`,
+                            borderRadius: '6px', padding: '2px 6px',
+                          }}>{avg}%</div>
+                        </div>
+                        {/* Mini bars */}
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          {[['Attendance', att], ['Homework', hw]].map(([label, val]) => (
+                            <div key={label as string} style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{label}</span>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: clr(val as number) }}>{Math.round(val as number)}%</span>
+                              </div>
+                              <div style={{ height: '3.5px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.min(val as number, 100)}%`, background: clr(val as number), borderRadius: '2px', transition: 'width 0.5s' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Hover tooltip */}
+                        {isHovered && (
+                          <div style={{
+                            position: 'absolute', left: 0, right: 0, top: '100%', marginTop: '4px', zIndex: 50,
+                            background: '#fff', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                            border: '1px solid #e2e8f0',
+                          }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.4rem' }}>
+                              {t.name} — Details
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Attendance</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(att), textAlign: 'right' }}>
+                                {t.attendance?.presentDays ?? '–'}/{t.attendance?.totalWorkingDays ?? '–'} days ({Math.round(att)}%)
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Homework Given</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(hw), textAlign: 'right' }}>
+                                {t.homework?.totalProvided ?? '–'}/{t.homework?.target ?? '–'} target ({Math.round(hw)}%)
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
 
           {/* Recent Notices */}
           <div className="nd-section-card">
