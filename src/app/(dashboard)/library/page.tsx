@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   BookOpen, Search, X, BookMarked, User,
   Hash, AlertCircle, RefreshCw, Filter, Tag, Plus, Loader2, Pencil, CheckCircle
@@ -71,6 +72,7 @@ function BookModal({
   onSuccess: () => void;
   bookId?: string;
 }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState<BookForm>(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -144,7 +146,7 @@ function BookModal({
         <div style={{ padding: '1.5rem 1.75rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--foreground)' }}>
-              {isEdit ? 'Update Book' : 'Add New Book'}
+              {isEdit ? 'Update Book' : t('library.addBook')}
             </h2>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
               {isEdit ? 'Edit the book details below.' : 'Fill in the details to add a book to the library.'}
@@ -263,6 +265,7 @@ function BookModal({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LibraryPage() {
+  const { t } = useLanguage();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -434,7 +437,7 @@ export default function LibraryPage() {
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', opacity: 0.5 }}>
             <BookOpen size={40} />
           </div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>No Books Found</h3>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('library.noBooks')}</h3>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
             {search || category !== 'All' ? 'Try adjusting your search or filter.' : 'The library collection is currently empty.'}
           </p>

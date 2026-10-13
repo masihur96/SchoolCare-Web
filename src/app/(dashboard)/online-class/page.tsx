@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { Video, Calendar, Clock, Link as LinkIcon, Loader2, User, BookOpen } from 'lucide-react';
 
 interface Participant {
@@ -27,6 +28,7 @@ interface OnlineClass {
 }
 
 export default function OnlineClassPage() {
+  const { t } = useLanguage();
   const [meetings, setMeetings] = useState<OnlineClass[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,9 +57,9 @@ export default function OnlineClassPage() {
       <div className="oc-header">
         <h1 className="oc-title">
           <div className="oc-title-icon"><Video size={24} color="#14b8a6" /></div>
-          Online Classes & Meetings
+          {t('onlineClass.title')}
         </h1>
-        <p className="oc-subtitle">View and join your upcoming virtual sessions.</p>
+        <p className="oc-subtitle">{t('onlineClass.subtitle')}</p>
       </div>
 
       {loading ? (
@@ -67,8 +69,8 @@ export default function OnlineClassPage() {
       ) : meetings.length === 0 ? (
         <div className="oc-empty">
           <Video size={48} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-          <h3>No upcoming meetings</h3>
-          <p>You don't have any online classes or meetings scheduled at the moment.</p>
+          <h3>{t('onlineClass.noMeetings')}</h3>
+          <p>{t('onlineClass.noMeetingsDesc')}</p>
         </div>
       ) : (
         <div className="oc-grid">
@@ -107,7 +109,7 @@ export default function OnlineClassPage() {
                 className="oc-join-btn"
               >
                 <LinkIcon size={16} />
-                Join Meeting
+                {t('onlineClass.joinMeeting')}
               </a>
             </div>
           ))}

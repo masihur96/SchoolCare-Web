@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, BookOpen, Users, Calendar, Clock, Loader2, Edit, FileText, CheckCircle, CircleDashed } from 'lucide-react';
 import CreateExamModal from '@/components/CreateExamModal';
 import ExamRoutineModal from '@/components/ExamRoutineModal';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -33,6 +34,7 @@ interface Exam {
 }
 
 export default function ExamsPage() {
+  const { t } = useLanguage();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -106,15 +108,15 @@ export default function ExamsPage() {
       <div className="page-header" style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
-            Examination Board
+            {t('exams.title')}
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>Manage all school assessments, routines, and results centrally.</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>{t('exams.subtitle')}</p>
         </div>
         <button onClick={() => {
           setExamToEdit(null);
           setIsCreateModalOpen(true);
         }} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', fontSize: '0.95rem', fontWeight: 600, boxShadow: '0 8px 16px -4px rgba(var(--primary-rgb), 0.3)' }}>
-          <Plus size={20} /> Create New Exam
+          <Plus size={20} /> {t('exams.createExam')}
         </button>
       </div>
 
@@ -155,8 +157,8 @@ export default function ExamsPage() {
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', opacity: 0.5 }}>
               <BookOpen size={40} className="text-muted-foreground" />
             </div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>No Exams Scheduled</h3>
-            <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.05rem' }}>Get started by creating your first term or final examination.</p>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>{t('exams.noExams')}</h3>
+            <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.05rem' }}>{t('exams.noExamsDesc')}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1.5rem' }}>
@@ -199,13 +201,13 @@ export default function ExamsPage() {
                     {/* Timeline */}
                     <div style={{ display: 'flex', background: 'rgba(0,0,0,0.015)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', marginBottom: '1.5rem' }}>
                       <div style={{ flex: 1, borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
-                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>Starts</div>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>{t('exams.starts')}</div>
                         <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <Calendar size={14} className="text-primary" /> {formatDate(exam.start_date)}
                         </div>
                       </div>
                       <div style={{ flex: 1, paddingLeft: '1rem' }}>
-                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>Ends</div>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>{t('exams.ends')}</div>
                         <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <Calendar size={14} className="text-primary" /> {formatDate(exam.end_date)}
                         </div>
@@ -216,7 +218,7 @@ export default function ExamsPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', flex: 1 }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>
-                          <Users size={14} /> Assigned Classes
+                          <Users size={14} /> {t('exams.assignedClasses')}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                           {uniqueClasses.length > 0 ? uniqueClasses.slice(0, 3).map((c, i) => (
@@ -245,7 +247,7 @@ export default function ExamsPage() {
                         style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
                         onClick={() => setExamForRoutine(exam)}
                       >
-                        <FileText size={16} /> Routine & Results
+                        <FileText size={16} /> {t('exams.routineAndResults')}
                       </button>
                       <button 
                         onClick={() => {
@@ -257,7 +259,7 @@ export default function ExamsPage() {
                         onMouseEnter={e => e.currentTarget.style.background='var(--muted)'} 
                         onMouseLeave={e => e.currentTarget.style.background='var(--background)'}
                       >
-                        <Edit size={16} /> Edit
+                        <Edit size={16} /> {t('common.edit')}
                       </button>
                     </div>
 

@@ -66,22 +66,22 @@ export function Sidebar() {
   }, []);
 
   const navItems = [
-    { name: t('nav.dashboard') || 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Class and Sections', href: '/classes', icon: BookOpen },
-    { name: t('nav.students') || 'Students', href: '/students', icon: Users },
-    { name: 'Student Attendance', href: '/attendance', icon: CheckCircle },
-    { name: 'Exam and Result', href: '/exams', icon: Activity },
-    { name: 'Class Routine', href: '/routine', icon: Calendar },
-    { name: 'Homework', href: '/homework', icon: Clock, dummy: true },
-    { name: 'Notice', href: '/notices', icon: MessageSquare },
-    { name: 'Bulk SMS', href: '/bulk-sms', icon: Send },
-    { name: 'Library', href: '/library', icon: Book },
-    { name: 'Academic Book', href: '/academic-books', icon: BookMarked },
-    { name: 'Teachers', href: '/teachers', icon: GraduationCap },
-    { name: 'Teacher Attendance', href: '/teacher-attendance', icon: UserCheck },
-    { name: 'Expense Tracking', href: '/fees', icon: PieChart },
-    { name: 'Online Class', href: '/online-class', icon: Video },
-    { name: t('nav.settings') || 'Settings', href: '/settings', icon: Settings },
+    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.students'), href: '/students', icon: Users },
+    { name: t('nav.teachers'), href: '/teachers', icon: GraduationCap },
+    { name: t('nav.studentAttendance'), href: '/attendance', icon: CheckCircle },
+    { name: t('nav.teacherAttendance'), href: '/teacher-attendance', icon: UserCheck },
+    { name: t('nav.classAndSections'), href: '/classes', icon: BookOpen },
+    { name: t('nav.classRoutine'), href: '/routine', icon: Calendar },
+    { name: t('nav.examAndResult'), href: '/exams', icon: Activity },
+    { name: t('nav.homework'), href: '/homework', icon: Clock },
+    { name: t('nav.onlineClass'), href: '/online-class', icon: Video },
+    { name: t('nav.notice'), href: '/notices', icon: MessageSquare },
+    { name: t('nav.library'), href: '/library', icon: Book },
+    { name: t('nav.academicBook'), href: '/academic-books', icon: BookMarked },
+    { name: t('nav.expenseTracking'), href: '/fees', icon: PieChart },
+    { name: t('nav.bulkSms'), href: '/bulk-sms', icon: Send },
+    { name: t('nav.settings'), href: '/settings', icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -159,7 +159,7 @@ export function Sidebar() {
                 <>
                   <div className="nd-profile-info">
                     <span className="nd-profile-name">{profile?.name || 'User'}</span>
-                    <span className="nd-profile-role">{profile?.role === 'admin' ? 'Super Admin' : (profile?.role || 'Staff')}</span>
+                    <span className="nd-profile-role">{profile?.role === 'admin' ? t('common.superAdmin') : (profile?.role || t('common.staff'))}</span>
                   </div>
                   <button 
                     className="nd-profile-more-btn"
@@ -196,11 +196,11 @@ export function Sidebar() {
                 <div className="nd-popover-menu">
                   <Link href="/profile" className="nd-popover-item" onClick={() => setIsProfileOpen(false)}>
                     <User size={16} />
-                    <span>Profile</span>
+                    <span>{t('nav.profile')}</span>
                   </Link>
                   <Link href="/change-password" className="nd-popover-item" onClick={() => setIsProfileOpen(false)}>
                     <Key size={16} />
-                    <span>Change Password</span>
+                    <span>{t('nav.changePassword')}</span>
                   </Link>
                 </div>
                 
@@ -209,7 +209,7 @@ export function Sidebar() {
                 <div className="nd-popover-menu">
                   <button onClick={handleLogout} className="nd-popover-item nd-popover-logout">
                     <LogOut size={16} />
-                    <span>Log Out</span>
+                    <span>{t('nav.logout')}</span>
                   </button>
                 </div>
               </div>

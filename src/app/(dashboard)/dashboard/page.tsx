@@ -13,6 +13,7 @@ import {
   MessageCircle, Send, X
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useLanguage } from '@/components/language-provider';
 
 const TeacherMap = dynamic(() => import('@/components/TeacherMap'), {
   ssr: false,
@@ -345,6 +346,7 @@ function CalendarWidget({ today }: { today: Date }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { t } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -613,7 +615,7 @@ export default function DashboardPage() {
       let reply = `Here to assist ${schoolName} with SchoolCare!`;
       const lower = text.toLowerCase();
       if (lower.includes('schedule') || lower.includes('routine')) {
-        reply = `For today at ${schoolName}, you have ${filteredTodayRoutines.length} classes scheduled. Check the Today's Schedule section on the dashboard for details!`;
+        reply = `For today at ${schoolName}, you have ${filteredTodayRoutines.length} classes scheduled. Check the {t('dashboard.todaySchedule')} section on the dashboard for details!`;
       } else if (lower.includes('lesson') || lower.includes('plan')) {
         reply = `Nova AI Lesson Tip for ${schoolName}: Structure your upcoming session with: 1) 5-min recap, 2) 15-min core topic teaching, 3) 15-min interactive student activity, and 4) 5-min wrap-up & homework briefing.`;
       } else if (lower.includes('attendance')) {
@@ -636,7 +638,7 @@ export default function DashboardPage() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '1rem' }}>
         <Loader2 size={36} style={{ animation: 'nd-spin 1s linear infinite', color: 'var(--primary)' }} />
-        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Loading dashboard…</p>
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>{t('common.loading')}</p>
         <style>{`@keyframes nd-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -819,7 +821,7 @@ export default function DashboardPage() {
                     {/* ── Attendance Overview ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.25rem' }}>
             
-            {/* Student Attendance Chart Card */}
+            {/* {t('dashboard.studentAttendance')} Chart Card */}
             <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -828,10 +830,10 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {studentAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                      {studentAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      Student Attendance
+                      {t('dashboard.studentAttendance')}
                     </p>
                   </div>
                 </div>
@@ -848,23 +850,23 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendStudent as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendStudent as any)?.monthlySummary?.daysInMonth || 31}d</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Recorded</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('dashboard.recorded')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendStudent as any)?.monthlySummary?.totalPresent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Present</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.present')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendStudent as any)?.monthlySummary?.totalAbsent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Absent</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.absent')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendStudent as any)?.monthlySummary?.totalLeave || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Leave</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.leave')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendStudent as any)?.monthlySummary?.totalLate || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Late</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.late')}</p>
                   </div>
                 </div>
               )}
@@ -874,7 +876,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Teacher Attendance Chart Card */}
+            {/* {t('dashboard.teacherAttendance')} Chart Card */}
             <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -883,10 +885,10 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {teacherAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : 'Monthly Overview'}
+                      {teacherAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      Teacher Attendance
+                      {t('dashboard.teacherAttendance')}
                     </p>
                   </div>
                 </div>
@@ -896,7 +898,7 @@ export default function DashboardPage() {
                     onClick={() => setShowTeacherMap(!showTeacherMap)}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: showTeacherMap ? '#a855f7' : '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                   >
-                    <MapPin size={14} /> {showTeacherMap ? 'Hide Map' : 'Map'}
+                    <MapPin size={14} /> {showTeacherMap ? t('dashboard.hideMap') : 'Map'}
                   </button>
                   <button 
                     onClick={() => setTeacherAttendanceView(teacherAttendanceView === 'month' ? 'year' : 'month')}
@@ -911,23 +913,23 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendTeacher as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendTeacher as any)?.monthlySummary?.daysInMonth || 31}d</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Recorded</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('dashboard.recorded')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendTeacher as any)?.monthlySummary?.totalPresent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Present</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.present')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendTeacher as any)?.monthlySummary?.totalAbsent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Absent</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.absent')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLeave || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Leave</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.leave')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLate || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Late</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.late')}</p>
                   </div>
                 </div>
               )}
@@ -1290,18 +1292,18 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 {(!d.recentHomework || d.recentHomework.length === 0) && (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1rem 0' }}>No homework assigned today.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1rem 0' }}>{t('dashboard.noHomeworkToday')}</p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ── Today's Schedule ── */}
+          {/* ── {t('dashboard.todaySchedule')} ── */}
           <div className="nd-section-card">
             <div className="nd-section-head" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={18} color="#6366f1" />
-                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Today's Schedule</h3>
+                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>{t('dashboard.todaySchedule')}</h3>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '999px' }}>
                   {filteredTodayRoutines.length}
                 </span>
@@ -1452,7 +1454,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── 2-col grid: Upcoming Meetings & Upcoming Exams ── */}
+          {/* ── 2-col grid: Upcoming Meetings & {t('dashboard.upcomingExams')} ── */}
           <div className="nd-2col">
 
             {/* Upcoming Meeting */}
@@ -1461,7 +1463,7 @@ export default function DashboardPage() {
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Video size={16} color="#0f766e" /> Upcoming Meetings
                 </h3>
-                <Link href="/online-class" className="nd-text-btn">View All</Link>
+                <Link href="/online-class" className="nd-text-btn">{t('dashboard.viewAll')}</Link>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
                 {((d.upcomingMeeting && d.upcomingMeeting.length > 0) ? d.upcomingMeeting : meetings).length > 0 ? (
@@ -1535,7 +1537,7 @@ export default function DashboardPage() {
                     );
                   })
                 ) : (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>No upcoming meetings scheduled.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noMeetings')}</p>
                 )}
               </div>
             </div>
@@ -1544,9 +1546,9 @@ export default function DashboardPage() {
             <div className="nd-section-card">
               <div className="nd-section-head">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FileText size={16} color="#6366f1" /> Upcoming Exams
+                  <FileText size={16} color="#6366f1" /> {t('dashboard.upcomingExams')}
                 </h3>
-                <Link href="/exams" className="nd-text-btn">View All</Link>
+                <Link href="/exams" className="nd-text-btn">{t('dashboard.viewAll')}</Link>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto' }}>
                 {d.currentExam && d.currentExam.length > 0 ? (
@@ -1593,7 +1595,7 @@ export default function DashboardPage() {
                     );
                   })
                 ) : (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>No upcoming exams scheduled.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noUpcomingExams')}</p>
                 )}
               </div>
             </div>
@@ -1826,13 +1828,13 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Recent Notices */}
+          {/* {t('dashboard.recentNotices')} */}
           <div className="nd-section-card">
             <div className="nd-section-head">
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Megaphone size={16} color="#f59e0b" /> Recent Notices
+                <Megaphone size={16} color="#f59e0b" /> {t('dashboard.recentNotices')}
               </h3>
-              <Link href="/notices" className="nd-text-btn">View All</Link>
+              <Link href="/notices" className="nd-text-btn">{t('dashboard.viewAll')}</Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '360px', overflowY: 'auto' }}>
               {d.recentNotice && d.recentNotice.length > 0 ? (
@@ -1886,7 +1888,7 @@ export default function DashboardPage() {
                   );
                 })
               ) : (
-                <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1.5rem 0' }}>No recent notices.</p>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1.5rem 0' }}>{t('dashboard.noRecentNotices')}</p>
               )}
             </div>
             <Link
@@ -1894,7 +1896,7 @@ export default function DashboardPage() {
               className="nd-outline-btn"
               style={{ marginTop: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}
             >
-              View All Notices
+              {t('dashboard.viewAll')} Notices
             </Link>
           </div>
         </div>
@@ -2020,7 +2022,7 @@ export default function DashboardPage() {
                 scrollbarWidth: 'none',
               }}>
                 {[
-                  "📅 Today's Schedule",
+                  "📅 {t('dashboard.todaySchedule')}",
                   "📝 Lesson Plan",
                   "📊 Attendance",
                   "💡 Homework Idea"

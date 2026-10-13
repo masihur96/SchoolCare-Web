@@ -5,6 +5,7 @@ import { Calendar, Clock, MapPin, Loader2, BookOpen, User, Filter, CheckSquare, 
 import AttendanceModal from '@/components/AttendanceModal';
 import HomeworkModal from '@/components/HomeworkModal';
 import CreateRoutineModal from '@/components/CreateRoutineModal';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -50,6 +51,7 @@ interface Routine {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function RoutinePage() {
+  const { t } = useLanguage();
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -198,9 +200,9 @@ export default function RoutinePage() {
       <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
-            Class Routine
+            {t('routine.title')}
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>Manage and view weekly schedules for classes and teachers</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '1.1rem' }}>{t('routine.subtitle')}</p>
         </div>
         <button 
           onClick={() => setIsCreateModalOpen(true)}
@@ -208,7 +210,7 @@ export default function RoutinePage() {
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: 'fit-content' }}
         >
           <Calendar size={18} />
-          Create Routine
+          {t('routine.createRoutine')}
         </button>
       </div>
 
@@ -222,8 +224,8 @@ export default function RoutinePage() {
                 <Filter size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>Filter Routine</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>Narrow down by class or teacher</p>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>{t('routine.filterRoutine')}</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>{t('routine.narrowDown')}</p>
               </div>
             </div>
             
@@ -238,7 +240,7 @@ export default function RoutinePage() {
                   disabled={loading || availableTeachers.length === 0}
                   style={{ width: '100%', paddingLeft: '2.5rem', height: '44px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontWeight: 500, cursor: 'pointer' }}
                 >
-                  <option value="">All Teachers</option>
+                  <option value="">{t('common.allTeachers')}</option>
                   {availableTeachers.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -257,7 +259,7 @@ export default function RoutinePage() {
                   disabled={loading || availableClasses.length === 0}
                   style={{ width: '100%', paddingLeft: '2.5rem', height: '44px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontWeight: 500, cursor: 'pointer' }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('common.allClasses')}</option>
                   {availableClasses.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -274,7 +276,7 @@ export default function RoutinePage() {
                 disabled={!selectedClassId || availableSections.length === 0}
                 style={{ width: '100%', height: '44px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontWeight: 500, cursor: selectedClassId ? 'pointer' : 'not-allowed', opacity: selectedClassId ? 1 : 0.6 }}
               >
-                <option value="">All Sections</option>
+                <option value="">{t('common.allSections')}</option>
                 {availableSections.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -318,7 +320,7 @@ export default function RoutinePage() {
           ) : filteredRoutines.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--muted-foreground)' }}>
               <Calendar size={64} style={{ opacity: 0.15, margin: '0 auto 1.5rem' }} />
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--foreground)' }}>No routine blocks found</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('routine.noRoutine')}</p>
               <p style={{ fontSize: '0.95rem', maxWidth: '400px', margin: '0.5rem auto 0' }}>Try adjusting your Class, Section, or Teacher filters above to find what you are looking for.</p>
             </div>
           ) : (

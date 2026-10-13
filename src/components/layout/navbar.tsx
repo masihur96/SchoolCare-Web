@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { LanguageToggle } from '@/components/language-toggle';
+import { useLanguage } from '@/components/language-provider';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -245,6 +246,7 @@ const KIND_LABEL: Record<string, string> = {
 
 // ─── Main Navbar ──────────────────────────────────────────────────────────────
 export function Navbar() {
+  const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -499,7 +501,7 @@ export function Navbar() {
               <button 
                 className="marquee-action-btn" 
                 onClick={() => setMarqueeModalOpen(true)}
-                title="Manage Marquee"
+                title={t('navbar.manageMarquee')}
               >
                 <Megaphone size={16} />
               </button>
@@ -546,13 +548,13 @@ export function Navbar() {
                 <div className="nb-panel-head">
                   <div className="nb-panel-title">
                     <div className="nb-panel-icon"><Bell size={16} /></div>
-                    <span>Notifications</span>
-                    {unreadCount > 0 && <span className="nb-unread-chip">{unreadCount} new</span>}
+                    <span>{t('navbar.notifications')}</span>
+                    {unreadCount > 0 && <span className="nb-unread-chip">{unreadCount} {t('navbar.newNotifs')}</span>}
                   </div>
                   <div className="nb-panel-actions">
                     {notifs.length > 0 && unreadCount > 0 && (
                       <button className="nb-action-btn" onClick={markAllRead} title="Mark all read">
-                        <CheckCheck size={15} /><span>All read</span>
+                        <CheckCheck size={15} /><span>{t('navbar.allRead')}</span>
                       </button>
                     )}
                     <button className="nb-action-btn" onClick={fetchNotifs} title="Refresh" disabled={notifLoading}>
@@ -577,8 +579,8 @@ export function Navbar() {
                   {!notifLoading && !notifError && notifs.length === 0 && (
                     <div className="nb-center nb-empty">
                       <div className="nb-empty-icon"><Bell size={28} /></div>
-                      <p className="nb-empty-title">All caught up!</p>
-                      <p className="nb-empty-sub">No notifications right now.</p>
+                      <p className="nb-empty-title">{t('navbar.allCaughtUp')}</p>
+                      <p className="nb-empty-sub">{t('navbar.noNotifications')}</p>
                     </div>
                   )}
                   {!notifLoading && !notifError && notifs.length > 0 && (

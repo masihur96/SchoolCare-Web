@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   BookOpen, Search, X, BookMarked, User,
   Hash, AlertCircle, RefreshCw, Filter, Tag, Plus, Loader2,
@@ -803,6 +804,7 @@ function BookReaderModal({
 
 // ─── Main Academic Books Page Component ──────────────────────────────────────
 export default function AcademicBooksPage() {
+  const { t } = useLanguage();
   const [books, setBooks] = useState<AcademicBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1325,7 +1327,7 @@ export default function AcademicBooksPage() {
           >
             <BookMarked size={42} />
           </div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>No Academic Books Found</h3>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('academicBooks.noBooks')}</h3>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '0.95rem', maxWidth: '420px' }}>
             {search || selectedClassId || selectedSubject
               ? 'Try modifying your filters to find curriculum books.'

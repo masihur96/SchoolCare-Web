@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { Search, Plus, Edit, Trash2, Layers, BookOpen, Loader2, Eye, X, UserPlus, UserCog, Users } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
@@ -41,6 +42,7 @@ interface ProcessedClass {
 }
 
 export default function ClassesPage() {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [classesData, setClassesData] = useState<ProcessedClass[]>([]);
   const [loading, setLoading] = useState(true);
@@ -504,7 +506,7 @@ export default function ClassesPage() {
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Classes & Curriculum
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>Manage classes, sections, and subjects</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('classes.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button className="btn" onClick={() => setIsAddSectionModalOpen(true)} style={{ background: 'var(--card)', color: 'var(--foreground)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -651,7 +653,7 @@ export default function ClassesPage() {
                   <td colSpan={5} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>No classes found</p>
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('classes.noClasses')}</p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query.</p>
                     </div>
                   </td>

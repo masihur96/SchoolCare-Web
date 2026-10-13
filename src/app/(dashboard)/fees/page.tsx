@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   TrendingDown, TrendingUp, DollarSign, Search, Filter, RefreshCw,
   Calendar, CreditCard, ArrowDownRight, ArrowUpRight, X, ChevronLeft,
@@ -88,6 +89,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function ExpenseTrackingPage() {
+  const { t } = useLanguage();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -284,13 +286,13 @@ export default function ExpenseTrackingPage() {
       {/* ── KPI Summary Cards ──────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
-        {/* Total Expenses */}
+        {/* {t('fees.totalExpense')} */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
           <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: '#fef2f2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <TrendingDown size={26} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Expenses</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalExpense')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ef4444', lineHeight: 1.15 }}>
               {formatCurrency(summary.totalExpense)}
             </div>
@@ -306,7 +308,7 @@ export default function ExpenseTrackingPage() {
             <TrendingUp size={26} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Collections</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalIncome')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#16a34a', lineHeight: 1.15 }}>
               {formatCurrency(summary.totalIncome)}
             </div>
@@ -316,13 +318,13 @@ export default function ExpenseTrackingPage() {
           </div>
         </div>
 
-        {/* Net Cashflow Balance */}
+        {/* {t('fees.netBalance')} Balance */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
           <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: summary.netBalance >= 0 ? '#eff6ff' : '#fff7ed', color: summary.netBalance >= 0 ? '#2563eb' : '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Wallet size={26} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Net Cashflow</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.netBalance')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: summary.netBalance >= 0 ? '#2563eb' : '#ea580c', lineHeight: 1.15 }}>
               {formatCurrency(summary.netBalance)}
             </div>
@@ -762,7 +764,7 @@ export default function ExpenseTrackingPage() {
           <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.6 }}>
             <TrendingDown size={38} />
           </div>
-          <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>No Transactions Found</h3>
+          <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('fees.noTransactions')}</h3>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.92rem', maxWidth: '420px' }}>
             No transaction records match the specified filters or date range.
           </p>

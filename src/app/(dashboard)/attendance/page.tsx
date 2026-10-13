@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Filter, ChevronLeft, ChevronRight, Loader2, Download, Check, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -59,6 +60,7 @@ interface AttendanceRecord {
 }
 
 export default function AttendancePage() {
+  const { t } = useLanguage();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [classesData, setClassesData] = useState<ClassEntity[]>([]);
   const [sectionsData, setSectionsData] = useState<SectionEntity[]>([]);
@@ -321,7 +323,7 @@ export default function AttendancePage() {
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Student Attendance
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>View, track, and export period-wise student attendance</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('attendance.subtitle')}</p>
         </div>
         <button className="btn btn-primary gap-2" onClick={exportToPDF} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
           <Download size={18} /> Export PDF
@@ -417,7 +419,7 @@ export default function AttendancePage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('common.allClasses')}</option>
                   {classesData.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -435,7 +437,7 @@ export default function AttendancePage() {
                   style={{ height: '40px' }}
                   disabled={!filterClass}
                 >
-                  <option value="">All Sections</option>
+                  <option value="">{t('common.allSections')}</option>
                   {availableSections.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -469,7 +471,7 @@ export default function AttendancePage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Teachers</option>
+                  <option value="">{t('common.allTeachers')}</option>
                   {teachersData.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -606,7 +608,7 @@ export default function AttendancePage() {
                   <td colSpan={6} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>No attendance records found</p>
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('attendance.noRecords')}</p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query or filters.</p>
                     </div>
                   </td>

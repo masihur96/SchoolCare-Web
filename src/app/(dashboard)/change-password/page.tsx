@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, AlertCircle, Loader2, Key, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -35,6 +36,7 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -103,9 +105,9 @@ export default function ChangePasswordPage() {
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       <div className="page-header mb-6">
-        <h1 className="text-2xl font-bold">Change Password</h1>
+        <h1 className="text-2xl font-bold">{t('changePassword.title')}</h1>
         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
-          Update your account password to maintain security.
+          {t('changePassword.subtitle')}
         </p>
       </div>
 
@@ -115,8 +117,8 @@ export default function ChangePasswordPage() {
             <Key size={24} style={{ color: 'var(--primary)' }} />
           </div>
           <div>
-            <h3 style={{ fontWeight: 700, fontSize: '1.125rem' }}>Secure your account</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Choose a strong password with at least 6 characters.</p>
+            <h3 style={{ fontWeight: 700, fontSize: '1.125rem' }}>{t('changePassword.boxTitle')}</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{t('changePassword.boxSubtitle')}</p>
           </div>
         </div>
 
@@ -132,7 +134,7 @@ export default function ChangePasswordPage() {
                 className="input"
                 value={oldPassword}
                 onChange={e => setOldPassword(e.target.value)}
-                placeholder="Enter your current password"
+                placeholder={t('changePassword.currentPlaceholder')}
                 required
                 style={{ paddingRight: '2.75rem', width: '100%' }}
               />
@@ -156,7 +158,7 @@ export default function ChangePasswordPage() {
                 className="input"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder={t('changePassword.newPlaceholder')}
                 required
                 minLength={6}
                 style={{ paddingRight: '2.75rem', width: '100%' }}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
@@ -35,6 +36,7 @@ interface StudentEntity {
 }
 
 export default function StudentsPage() {
+  const { t } = useLanguage();
   const [students, setStudents] = useState<StudentEntity[]>([]);
   const [classesData, setClassesData] = useState<ClassEntity[]>([]);
   const [sectionsData, setSectionsData] = useState<SectionEntity[]>([]);
@@ -329,10 +331,10 @@ export default function StudentsPage() {
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Students
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>Manage and view student records</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('students.subtitle')}</p>
         </div>
         <button className="btn btn-primary gap-2" onClick={openAddModal} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
-          <Plus size={18} /> Add Student
+          <Plus size={18} /> {t('students.addStudent')}
         </button>
       </div>
 
@@ -368,7 +370,7 @@ export default function StudentsPage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('common.allClasses')}</option>
                   {classesData.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -386,7 +388,7 @@ export default function StudentsPage() {
                   style={{ height: '40px' }}
                   disabled={!filterClass}
                 >
-                  <option value="">All Sections</option>
+                  <option value="">{t('common.allSections')}</option>
                   {availableSections.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -512,8 +514,8 @@ export default function StudentsPage() {
                   <td colSpan={6} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>No students found</p>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query or filters.</p>
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('students.noStudents')}</p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{t('students.tryAdjusting')}</p>
                     </div>
                   </td>
                 </tr>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
@@ -98,6 +99,7 @@ const LocationCell = ({ lat, lon, radius, hideRadius }: { lat?: number, lon?: nu
 };
 
 export default function TeachersPage() {
+  const { t } = useLanguage();
   const [teachers, setTeachers] = useState<TeacherEntity[]>([]);
   const [classesData, setClassesData] = useState<ClassEntity[]>([]);
   const [sectionsData, setSectionsData] = useState<SectionEntity[]>([]);
@@ -407,10 +409,10 @@ export default function TeachersPage() {
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Teachers
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>Manage and view teacher records</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('teachers.subtitle')}</p>
         </div>
         <button className="btn btn-primary gap-2" onClick={openAddModal} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
-          <Plus size={18} /> Add Teacher
+          <Plus size={18} /> {t('teachers.addTeacher')}
         </button>
       </div>
 
@@ -446,7 +448,7 @@ export default function TeachersPage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('common.allClasses')}</option>
                   {classesData.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -464,7 +466,7 @@ export default function TeachersPage() {
                   style={{ height: '40px' }}
                   disabled={!filterClass}
                 >
-                  <option value="">All Sections</option>
+                  <option value="">{t('common.allSections')}</option>
                   {availableSections.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -609,8 +611,8 @@ export default function TeachersPage() {
                   <td colSpan={7} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>No teachers found</p>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query or filters.</p>
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('teachers.noTeachers')}</p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{t('teachers.tryAdjusting')}</p>
                     </div>
                   </td>
                 </tr>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   Send, Users, MessageSquare, CheckCircle, Clock, AlertTriangle,
   Smartphone, Filter, Search, Plus, RefreshCw, Copy, Check,
@@ -153,6 +154,7 @@ const DYNAMIC_TAGS = [
 ];
 
 export default function BulkSMSPage() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'compose' | 'history' | 'templates' | 'settings'>('compose');
 
   // Compose State
@@ -261,7 +263,7 @@ export default function BulkSMSPage() {
               <CreditCard size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)', fontWeight: 600 }}>SMS Balance</div>
+              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance')}</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.1 }}>8,450 <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#10b981' }}>Credits</span></div>
             </div>
           </div>
@@ -282,7 +284,7 @@ export default function BulkSMSPage() {
             <Send size={24} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sent This Month</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentThisMonth')}</div>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>24,180</div>
             <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>↑ +14.2% vs last month</div>
           </div>
@@ -293,7 +295,7 @@ export default function BulkSMSPage() {
             <CheckCircle size={24} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Delivery Rate</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.deliveryRate')}</div>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>99.4%</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>24,035 Successful</div>
           </div>
@@ -820,7 +822,7 @@ export default function BulkSMSPage() {
                   <th style={{ padding: '1rem 1rem' }}>Recipients</th>
                   <th style={{ padding: '1rem 1rem' }}>Credits</th>
                   <th style={{ padding: '1rem 1rem' }}>Date & Time</th>
-                  <th style={{ padding: '1rem 1rem' }}>Delivery Rate</th>
+                  <th style={{ padding: '1rem 1rem' }}>{t('bulkSms.deliveryRate')}</th>
                   <th style={{ padding: '1rem 1rem' }}>Status</th>
                   <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Actions</th>
                 </tr>

@@ -5,6 +5,7 @@ import { Search, Filter, ChevronLeft, ChevronRight, Loader2, Download, Check, Cl
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import CreateTeacherAttendanceModal from '@/components/CreateTeacherAttendanceModal';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -41,6 +42,7 @@ interface TeacherAttendanceRecord {
 }
 
 export default function TeacherAttendancePage() {
+  const { t } = useLanguage();
   const [records, setRecords] = useState<TeacherAttendanceRecord[]>([]);
   const [teachersData, setTeachersData] = useState<TeacherEntity[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolEntity | null>(null);
@@ -254,7 +256,7 @@ export default function TeacherAttendancePage() {
           <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Teacher Attendance
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>View and export daily attendance for teachers</p>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('teacherAttendance.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <button className="btn btn-primary gap-2" onClick={() => setShowCreateModal(true)} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
@@ -315,7 +317,7 @@ export default function TeacherAttendancePage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Teachers</option>
+                  <option value="">{t('common.allTeachers')}</option>
                   {teachersData.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -405,7 +407,7 @@ export default function TeacherAttendancePage() {
                   <td colSpan={5} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>No attendance records found</p>
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('attendance.noRecords')}</p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query or filters.</p>
                     </div>
                   </td>

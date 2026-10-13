@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   Plus, AlertCircle, Calendar, Trash2, Edit, Loader2,
   Bell, Users, User, GraduationCap, X, CheckCircle2,
@@ -66,6 +67,7 @@ const formatDate = (dateString?: string) => {
 const getInitials = (name: string) => name.trim().charAt(0).toUpperCase();
 
 export default function NoticesPage() {
+  const { t } = useLanguage();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -385,7 +387,7 @@ export default function NoticesPage() {
                   }}>
                     <Bell size={28} />
                   </div>
-                  <h4 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>No notices found</h4>
+                  <h4 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>{t('notices.noNotices')}</h4>
                   <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', maxWidth: 320, margin: '0 auto 1.5rem' }}>
                     {filterAudience !== 'All'
                       ? `No notices for "${filterAudience}" yet.`

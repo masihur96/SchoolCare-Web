@@ -5,6 +5,7 @@ import {
   AlertTriangle, Trash2, CheckCircle2, AlertCircle, Loader2, Shield
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -43,6 +44,7 @@ interface Profile {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -121,9 +123,9 @@ export default function SettingsPage() {
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       <div className="page-header mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
-          Manage your account settings
+          {t('settings.subtitle')}
         </p>
       </div>
 
@@ -133,8 +135,8 @@ export default function SettingsPage() {
             <AlertTriangle size={24} style={{ color: '#ef4444' }} />
           </div>
           <div>
-            <h3 style={{ fontWeight: 700, fontSize: '1.125rem' }}>Danger Zone</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Permanently delete your account</p>
+            <h3 style={{ fontWeight: 700, fontSize: '1.125rem' }}>{t('settings.dangerZone')}</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{t('settings.permanentlyDelete')}</p>
           </div>
         </div>
 
@@ -145,7 +147,7 @@ export default function SettingsPage() {
           background: 'rgba(239,68,68,0.04)',
         }}>
           <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
-            Permanently delete your account and all associated data. This action is <strong>irreversible</strong> and required by Google Play Console policies.
+            {t('settings.deleteDesc')}
           </p>
           
           <button
