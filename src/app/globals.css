@@ -81,6 +81,15 @@ body {
   overflow-x: hidden;
 }
 
+/* Bangla (Bengali) font support — applied when html[lang="bn"] */
+html[lang="bn"] body,
+html[lang="bn"] input,
+html[lang="bn"] button,
+html[lang="bn"] textarea,
+html[lang="bn"] select {
+  font-family: var(--font-hind-siliguri), 'Hind Siliguri', system-ui, sans-serif;
+}
+
 /* Glassmorphism Utilities */
 .glass {
   background: var(--sidebar-bg);

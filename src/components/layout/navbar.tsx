@@ -1027,7 +1027,7 @@ export function Navbar() {
             background: 'var(--card)', borderRadius: '12px',
             border: '1px solid var(--border)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
           }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>Create Marquee Text</h3>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>{t('navbar.createMarquee')}</h3>
             
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Text content</label>
             <textarea 
@@ -1052,9 +1052,9 @@ export function Navbar() {
                 color: 'var(--foreground)', marginBottom: '1.5rem'
               }}
             >
-              <option value="STUDENT">STUDENT</option>
-              <option value="TEACHER">TEACHER</option>
-              <option value="GENERAL">GENERAL</option>
+              <option value="STUDENT">{t('navbar.student')}</option>
+              <option value="TEACHER">{t('navbar.teacher')}</option>
+              <option value="GENERAL">{t('navbar.general')}</option>
             </select>
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>

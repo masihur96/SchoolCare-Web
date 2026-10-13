@@ -654,7 +654,7 @@ export default function ClassesPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
                       <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('classes.noClasses')}</p>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query.</p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{t('students.tryAdjusting')}</p>
                     </div>
                   </td>
                 </tr>
@@ -669,7 +669,7 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '700px', borderRadius: '1rem', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Class Details</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>{t('classes.title')}</h2>
               <button className="action-btn" onClick={() => setIsViewModalOpen(false)}>
                 <X size={20} />
               </button>
@@ -725,7 +725,7 @@ export default function ClassesPage() {
                           )}
                         </li>
                       );
-                    }) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>No sections assigned</p>}
+                    }) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{t('common.none')}</p>}
                   </ul>
                 </div>
 
@@ -751,7 +751,7 @@ export default function ClassesPage() {
                           <button onClick={() => { setDeletingSubjectId(s.id); setIsDeleteSubjectModalOpen(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--destructive)' }} title="Delete"><Trash2 size={14} /></button>
                         </div>
                       </li>
-                    )) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>No subjects assigned</p>}
+                    )) : <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{t('common.none')}</p>}
                   </ul>
                 </div>
               </div>

@@ -340,7 +340,7 @@ export default function ExpenseTrackingPage() {
             <FileText size={26} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Records</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('common.total')} {t('common.records')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15 }}>
               {summary.totalCount || total}
             </div>
@@ -599,7 +599,7 @@ export default function ExpenseTrackingPage() {
                 }}
                 style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
               >
-                <option value="">All Months</option>
+                <option value="">{t('common.allMonths')}</option>
                 {[
                   { m: '1', name: 'January' },
                   { m: '2', name: 'February' },
@@ -671,10 +671,10 @@ export default function ExpenseTrackingPage() {
                 }}
                 style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
               >
-                <option value={10}>10 records</option>
-                <option value={20}>20 records</option>
-                <option value={50}>50 records</option>
-                <option value={100}>100 records</option>
+                <option value={10}>10 {t('common.records')}</option>
+                <option value={20}>20 {t('common.records')}</option>
+                <option value={50}>50 {t('common.records')}</option>
+                <option value={100}>100 {t('common.records')}</option>
               </select>
             </div>
 
@@ -685,7 +685,7 @@ export default function ExpenseTrackingPage() {
       {/* Active Filter Badges */}
       {(search || category !== 'All Categories' || paymentMethod !== 'ALL' || startDate || endDate || month || year) && (
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Active filters:</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('common.activeFilters')}</span>
           {search && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#eff6ff', color: '#2563eb', borderRadius: '99px', fontSize: '0.78rem', fontWeight: 600 }}>
               Search: &ldquo;{search}&rdquo;
@@ -750,7 +750,7 @@ export default function ExpenseTrackingPage() {
           <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
             <AlertCircle size={36} color="#ef4444" />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Failed to Load Transactions</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('fees.noTransactions')}</h3>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.92rem' }}>{error}</p>
           <button
             onClick={() => fetchTransactions()}

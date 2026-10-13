@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLanguage } from '@/components/language-provider';
-import { Search, Plus, Edit, Trash2, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle } from 'lucide-react';
+import { 
+  Search, Plus, Edit3, Trash2, Eye, EyeOff, Filter, 
+  ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle,
+  GraduationCap, Download, RefreshCw,
+  Phone, BookOpen, Layers, CheckCircle2, Users,
+  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, FileText, ChevronDown
+} from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
+
 const getApiToken = () => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
@@ -28,9 +37,12 @@ interface StudentEntity {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  designation?: string;
   rollNumber: string;
   isActive: boolean;
   avatar?: string;
+  createdAt?: string;
   classes: ClassEntity[];
   sections: SectionEntity[];
 }
@@ -45,7 +57,7 @@ export default function StudentsPage() {
   
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
 
   // Filters
@@ -55,19 +67,28 @@ export default function StudentsPage() {
   const [filterSection, setFilterSection] = useState('');
   const [filterIsActive, setFilterIsActive] = useState(''); // 'true', 'false', ''
   
+  // Sorting
+  const [rollSortOrder, setRollSortOrder] = useState<'asc' | 'desc' | 'none'>('asc');
+  
   // Toggle filters visibility
   const [showFilters, setShowFilters] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit' | 'view'>('add');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentEntity | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Delete Confirmation Modal
-  const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: '', name: '' });
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; name: string; roll: string }>({ 
+    open: false, 
+    id: '', 
+    name: '',
+    roll: ''
+  });
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [newStudent, setNewStudent] = useState({
+
+  const [formState, setFormState] = useState({
     name: '',
     email: '',
     password: '',
@@ -78,12 +99,15 @@ export default function StudentsPage() {
     classIds: [] as string[],
     sectionIds: [] as string[]
   });
+  
   const [showPassword, setShowPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const getUserSchoolId = () => {
     try {
-      const payload = JSON.parse(atob(getApiToken().split('.')[1]));
+      const token = getApiToken();
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
       return payload.schoolId;
     } catch (e) {
       return null;
@@ -96,8 +120,8 @@ export default function StudentsPage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setPage(1); // Reset page on search change
-    }, 500);
+      setPage(1);
+    }, 400);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
@@ -147,15 +171,17 @@ export default function StudentsPage() {
       const response = await fetch(`${API_BASE_URL}/admin/users?${queryParams.toString()}`, { headers });
       const json = await response.json();
 
-      if (json.statusCode === 200) {
-        setStudents(json.data.data);
-        setTotal(json.data.total);
+      if (json.statusCode === 200 && json.data) {
+        setStudents(json.data.data || []);
+        setTotal(json.data.total ?? 0);
       } else {
         setStudents([]);
         setTotal(0);
       }
     } catch (error) {
       console.error("Failed to fetch students:", error);
+      setStudents([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -170,11 +196,19 @@ export default function StudentsPage() {
   }, [fetchStudents]);
 
   const resetForm = () => {
-    setNewStudent({
-      name: '', email: '', password: '', phone: '', designation: '', 
-      avatar: '', rollNumber: '', classIds: [], sectionIds: []
+    setFormState({
+      name: '', 
+      email: '', 
+      password: '', 
+      phone: '', 
+      designation: '', 
+      avatar: '', 
+      rollNumber: '', 
+      classIds: [], 
+      sectionIds: []
     });
-    setSelectedStudentId(null);
+    setSelectedStudent(null);
+    setShowPassword(false);
   };
 
   const openAddModal = () => {
@@ -184,41 +218,46 @@ export default function StudentsPage() {
   };
 
   const openEditModal = (student: StudentEntity) => {
-    setNewStudent({
-      name: student.name,
-      email: student.email,
-      password: '', // blank password for edit unless they type a new one
-      phone: (student as any).phone || '',
-      designation: (student as any).designation || '',
+    setFormState({
+      name: student.name || '',
+      email: student.email || '',
+      password: '',
+      phone: student.phone || '',
+      designation: student.designation || '',
       avatar: student.avatar || '',
       rollNumber: student.rollNumber || '',
       classIds: student.classes?.map(c => c.id) || [],
       sectionIds: student.sections?.map(s => s.id) || []
     });
-    setSelectedStudentId(student.id);
+    setSelectedStudent(student);
     setModalMode('edit');
     setIsModalOpen(true);
   };
 
   const openViewModal = (student: StudentEntity) => {
-    setNewStudent({
-      name: student.name,
-      email: student.email,
+    setFormState({
+      name: student.name || '',
+      email: student.email || '',
       password: '', 
-      phone: (student as any).phone || '',
-      designation: (student as any).designation || '',
+      phone: student.phone || '',
+      designation: student.designation || '',
       avatar: student.avatar || '',
       rollNumber: student.rollNumber || '',
       classIds: student.classes?.map(c => c.id) || [],
       sectionIds: student.sections?.map(s => s.id) || []
     });
-    setSelectedStudentId(student.id);
+    setSelectedStudent(student);
     setModalMode('view');
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    setDeleteModal({ open: true, id, name });
+  const handleDelete = (student: StudentEntity) => {
+    setDeleteModal({ 
+      open: true, 
+      id: student.id, 
+      name: student.name, 
+      roll: student.rollNumber || 'N/A' 
+    });
   };
 
   const confirmDelete = async () => {
@@ -231,7 +270,7 @@ export default function StudentsPage() {
         }
       });
       if (res.ok) {
-        setDeleteModal({ open: false, id: '', name: '' });
+        setDeleteModal({ open: false, id: '', name: '', roll: '' });
         fetchStudents();
       } else {
         alert('Failed to delete student.');
@@ -262,7 +301,7 @@ export default function StudentsPage() {
       });
       const result = await response.json();
       if (result.statusCode === 200 && result.data?.url) {
-        setNewStudent(prev => ({ ...prev, avatar: result.data.url }));
+        setFormState(prev => ({ ...prev, avatar: result.data.url }));
       } else {
         alert('Failed to upload image.');
       }
@@ -279,7 +318,7 @@ export default function StudentsPage() {
     setActionLoading(true);
     
     const payload: any = {
-      ...newStudent,
+      ...formState,
       role: 'student',
       schoolId: userSchoolId,
     };
@@ -289,8 +328,8 @@ export default function StudentsPage() {
     }
 
     try {
-      const url = modalMode === 'edit' && selectedStudentId 
-        ? `${API_BASE_URL}/admin/users/${selectedStudentId}`
+      const url = modalMode === 'edit' && selectedStudent?.id 
+        ? `${API_BASE_URL}/admin/users/${selectedStudent.id}`
         : `${API_BASE_URL}/admin/users`;
         
       const response = await fetch(url, {
@@ -311,55 +350,422 @@ export default function StudentsPage() {
         alert(`Failed to save: ${errorData.message || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("Error saving.");
+      alert("Error saving student information.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Derived sections based on selected class
-  const availableSections = filterClass 
-    ? sectionsData.filter(s => s.classId === filterClass)
-    : sectionsData;
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
-  const totalPages = Math.ceil(total / limit);
+  // Close export dropdown on click outside
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.export-dropdown-container')) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [exportDropdownOpen]);
+
+  // Export current list to CSV
+  const handleExportCSV = () => {
+    setExportDropdownOpen(false);
+    if (sortedStudents.length === 0) return;
+    const headers = ["SL", "Name", "Roll Number", "Email", "Phone", "Class", "Section", "Status"];
+    const rows = sortedStudents.map((s, idx) => [
+      ((page - 1) * limit + idx + 1).toString(),
+      `"${(s.name || '').replace(/"/g, '""')}"`,
+      `"${s.rollNumber || ''}"`,
+      `"${s.email || ''}"`,
+      `"${s.phone || ''}"`,
+      `"${(s.classes || []).map(c => c.name).join(', ')}"`,
+      `"${(s.sections || []).map(sec => sec.name).join(', ')}"`,
+      s.isActive ? "Active" : "Inactive"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `students_export_page_${page}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export current list to PDF
+  const handleExportPDF = () => {
+    setExportDropdownOpen(false);
+    if (sortedStudents.length === 0) return;
+
+    const doc = new jsPDF('portrait');
+
+    // Header
+    doc.setFontSize(18);
+    doc.setTextColor(79, 70, 229); // Primary Indigo color
+    doc.text("Students Report", 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(110, 110, 110);
+    const subtitleParts = [
+      `Page: ${page} of ${totalPages}`,
+      `Total: ${total} students`,
+      `Generated: ${new Date().toLocaleDateString()}`
+    ];
+    if (filterClass) {
+      const cls = classesData.find(c => c.id === filterClass)?.name;
+      if (cls) subtitleParts.push(`Class: ${cls}`);
+    }
+    if (filterSection) {
+      const sec = sectionsData.find(s => s.id === filterSection)?.name;
+      if (sec) subtitleParts.push(`Section: ${sec}`);
+    }
+    doc.text(subtitleParts.join(' | '), 14, 25);
+
+    const tableColumn = ["#", "Name", "Roll No", "Email", "Phone", "Class", "Section", "Status"];
+    const tableRows = sortedStudents.map((s, idx) => [
+      ((page - 1) * limit + idx + 1).toString(),
+      s.name || 'N/A',
+      s.rollNumber || 'N/A',
+      s.email || 'N/A',
+      s.phone || 'N/A',
+      (s.classes || []).map(c => c.name).join(', ') || 'Unassigned',
+      (s.sections || []).map(sec => sec.name).join(', ') || 'None',
+      s.isActive ? 'Active' : 'Inactive'
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 249, 252] },
+      didDrawPage: (data) => {
+        const pageCount = (doc.internal as any).getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.width - 25,
+          doc.internal.pageSize.height - 10
+        );
+      }
+    });
+
+    doc.save(`students_export_page_${page}.pdf`);
+  };
+
+  // Derived sections based on selected filter class
+  const availableFilterSections = useMemo(() => {
+    return filterClass 
+      ? sectionsData.filter(s => s.classId === filterClass)
+      : sectionsData;
+  }, [filterClass, sectionsData]);
+
+  // Available modal sections based on student's selected classes
+  const availableModalSections = useMemo(() => {
+    if (formState.classIds.length === 0) return sectionsData;
+    return sectionsData.filter(s => formState.classIds.includes(s.classId));
+  }, [formState.classIds, sectionsData]);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const activeFiltersCount = (filterClass ? 1 : 0) + (filterSection ? 1 : 0) + (filterIsActive !== '' ? 1 : 0) + (debouncedSearch ? 1 : 0);
+
+  // Sort students by roll number
+  const sortedStudents = useMemo(() => {
+    if (rollSortOrder === 'none') return students;
+    return [...students].sort((a, b) => {
+      const rollA = (a.rollNumber || '').trim();
+      const rollB = (b.rollNumber || '').trim();
+      
+      const numA = Number(rollA);
+      const numB = Number(rollB);
+
+      let comparison = 0;
+      if (!isNaN(numA) && !isNaN(numB) && rollA !== '' && rollB !== '') {
+        comparison = numA - numB;
+      } else {
+        comparison = rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+
+      return rollSortOrder === 'desc' ? -comparison : comparison;
+    });
+  }, [students, rollSortOrder]);
+
+  const toggleRollSort = () => {
+    setRollSortOrder(current => {
+      if (current === 'asc') return 'desc';
+      if (current === 'desc') return 'none';
+      return 'asc';
+    });
+  };
+
+  const resetAllFilters = () => {
+    setFilterClass('');
+    setFilterSection('');
+    setFilterIsActive('');
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setRollSortOrder('asc');
+    setPage(1);
+  };
 
   return (
-    <div className="page-container animate-fade-in" style={{ padding: '2rem' }}>
-      <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Students
-          </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>{t('students.subtitle')}</p>
-        </div>
-        <button className="btn btn-primary gap-2" onClick={openAddModal} style={{ boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}>
-          <Plus size={18} /> {t('students.addStudent')}
-        </button>
-      </div>
-
-      <div className="data-table-wrapper glass-card">
-        <div className="data-table-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)' }}>
+    <div className="page-container animate-fade-in" style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}>
+      
+      {/* ── Main Data Table Card ───────────────────────────────── */}
+      <div className="data-table-wrapper glass-card" style={{ background: 'var(--card)', borderRadius: '1.25rem', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+        
+        {/* Table Search & Filter Toolbar */}
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-            <div className="search-bar" style={{ display: 'flex', width: '300px', border: '1px solid var(--border)', borderRadius: '9999px', overflow: 'hidden', padding: '0 1rem', height: '40px', background: 'var(--background)' }}>
-              <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.5rem', marginTop: 'auto', marginBottom: 'auto' }} />
-              <input 
-                type="text" 
-                placeholder="Search by name, email or roll..." 
-                style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: 'var(--foreground)' }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '260px', maxWidth: '400px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                border: '1px solid var(--border)', 
+                borderRadius: '0.75rem', 
+                padding: '0 0.875rem', 
+                height: '42px', 
+                background: 'var(--background)',
+                transition: 'all 0.2s',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+              }}>
+                <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
+                <input 
+                  type="text" 
+                  placeholder={t('students.searchPlaceholder') || "Search student name, roll number, or email..."} 
+                  style={{ 
+                    border: 'none', 
+                    outline: 'none', 
+                    background: 'transparent', 
+                    width: '100%', 
+                    color: 'var(--foreground)',
+                    fontSize: '0.9rem'
+                  }}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => setSearchTerm('')}
+                    style={{ background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', color: 'var(--muted-foreground)' }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
             </div>
-            <button className="btn" onClick={() => setShowFilters(!showFilters)} style={{ border: '1px solid var(--border)', gap: '0.5rem', background: showFilters ? 'var(--primary)' : 'var(--card)', color: showFilters ? 'var(--primary-foreground)' : 'var(--foreground)' }}>
-              <Filter size={18} /> Filters
-            </button>
+
+            {/* Filter, Export & Add Student Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* Filters Toggle Button */}
+              <button 
+                className="btn" 
+                onClick={() => setShowFilters(!showFilters)} 
+                style={{ 
+                  border: showFilters || activeFiltersCount > 0 ? '1px solid var(--primary)' : '1px solid var(--border)', 
+                  gap: '0.5rem', 
+                  borderRadius: '0.75rem',
+                  height: '42px',
+                  padding: '0 1rem',
+                  background: showFilters ? 'var(--primary)' : 'var(--background)', 
+                  color: showFilters ? 'var(--primary-foreground)' : 'var(--foreground)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <Filter size={16} />
+                <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span style={{ 
+                    background: showFilters ? '#ffffff' : 'var(--primary)', 
+                    color: showFilters ? 'var(--primary)' : '#ffffff', 
+                    fontSize: '0.75rem', 
+                    borderRadius: '999px', 
+                    padding: '0.1rem 0.5rem',
+                    fontWeight: 700
+                  }}>
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Export Dropdown (Beside Filters) */}
+              <div className="export-dropdown-container" style={{ position: 'relative' }}>
+                <button 
+                  className="btn"
+                  onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                  disabled={students.length === 0}
+                  title="Export Options"
+                  style={{ 
+                    background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
+                    border: '1px solid var(--border)', 
+                    color: 'var(--foreground)',
+                    height: '42px',
+                    padding: '0 0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    borderRadius: '0.75rem',
+                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                    opacity: students.length === 0 ? 0.6 : 1,
+                    cursor: students.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Download size={16} />
+                  <span>Export</span>
+                  <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+
+                {exportDropdownOpen && (
+                  <div 
+                    className="glass-card animate-fade-in"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      left: 0,
+                      zIndex: 50,
+                      minWidth: '160px',
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      padding: '0.35rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.2rem'
+                    }}
+                  >
+                    <button
+                      onClick={handleExportCSV}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        width: '100%',
+                        padding: '0.55rem 0.75rem',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--foreground)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--muted)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                      <span>Export as CSV</span>
+                    </button>
+                    <button
+                      onClick={handleExportPDF}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        width: '100%',
+                        padding: '0.55rem 0.75rem',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--foreground)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--muted)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileText size={15} style={{ color: '#ef4444' }} />
+                      <span>Export as PDF</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Student Button (Beside Filters) */}
+              <button 
+                className="btn btn-primary"
+                onClick={openAddModal} 
+                style={{ 
+                  height: '42px',
+                  padding: '0 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 15px rgba(79, 70, 229, 0.35)'
+                }}
+              >
+                <Plus size={18} /> {t('students.addStudent') || 'Add Student'}
+              </button>
+
+              {/* Page Sizer */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <select 
+                  value={limit} 
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <button 
+                  onClick={resetAllFilters}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: 'var(--muted-foreground)', 
+                    fontSize: '0.825rem', 
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
-          
+
+          {/* Collapsible Filter Tray */}
           {showFilters && (
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', padding: '1rem', background: 'var(--background)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Class</label>
+            <div className="animate-fade-in" style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem', 
+              padding: '1.25rem', 
+              background: 'var(--background)', 
+              borderRadius: '0.875rem', 
+              border: '1px solid var(--border)' 
+            }}>
+              {/* Class Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('students.filterByClass') || 'Class'}
+                </label>
                 <select 
                   className="input" 
                   value={filterClass} 
@@ -368,16 +774,20 @@ export default function StudentsPage() {
                     setFilterSection('');
                     setPage(1);
                   }}
-                  style={{ height: '40px' }}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">{t('common.allClasses')}</option>
+                  <option value="">{t('common.allClasses') || 'All Classes'}</option>
                   {classesData.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Section</label>
+
+              {/* Section Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('students.filterBySection') || 'Section'}
+                </label>
                 <select 
                   className="input" 
                   value={filterSection} 
@@ -385,17 +795,21 @@ export default function StudentsPage() {
                     setFilterSection(e.target.value);
                     setPage(1);
                   }}
-                  style={{ height: '40px' }}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
                   disabled={!filterClass}
                 >
-                  <option value="">{t('common.allSections')}</option>
-                  {availableSections.map(s => (
+                  <option value="">{t('common.allSections') || 'All Sections'}</option>
+                  {availableFilterSections.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '150px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>Status</label>
+
+              {/* Status Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('students.filterByStatus') || 'Enrollment Status'}
+                </label>
                 <select 
                   className="input" 
                   value={filterIsActive} 
@@ -403,119 +817,347 @@ export default function StudentsPage() {
                     setFilterIsActive(e.target.value);
                     setPage(1);
                   }}
-                  style={{ height: '40px' }}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
+                  <option value="">{t('common.all') || 'All Statuses'}</option>
+                  <option value="true">{t('common.active') || 'Active'}</option>
+                  <option value="false">{t('common.inactive') || 'Inactive'}</option>
+                </select>
+              </div>
+
+              {/* Sort by Roll No */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  Sort by Roll No
+                </label>
+                <select 
+                  className="input" 
+                  value={rollSortOrder} 
+                  onChange={(e) => setRollSortOrder(e.target.value as 'asc' | 'desc' | 'none')}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
+                >
+                  <option value="asc">Roll: Low to High (1 → 100)</option>
+                  <option value="desc">Roll: High to Low (100 → 1)</option>
+                  <option value="none">Original Order</option>
                 </select>
               </div>
             </div>
           )}
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* ── Table Layout ────────────────────────────────────────── */}
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
-              <tr>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'left', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>SL No.</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'left', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>Roll No</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'left', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>Name</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'left', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>Class & Section</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'left', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>Status</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'right', background: 'rgba(0,0,0,0.02)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.875rem', textTransform: 'uppercase' }}>Actions</th>
+              <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px' }}>
+                  #
+                </th>
+                <th 
+                  onClick={toggleRollSort}
+                  title="Click to sort by Roll Number"
+                  style={{ 
+                    padding: '0.875rem 1.25rem', 
+                    color: rollSortOrder !== 'none' ? 'var(--primary)' : 'var(--muted-foreground)', 
+                    fontWeight: 600, 
+                    fontSize: '0.78rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em', 
+                    width: '120px',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>{t('students.rollNo') || 'Roll No'}</span>
+                    {rollSortOrder === 'asc' ? (
+                      <ArrowUp size={14} style={{ color: 'var(--primary)' }} />
+                    ) : rollSortOrder === 'desc' ? (
+                      <ArrowDown size={14} style={{ color: 'var(--primary)' }} />
+                    ) : (
+                      <ArrowUpDown size={14} style={{ opacity: 0.4 }} />
+                    )}
+                  </div>
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Student Details
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Class & Section
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Contact Info
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '110px' }}>
+                  Status
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
+                Array.from({ length: 6 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
                       <div className="shimmer shimmer-text" style={{ width: '20px', margin: 0 }}></div>
                     </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <div className="shimmer shimmer-text" style={{ width: '40px', margin: 0 }}></div>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '45px', margin: 0 }}></div>
                     </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div className="shimmer shimmer-circle" style={{ width: '40px', height: '40px', flexShrink: 0 }}></div>
-                        <div style={{ display: 'flex', flexDirection: 'column', width: '150px' }}>
+                        <div className="shimmer shimmer-circle" style={{ width: '42px', height: '42px', flexShrink: 0, borderRadius: '50%' }}></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '140px' }}>
                           <div className="shimmer shimmer-text"></div>
                           <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100px' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '110px' }}>
                         <div className="shimmer shimmer-text"></div>
                         <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
                       </div>
                     </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <div className="shimmer shimmer-block" style={{ width: '60px', height: '22px', borderRadius: '999px' }}></div>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '110px', margin: 0 }}></div>
                     </td>
-                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-block" style={{ width: '65px', height: '22px', borderRadius: '999px' }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
-                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
-                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius)' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: '0.5rem' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: '0.5rem' }}></div>
                       </div>
                     </td>
                   </tr>
                 ))
-              ) : students.length > 0 ? (
-                students.map((student, index) => (
-                  <tr key={student.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s' }}>
-                    <td style={{ padding: '1.25rem 1.5rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>{(page - 1) * limit + index + 1}</td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>{student.rollNumber || 'N/A'}</td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', background: 'var(--muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {student.avatar ? (
-                            <img src={student.avatar} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ color: 'var(--muted-foreground)', fontSize: '1rem', fontWeight: 600 }}>{student.name.charAt(0)}</span>
+              ) : sortedStudents.length > 0 ? (
+                sortedStudents.map((student, index) => {
+                  const sl = (page - 1) * limit + index + 1;
+                  const classesList = student.classes && student.classes.length > 0
+                    ? student.classes.map(c => c.name).join(', ')
+                    : 'Unassigned';
+                  const sectionsList = student.sections && student.sections.length > 0
+                    ? student.sections.map(s => s.name).join(', ')
+                    : 'None';
+
+                  return (
+                    <tr 
+                      key={student.id} 
+                      style={{ 
+                        borderBottom: '1px solid var(--border)', 
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--muted)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      {/* SL No */}
+                      <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {sl}
+                      </td>
+
+                      {/* Roll Number */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <span style={{ 
+                          display: 'inline-block',
+                          padding: '0.2rem 0.55rem',
+                          background: 'rgba(79, 70, 229, 0.08)',
+                          color: 'var(--primary)',
+                          borderRadius: '0.4rem',
+                          fontSize: '0.825rem',
+                          fontWeight: 700,
+                          fontFamily: 'monospace'
+                        }}>
+                          {student.rollNumber || 'N/A'}
+                        </span>
+                      </td>
+
+                      {/* Student Details (Avatar + Name + Email) */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          <div style={{ 
+                            width: '42px', 
+                            height: '42px', 
+                            borderRadius: '50%', 
+                            overflow: 'hidden', 
+                            background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(129,140,248,0.2))', 
+                            flexShrink: 0, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            border: '1.5px solid var(--border)'
+                          }}>
+                            {student.avatar ? (
+                              <img src={student.avatar} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ color: 'var(--primary)', fontSize: '1rem', fontWeight: 700 }}>
+                                {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span 
+                              style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }}
+                              onClick={() => openViewModal(student)}
+                              title="Click to view full profile"
+                            >
+                              {student.name}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                              {student.email}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Class & Section */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                            <BookOpen size={13} style={{ color: 'var(--primary)' }} />
+                            <span>{classesList}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                            <Layers size={13} />
+                            <span>Section: {sectionsList}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Contact Info */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: student.phone ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
+                            <Phone size={13} style={{ color: 'var(--muted-foreground)' }} />
+                            <span>{student.phone || 'No phone'}</span>
+                          </div>
+                          {student.designation && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                              {student.designation}
+                            </span>
                           )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{student.name}</span>
-                          <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>{student.email}</span>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: student.isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: student.isActive ? '#10b981' : '#ef4444',
+                          border: `1px solid ${student.isActive ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`
+                        }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: student.isActive ? '#10b981' : '#ef4444'
+                          }}></span>
+                          {student.isActive ? (t('common.active') || 'Active') : (t('common.inactive') || 'Inactive')}
+                        </span>
+                      </td>
+
+                      {/* Action buttons */}
+                      <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button 
+                            className="action-btn" 
+                            title="View student profile" 
+                            onClick={() => openViewModal(student)}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '0.5rem', 
+                              border: '1px solid var(--border)', 
+                              background: 'var(--background)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            <Eye size={15} />
+                          </button>
+                          
+                          <button 
+                            className="action-btn" 
+                            title="Edit student" 
+                            onClick={() => openEditModal(student)}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '0.5rem', 
+                              border: '1px solid var(--border)', 
+                              background: 'var(--background)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                          
+                          <button 
+                            className="action-btn" 
+                            title="Delete student" 
+                            onClick={() => handleDelete(student)}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '0.5rem', 
+                              border: '1px solid rgba(239, 68, 68, 0.2)', 
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: '#ef4444'
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                          Class: {student.classes?.map(c => c.name).join(', ') || 'N/A'}
-                        </span>
-                        <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-                          Sec: {student.sections?.map(s => s.name).join(', ') || 'N/A'}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1.25rem 1.5rem' }}>
-                      <span className={`badge ${student.isActive ? 'badge-success' : 'badge-destructive'}`}>
-                        {student.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
-                      <div className="action-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        <button className="action-btn" title="View" onClick={() => openViewModal(student)}><Eye size={16} /></button>
-                        <button className="action-btn" title="Edit" onClick={() => openEditModal(student)}><Edit size={16} /></button>
-                        <button className="action-btn" style={{ color: 'var(--destructive)' }} title="Delete" onClick={() => handleDelete(student.id, student.name)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                      <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
-                      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('students.noStudents')}</p>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{t('students.tryAdjusting')}</p>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '4.5rem 1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', maxWidth: '380px', margin: '0 auto' }}>
+                      <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted-foreground)' }}>
+                        <Search size={28} />
+                      </div>
+                      <p style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                        {t('students.noStudents') || 'No students found'}
+                      </p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+                        {searchTerm || filterClass || filterSection || filterIsActive
+                          ? (t('students.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
+                          : 'No student records have been created in this school yet. Click "Add Student" to begin.'}
+                      </p>
+                      {(searchTerm || filterClass || filterSection || filterIsActive) && (
+                        <button 
+                          onClick={resetAllFilters} 
+                          className="btn" 
+                          style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -524,204 +1166,627 @@ export default function StudentsPage() {
           </table>
         </div>
         
-        {/* Pagination */}
+        {/* ── Table Footer & Pagination ──────────────────────────── */}
         {!loading && total > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '1rem 1.5rem', 
+            borderTop: '1px solid var(--border)',
+            background: 'var(--background)',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} students
+              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> students
             </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
+                Page {page} of {totalPages}
+              </span>
+
               <button 
                 className="btn" 
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+                style={{ 
+                  padding: '0.5rem 0.75rem', 
+                  border: '1px solid var(--border)', 
+                  cursor: page === 1 ? 'not-allowed' : 'pointer', 
+                  opacity: page === 1 ? 0.4 : 1,
+                  background: 'var(--card)',
+                  borderRadius: '0.5rem'
+                }}
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
+                title="Previous page"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={16} />
               </button>
+              
               <button 
                 className="btn" 
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}
+                style={{ 
+                  padding: '0.5rem 0.75rem', 
+                  border: '1px solid var(--border)', 
+                  cursor: page >= totalPages ? 'not-allowed' : 'pointer', 
+                  opacity: page >= totalPages ? 0.4 : 1,
+                  background: 'var(--card)',
+                  borderRadius: '0.5rem'
+                }}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                title="Next page"
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={16} />
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Add Student Modal */}
+      {/* ── View / Add / Edit Modal ────────────────────────────── */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '700px', borderRadius: '1rem', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>
-                {modalMode === 'add' ? 'Add New Student' : modalMode === 'edit' ? 'Edit Student' : 'View Student'}
-              </h2>
-              <button className="action-btn" onClick={() => setIsModalOpen(false)} disabled={actionLoading}>
-                <X size={20} />
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          backgroundColor: 'rgba(0,0,0,0.55)', 
+          backdropFilter: 'blur(6px)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 110, 
+          padding: '1rem' 
+        }}>
+          <div className="glass-card animate-fade-in" style={{ 
+            background: 'var(--card)', 
+            width: '100%', 
+            maxWidth: modalMode === 'view' ? '600px' : '720px', 
+            borderRadius: '1.25rem', 
+            overflow: 'hidden', 
+            maxHeight: '90vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            border: '1px solid var(--border)'
+          }}>
+            {/* Modal Header */}
+            <div style={{ 
+              padding: '1.25rem 1.75rem', 
+              borderBottom: '1px solid var(--border)', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              background: 'var(--background)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <div style={{ 
+                  width: '36px', 
+                  height: '36px', 
+                  borderRadius: '0.6rem', 
+                  background: modalMode === 'view' ? 'rgba(79, 70, 229, 0.1)' : modalMode === 'edit' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  color: modalMode === 'view' ? 'var(--primary)' : modalMode === 'edit' ? '#f59e0b' : '#10b981',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}>
+                  {modalMode === 'view' ? <Eye size={18} /> : modalMode === 'edit' ? <Edit3 size={18} /> : <Plus size={18} />}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                    {modalMode === 'add' ? 'Enroll New Student' : modalMode === 'edit' ? 'Edit Student Profile' : 'Student Profile Details'}
+                  </h2>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
+                    {modalMode === 'view' ? 'Read-only student information' : 'Fill in the information below to continue'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                className="action-btn" 
+                onClick={() => setIsModalOpen(false)} 
+                disabled={actionLoading}
+                style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  borderRadius: '50%', 
+                  border: '1px solid var(--border)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'var(--card)',
+                  cursor: 'pointer',
+                  color: 'var(--foreground)'
+                }}
+              >
+                <X size={18} />
               </button>
             </div>
-            <div style={{ overflowY: 'auto' }}>
-              <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
-                    <input type="text" className="input" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} required disabled={actionLoading || modalMode === 'view'} />
+
+            {/* Modal Content */}
+            <div style={{ overflowY: 'auto', padding: '1.75rem' }}>
+              {modalMode === 'view' && selectedStudent ? (
+                /* View Only Profile Card */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '1.25rem', borderRadius: '1rem', background: 'var(--background)', border: '1px solid var(--border)' }}>
+                    <div style={{ 
+                      width: '64px', 
+                      height: '64px', 
+                      borderRadius: '50%', 
+                      overflow: 'hidden', 
+                      background: 'var(--primary)', 
+                      color: '#ffffff',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      fontSize: '1.5rem',
+                      fontWeight: 700,
+                      flexShrink: 0
+                    }}>
+                      {selectedStudent.avatar ? (
+                        <img src={selectedStudent.avatar} alt={selectedStudent.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        selectedStudent.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>{selectedStudent.name}</h3>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{selectedStudent.email}</span>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <span style={{
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '999px',
+                          fontSize: '0.725rem',
+                          fontWeight: 600,
+                          background: selectedStudent.isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: selectedStudent.isActive ? '#10b981' : '#ef4444',
+                        }}>
+                          {selectedStudent.isActive ? 'Active Account' : 'Inactive'}
+                        </span>
+                        {selectedStudent.rollNumber && (
+                          <span style={{
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '999px',
+                            fontSize: '0.725rem',
+                            fontWeight: 600,
+                            background: 'rgba(79, 70, 229, 0.1)',
+                            color: 'var(--primary)',
+                            fontFamily: 'monospace'
+                          }}>
+                            Roll #{selectedStudent.rollNumber}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Email *</label>
-                    <input type="email" className="input" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} required disabled={actionLoading || modalMode === 'view'} />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Phone Number</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.phone || 'Not provided'}</div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Designation / Tag</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.designation || 'Student'}</div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Enrolled Classes</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
+                        {selectedStudent.classes?.map(c => c.name).join(', ') || 'None assigned'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sections</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
+                        {selectedStudent.sections?.map(s => s.name).join(', ') || 'None assigned'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                    <button 
+                      type="button" 
+                      className="btn" 
+                      style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} 
+                      onClick={() => setIsModalOpen(false)}
+                    >
+                      Close
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }} 
+                      onClick={() => openEditModal(selectedStudent)}
+                    >
+                      <Edit3 size={16} /> Edit Profile
+                    </button>
                   </div>
                 </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  {modalMode !== 'view' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Password {modalMode === 'add' && '*'}</label>
+              ) : (
+                /* Form for Add and Edit */
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  
+                  {/* Photo & Identity Section */}
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', padding: '1rem', background: 'var(--background)', borderRadius: '0.875rem', border: '1px solid var(--border)' }}>
+                    <div style={{ 
+                      width: '56px', 
+                      height: '56px', 
+                      borderRadius: '50%', 
+                      overflow: 'hidden', 
+                      border: '2px solid var(--border)', 
+                      background: 'var(--card)', 
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {formState.avatar ? (
+                        <img src={formState.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <Users size={24} style={{ color: 'var(--muted-foreground)' }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>
+                        Student Profile Photo
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <label className="btn" style={{ 
+                          border: '1px solid var(--border)', 
+                          background: 'var(--card)', 
+                          cursor: 'pointer', 
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.825rem',
+                          borderRadius: '0.5rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}>
+                          {uploadingAvatar ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                          <span>{uploadingAvatar ? 'Uploading...' : 'Upload Image'}</span>
+                          <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar} />
+                        </label>
+                        {formState.avatar && (
+                          <button 
+                            type="button" 
+                            onClick={() => setFormState(p => ({ ...p, avatar: '' }))}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Name and Email */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Full Name *</label>
+                      <input 
+                        type="text" 
+                        className="input" 
+                        value={formState.name} 
+                        onChange={(e) => setFormState({...formState, name: e.target.value})} 
+                        required 
+                        disabled={actionLoading} 
+                        placeholder="e.g. John Doe"
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Email Address *</label>
+                      <input 
+                        type="email" 
+                        className="input" 
+                        value={formState.email} 
+                        onChange={(e) => setFormState({...formState, email: e.target.value})} 
+                        required 
+                        disabled={actionLoading} 
+                        placeholder="student@school.edu"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Password & Phone */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        Password {modalMode === 'add' ? '*' : '(Leave empty to keep current)'}
+                      </label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <input type={showPassword ? "text" : "password"} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} required={modalMode === 'add'} disabled={actionLoading} placeholder={modalMode === 'edit' ? "Leave blank to keep current" : ""} />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        <input 
+                          type={showPassword ? "text" : "password"} 
+                          className="input" 
+                          style={{ width: '100%', paddingRight: '2.5rem' }} 
+                          value={formState.password} 
+                          onChange={(e) => setFormState({...formState, password: e.target.value})} 
+                          required={modalMode === 'add'} 
+                          disabled={actionLoading} 
+                          placeholder={modalMode === 'edit' ? "••••••••" : "Minimum 6 characters"} 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPassword(!showPassword)} 
+                          style={{ position: 'absolute', right: '0.75rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Phone</label>
-                    <input type="text" className="input" value={newStudent.phone} onChange={(e) => setNewStudent({...newStudent, phone: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Designation</label>
-                    <input type="text" className="input" value={newStudent.designation} onChange={(e) => setNewStudent({...newStudent, designation: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Roll Number</label>
-                    <input type="text" className="input" value={newStudent.rollNumber} onChange={(e) => setNewStudent({...newStudent, rollNumber: e.target.value})} disabled={actionLoading || modalMode === 'view'} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Classes</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.5rem', minHeight: '60px' }}>
-                      {classesData.map(c => (
-                        <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={newStudent.classIds.includes(c.id)}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setNewStudent(prev => ({
-                                ...prev,
-                                classIds: checked 
-                                  ? [...prev.classIds, c.id] 
-                                  : prev.classIds.filter(id => id !== c.id)
-                              }));
-                            }}
-                            disabled={actionLoading || modalMode === 'view'}
-                          />
-                          {c.name}
-                        </label>
-                      ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Phone Number</label>
+                      <input 
+                        type="text" 
+                        className="input" 
+                        value={formState.phone} 
+                        onChange={(e) => setFormState({...formState, phone: e.target.value})} 
+                        disabled={actionLoading} 
+                        placeholder="+880 1700 000000"
+                      />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Sections</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.5rem', minHeight: '60px' }}>
-                      {sectionsData.filter(s => newStudent.classIds.includes(s.classId)).map(s => (
-                        <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={newStudent.sectionIds.includes(s.id)}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setNewStudent(prev => ({
-                                ...prev,
-                                sectionIds: checked 
-                                  ? [...prev.sectionIds, s.id] 
-                                  : prev.sectionIds.filter(id => id !== s.id)
-                              }));
-                            }}
-                            disabled={actionLoading || modalMode === 'view'}
-                          />
-                          {s.name}
-                        </label>
-                      ))}
+
+                  {/* Roll Number & Designation */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Roll Number / ID</label>
+                      <input 
+                        type="text" 
+                        className="input" 
+                        value={formState.rollNumber} 
+                        onChange={(e) => setFormState({...formState, rollNumber: e.target.value})} 
+                        disabled={actionLoading} 
+                        placeholder="e.g. 101"
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Designation / Tag</label>
+                      <input 
+                        type="text" 
+                        className="input" 
+                        value={formState.designation} 
+                        onChange={(e) => setFormState({...formState, designation: e.target.value})} 
+                        disabled={actionLoading} 
+                        placeholder="e.g. Class Representative, Student"
+                      />
                     </div>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Avatar Image</label>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <label className="btn" style={{ border: '1px solid var(--border)', background: 'var(--card)', cursor: modalMode === 'view' ? 'default' : 'pointer', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', opacity: modalMode === 'view' ? 0.5 : 1 }}>
-                      {uploadingAvatar ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                      {uploadingAvatar ? 'Uploading...' : 'Upload Image'}
-                      <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar || modalMode === 'view'} />
-                    </label>
-                    {newStudent.avatar && (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '0.25rem', overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
-                        <img src={newStudent.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                    )}
+                  {/* Class Assignment Multi-selector */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {t('common.classes') || 'Assign Classes'}
+                      </label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                        {formState.classIds.length} selected
+                      </span>
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '0.5rem', 
+                      padding: '0.75rem', 
+                      border: '1px solid var(--border)', 
+                      borderRadius: '0.75rem', 
+                      minHeight: '52px',
+                      background: 'var(--background)' 
+                    }}>
+                      {classesData.length > 0 ? (
+                        classesData.map(c => {
+                          const isSelected = formState.classIds.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setFormState(prev => ({
+                                  ...prev,
+                                  classIds: isSelected 
+                                    ? prev.classIds.filter(id => id !== c.id) 
+                                    : [...prev.classIds, c.id]
+                                }));
+                              }}
+                              disabled={actionLoading}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '999px',
+                                fontSize: '0.825rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                background: isSelected ? 'var(--primary)' : 'var(--card)',
+                                color: isSelected ? 'var(--primary-foreground)' : 'var(--foreground)'
+                              }}
+                            >
+                              {isSelected && <CheckCircle2 size={13} />}
+                              <span>{c.name}</span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>No classes available</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                
-                {modalMode !== 'view' && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                    <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsModalOpen(false)} disabled={actionLoading}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" disabled={actionLoading}>
-                      {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }}/>} 
-                      {modalMode === 'add' ? 'Add Student' : 'Save Changes'}
+
+                  {/* Section Assignment Multi-selector */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {t('common.sections') || 'Assign Sections'}
+                      </label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                        {formState.sectionIds.length} selected
+                      </span>
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '0.5rem', 
+                      padding: '0.75rem', 
+                      border: '1px solid var(--border)', 
+                      borderRadius: '0.75rem', 
+                      minHeight: '52px',
+                      background: 'var(--background)' 
+                    }}>
+                      {availableModalSections.length > 0 ? (
+                        availableModalSections.map(s => {
+                          const isSelected = formState.sectionIds.includes(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setFormState(prev => ({
+                                  ...prev,
+                                  sectionIds: isSelected 
+                                    ? prev.sectionIds.filter(id => id !== s.id) 
+                                    : [...prev.sectionIds, s.id]
+                                }));
+                              }}
+                              disabled={actionLoading}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '999px',
+                                fontSize: '0.825rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                background: isSelected ? 'var(--primary)' : 'var(--card)',
+                                color: isSelected ? 'var(--primary-foreground)' : 'var(--foreground)'
+                              }}
+                            >
+                              {isSelected && <CheckCircle2 size={13} />}
+                              <span>{s.name}</span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>
+                          {formState.classIds.length === 0 ? "Select classes above to view sections" : "No sections found for chosen classes"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Submit Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+                    <button 
+                      type="button" 
+                      className="btn" 
+                      style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} 
+                      onClick={() => setIsModalOpen(false)} 
+                      disabled={actionLoading}
+                    >
+                      {t('common.cancel') || 'Cancel'}
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary" 
+                      disabled={actionLoading}
+                      style={{ borderRadius: '0.75rem', padding: '0.625rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      {actionLoading ? <Loader2 size={16} className="animate-spin" /> : null} 
+                      {modalMode === 'add' ? (t('students.addStudent') || 'Create Student') : (t('common.saveChanges') || 'Save Changes')}
                     </button>
                   </div>
-                )}
-              </form>
+                </form>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ── Delete Confirmation Modal ──────────────────────────── */}
       {deleteModal.open && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
-            <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', textAlign: 'center' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(239,68,68,0.25)' }}>
-                <AlertTriangle size={28} style={{ color: '#ef4444' }} />
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          backgroundColor: 'rgba(0,0,0,0.65)', 
+          backdropFilter: 'blur(6px)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 120, 
+          padding: '1rem' 
+        }}>
+          <div className="glass-card animate-fade-in" style={{ 
+            background: 'var(--card)', 
+            width: '100%', 
+            maxWidth: '440px', 
+            borderRadius: '1.25rem', 
+            overflow: 'hidden', 
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ padding: '2rem 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', textAlign: 'center' }}>
+              <div style={{ 
+                width: '64px', 
+                height: '64px', 
+                borderRadius: '50%', 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                border: '1.5px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444'
+              }}>
+                <AlertTriangle size={32} />
               </div>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>Delete Student Account</h2>
-                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9375rem', lineHeight: 1.5, margin: 0 }}>
-                  Are you sure you want to permanently delete <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong>? This action cannot be undone.
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>
+                  {t('students.deleteStudent') || 'Delete Student Record'}
+                </h2>
+                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
+                  Are you sure you want to permanently delete student <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong> (Roll: {deleteModal.roll})? All class enrollments and records will be revoked.
                 </p>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', padding: '0 2rem 2rem 2rem' }}>
+            
+            <div style={{ display: 'flex', gap: '0.75rem', padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
               <button
                 className="btn"
-                style={{ flex: 1, border: '1px solid var(--border)', fontSize: '0.9375rem' }}
-                onClick={() => setDeleteModal({ open: false, id: '', name: '' })}
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: '0.75rem', fontSize: '0.9rem' }}
+                onClick={() => setDeleteModal({ open: false, id: '', name: '', roll: '' })}
                 disabled={deleteLoading}
               >
                 Cancel
               </button>
               <button
                 className="btn"
-                style={{ flex: 1, background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff', fontSize: '0.9375rem', border: 'none', boxShadow: '0 4px 15px rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                style={{ 
+                  flex: 1, 
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)', 
+                  color: '#ffffff', 
+                  fontSize: '0.9rem', 
+                  borderRadius: '0.75rem',
+                  border: 'none', 
+                  boxShadow: '0 4px 15px rgba(239,68,68,0.35)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '0.5rem',
+                  fontWeight: 600
+                }}
                 onClick={confirmDelete}
                 disabled={deleteLoading}
               >
                 {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                {deleteLoading ? 'Deleting...' : 'Delete'}
+                {deleteLoading ? (t('common.deleting') || 'Deleting...') : (t('common.delete') || 'Delete')}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

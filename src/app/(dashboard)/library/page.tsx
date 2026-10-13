@@ -191,12 +191,12 @@ function BookModal({
               {/* ISBN & Category */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={labelStyle}>ISBN</label>
+                  <label style={labelStyle}>{t('common.isbn')}</label>
                   <input type="text" placeholder="e.g. 9780743273565" value={form.isbn}
                     onChange={e => handleFormChange('isbn', e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Category</label>
+                  <label style={labelStyle}>{t('common.category')}</label>
                   <select value={form.category} onChange={e => handleFormChange('category', e.target.value)}
                     style={{ ...inputStyle, cursor: 'pointer' }}>
                     {BOOK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -206,14 +206,14 @@ function BookModal({
 
               {/* Cover Image URL */}
               <div>
-                <label style={labelStyle}>Cover Image URL</label>
+                <label style={labelStyle}>{t('common.coverImageUrl')}</label>
                 <input type="url" placeholder="https://example.com/cover.jpg" value={form.coverImageUrl}
                   onChange={e => handleFormChange('coverImageUrl', e.target.value)} style={inputStyle} />
               </div>
 
               {/* Description */}
               <div>
-                <label style={labelStyle}>Description</label>
+                <label style={labelStyle}>{t('common.description')}</label>
                 <textarea placeholder="Brief description of the book..." value={form.description}
                   onChange={e => handleFormChange('description', e.target.value)}
                   rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
@@ -426,7 +426,7 @@ export default function LibraryPage() {
           <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
             <AlertCircle size={36} color="#ef4444" />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Failed to Load Books</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('library.noBooks')}</h3>
           <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '0.95rem' }}>{error}</p>
           <button onClick={() => fetchBooks(search, category)} style={{ marginTop: '1.5rem', padding: '0.65rem 1.5rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <RefreshCw size={16} /> Try Again
@@ -504,7 +504,7 @@ export default function LibraryPage() {
                   {/* Availability */}
                   {(book.quantity !== undefined || book.available !== undefined) && (
                     <div style={{ paddingTop: '0.6rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>Available</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>{t('library.available')}</span>
                       <span style={{ fontSize: '0.82rem', fontWeight: 700, color: (book.available ?? book.quantity ?? 0) > 0 ? '#16a34a' : '#ef4444' }}>
                         {book.available ?? book.quantity ?? 0}
                         {book.quantity !== undefined && book.available !== undefined ? ` / ${book.quantity}` : ''}

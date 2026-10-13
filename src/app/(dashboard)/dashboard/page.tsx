@@ -147,6 +147,7 @@ function DonutChart({ pct, color, size = 100 }: { pct: number; color: string; si
 
 // ─── Area Chart ───────────────────────────────────────────────────────────────
 function AreaChart({ data, height = 320 }: { data: { label: string, value: number, subLabel?: string, subColor?: string, stats?: { present: number, absent: number, leave: number, late: number, total: number } }[], height?: number }) {
+  const { t } = useLanguage();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -163,7 +164,7 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
   const padX = 30;
   const padY = 40;
 
-  if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>No data</div>;
+  if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>{t('common.noData')}</div>;
 
   const maxVal = 100;
   const getX = (i: number) => padX + (i / (data.length - 1 || 1)) * (w - padX * 2);
@@ -264,16 +265,16 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
             {data[hoverIndex].label.replace(' ', ', ')} - {data[hoverIndex].value}%
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', fontSize: '0.75rem' }}>
-            <span style={{ color: '#10b981' }}>Present:</span>
+            <span style={{ color: '#10b981' }}>{t('common.present')}:</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.present / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.present})</span>
             
-            <span style={{ color: '#ef4444' }}>Absent:</span>
+            <span style={{ color: '#ef4444' }}>{t('common.absent')}:</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.absent / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.absent})</span>
             
-            <span style={{ color: '#f59e0b' }}>Leave:</span>
+            <span style={{ color: '#f59e0b' }}>{t('common.leave')}:</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.leave / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.leave})</span>
             
-            <span style={{ color: '#8b5cf6' }}>Late:</span>
+            <span style={{ color: '#8b5cf6' }}>{t('common.late')}:</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.late / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.late})</span>
           </div>
         </div>
@@ -638,7 +639,7 @@ export default function DashboardPage() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '1rem' }}>
         <Loader2 size={36} style={{ animation: 'nd-spin 1s linear infinite', color: 'var(--primary)' }} />
-        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>{t('common.loading')}</p>
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>Loading map...</p>
         <style>{`@keyframes nd-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -948,10 +949,10 @@ export default function DashboardPage() {
           {/* ── 3-col grid ── */}
           <div className="nd-3col">
 
-            {/* Today Attend Teacher */}
+            {/* {t('dashboard.teacherAttendance')} */}
             <div className="nd-section-card" style={{ position: 'relative' }}>
               <div className="nd-section-head">
-                <h3>Today Attend Teacher</h3>
+                <h3>{t('dashboard.teacherAttendance')}</h3>
               </div>
               <div style={{ marginBottom: '1rem' }}>
                 <div className="nd-progress-labels">
@@ -1061,19 +1062,19 @@ export default function DashboardPage() {
                   <div style={{ width: '100%', fontSize: '0.68rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     {hoveredTeacher.data.status && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Status</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.status')}</span>
                         <span style={{ textTransform: 'capitalize' }}>{hoveredTeacher.data.status}</span>
                       </div>
                     )}
                     {hoveredTeacher.data.teacher?.phone && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Phone</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.phone')}</span>
                         <span>{hoveredTeacher.data.teacher.phone}</span>
                       </div>
                     )}
                     {hoveredTeacher.data.teacher?.email && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Email</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.email')}</span>
                         <span>{hoveredTeacher.data.teacher.email}</span>
                       </div>
                     )}
@@ -1082,10 +1083,10 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Today Attend Student */}
+            {/* {t('dashboard.studentAttendance')} */}
             <div className="nd-section-card" style={{ position: 'relative' }}>
               <div className="nd-section-head" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
-                <h3>Today Attend Student</h3>
+                <h3>{t('dashboard.studentAttendance')}</h3>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <select className="nd-hw-filter" value={studentClassFilter} onChange={(e) => setStudentClassFilter(e.target.value)}>
                     <option value="All">All Classes</option>
@@ -1235,19 +1236,19 @@ export default function DashboardPage() {
                     )}
                     {hoveredStudent.data.status && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Status</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.status')}</span>
                         <span style={{ textTransform: 'capitalize' }}>{hoveredStudent.data.status}</span>
                       </div>
                     )}
                     {hoveredStudent.data.student?.phone && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Phone</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.phone')}</span>
                         <span>{hoveredStudent.data.student.phone}</span>
                       </div>
                     )}
                     {hoveredStudent.data.student?.email && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Email</span>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.email')}</span>
                         <span>{hoveredStudent.data.student.email}</span>
                       </div>
                     )}
@@ -1256,10 +1257,10 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Today Home Work */}
+            {/* {t('dashboard.todayHomework')} */}
             <div className="nd-section-card">
               <div className="nd-section-head">
-                <h3>Today Home Work</h3>
+                <h3>{t('dashboard.todayHomework')}</h3>
                 <select 
                   className="nd-hw-filter" 
                   value={hwFilterClass} 

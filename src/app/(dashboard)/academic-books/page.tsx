@@ -124,6 +124,7 @@ function BookFormModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState<AcademicBookForm>(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -322,7 +323,7 @@ function BookFormModal({
 
               {/* Author */}
               <div>
-                <label style={labelStyle}>Author / Publisher</label>
+                <label style={labelStyle}>{t('common.author')}</label>
                 <input
                   type="text"
                   placeholder="e.g. National Curriculum and Textbook Board (NCTB)"
@@ -341,7 +342,7 @@ function BookFormModal({
                     onChange={e => handleChange('classId', e.target.value)}
                     style={{ ...inputStyle, cursor: 'pointer' }}
                   >
-                    <option value="">Select Class...</option>
+                    <option value="">{t('common.selectClass')}...</option>
                     {classes.map(c => {
                       const cId = c.id || c.uuid || '';
                       return (
@@ -351,7 +352,7 @@ function BookFormModal({
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Subject</label>
+                  <label style={labelStyle}>{t('common.subject')}</label>
                   <input
                     type="text"
                     list="subjects-datalist"
@@ -371,7 +372,7 @@ function BookFormModal({
               {/* Edition & Published Year */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={labelStyle}>Edition</label>
+                  <label style={labelStyle}>{t('common.edition')}</label>
                   <input
                     type="text"
                     placeholder="e.g. 2024 Edition"
@@ -381,7 +382,7 @@ function BookFormModal({
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Published Year</label>
+                  <label style={labelStyle}>{t('common.publishedYear')}</label>
                   <input
                     type="number"
                     placeholder="e.g. 2024"
@@ -395,7 +396,7 @@ function BookFormModal({
               {/* Total Pages & File Size */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={labelStyle}>Total Pages</label>
+                  <label style={labelStyle}>{t('common.pages')}</label>
                   <input
                     type="number"
                     placeholder="e.g. 280"
@@ -405,7 +406,7 @@ function BookFormModal({
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>File Size (in bytes)</label>
+                  <label style={labelStyle}>{t('common.fileSize')}</label>
                   <input
                     type="number"
                     placeholder="e.g. 15485760 (15 MB)"
@@ -418,7 +419,7 @@ function BookFormModal({
 
               {/* Cover Image URL */}
               <div>
-                <label style={labelStyle}>Cover Image URL</label>
+                <label style={labelStyle}>{t('common.coverImageUrl')}</label>
                 <input
                   type="url"
                   placeholder="https://example.com/cover.jpg"
@@ -442,7 +443,7 @@ function BookFormModal({
 
               {/* Description */}
               <div>
-                <label style={labelStyle}>Description</label>
+                <label style={labelStyle}>{t('common.description')}</label>
                 <textarea
                   placeholder="Standard syllabus textbook for secondary education..."
                   value={form.description}
@@ -568,6 +569,7 @@ function BookReaderModal({
   onClose: () => void;
   onEdit: () => void;
 }) {
+  const { t } = useLanguage();
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   return (
@@ -768,7 +770,7 @@ function BookReaderModal({
               >
                 <BookOpen size={42} color="#94a3b8" />
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>No PDF Attached</h3>
+              <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>{t('common.none')}</h3>
               <p style={{ maxWidth: '440px', marginTop: '0.5rem', color: '#94a3b8', fontSize: '0.95rem' }}>
                 This book does not have a PDF document link attached yet. Edit the book to provide a valid PDF document URL for reading.
               </p>
@@ -1131,7 +1133,7 @@ export default function AcademicBooksPage() {
               outline: 'none',
             }}
           >
-            <option value="">All Classes</option>
+            <option value="">{t('common.allClasses')}</option>
             {classes.map(c => {
               const cId = c.id || c.uuid || '';
               return (
@@ -1158,7 +1160,7 @@ export default function AcademicBooksPage() {
               outline: 'none',
             }}
           >
-            <option value="">All Subjects</option>
+            <option value="">{t('common.allSubjects')}</option>
             {subjects.map((s, idx) => (
               <option key={s.id || s.uuid || idx} value={s.name}>{s.name}</option>
             ))}

@@ -355,10 +355,10 @@ export default function AttendancePage() {
                 style={{ height: '40px', padding: '0 0.75rem', fontSize: '0.875rem' }}
                 title="Records per page"
               >
-                <option value={10}>10 / page</option>
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={100}>100 / page</option>
+                <option value={10}>10 {t('common.perPage')}</option>
+                <option value={25}>25 {t('common.perPage')}</option>
+                <option value={50}>50 {t('common.perPage')}</option>
+                <option value={100}>100 {t('common.perPage')}</option>
               </select>
               <button className="btn" onClick={() => setShowFilters(!showFilters)} style={{ border: '1px solid var(--border)', gap: '0.5rem', background: showFilters ? 'var(--primary)' : 'var(--card)', color: showFilters ? 'var(--primary-foreground)' : 'var(--foreground)' }}>
                 <Filter size={18} /> Filters
@@ -454,7 +454,7 @@ export default function AttendancePage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Subjects</option>
+                  <option value="">{t('common.allSubjects')}</option>
                   {subjectsData.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -488,7 +488,7 @@ export default function AttendancePage() {
                   }}
                   style={{ height: '40px' }}
                 >
-                  <option value="">All Status</option>
+                  <option value="">{t('common.allStatus')}</option>
                   <option value="present">Present</option>
                   <option value="absent">Absent</option>
                   <option value="late">Late</option>

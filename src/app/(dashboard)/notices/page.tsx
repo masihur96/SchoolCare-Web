@@ -582,7 +582,7 @@ export default function NoticesPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>Priority</label>
+                    <label>{t('common.priority')}</label>
                     <select
                       name="isImportent"
                       value={formData.isImportent ? 'true' : 'false'}

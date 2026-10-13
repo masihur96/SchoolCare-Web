@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import {
   User, Building2, Loader2, CheckCircle2, AlertCircle,
   Phone, Mail, MapPin, Shield, Calendar, Camera, Save, X
@@ -65,6 +66,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -216,8 +218,8 @@ export default function ProfilePage() {
     return (
       <div className="page-container" style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
         <User size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-        <h2>Profile Not Found</h2>
-        <p>Could not load your profile data.</p>
+        <h2>{t('profile.notFound')}</h2>
+        <p>{t('profile.notFoundDesc')}</p>
       </div>
     );
   }
@@ -231,9 +233,9 @@ export default function ProfilePage() {
       
       {/* Page Header */}
       <div className="page-header mb-6">
-        <h1 className="text-2xl font-bold">My Profile</h1>
+        <h1 className="text-2xl font-bold">{t('profile.title')}</h1>
         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
-          View and edit your personal details
+          {t('profile.subtitle')}
         </p>
       </div>
 
@@ -243,7 +245,7 @@ export default function ProfilePage() {
         <div className="glass-card" style={{ overflow: 'hidden' }}>
           <div className="widget-header">
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <User size={18} style={{ color: 'var(--primary)' }} /> Personal Details
+              <User size={18} style={{ color: 'var(--primary)' }} /> {t('profile.personalDetails')}
             </h3>
           </div>
           
@@ -312,7 +314,7 @@ export default function ProfilePage() {
                 <h2 style={{ fontWeight: 700, fontSize: '1.25rem', marginBottom: '0.25rem' }}>{currentName}</h2>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                   <span className="badge badge-primary" style={{ fontSize: '0.7rem', textTransform: 'capitalize' }}>{profile.role}</span>
-                  {profile.isActive && <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Active</span>}
+                  {profile.isActive && <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>{t('common.active')}</span>}
                   {(isEditing ? editForm.designation : profile.designation) && (
                     <span className="badge" style={{ fontSize: '0.7rem', background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                       {isEditing ? editForm.designation : profile.designation}
@@ -321,7 +323,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', flexShrink: 0 }}>
-                <p>Member since</p>
+                <p>{t('profile.memberSince')}</p>
                 <p style={{ fontWeight: 600, color: 'var(--foreground)' }}>{profile.createdAt ? formatDate(profile.createdAt) : '—'}</p>
               </div>
             </div>
@@ -389,7 +391,7 @@ export default function ProfilePage() {
                     disabled={saving}
                   >
                     {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} style={{ marginRight: '4px' }} />}
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? 'Saving...' : t('profile.saveChanges')}
                   </button>
                 </>
               ) : (
@@ -398,7 +400,7 @@ export default function ProfilePage() {
                   className="btn btn-primary"
                   style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
                 >
-                  Edit Profile
+                  {t('profile.editProfile')}
                 </button>
               )}
             </div>
@@ -478,7 +480,7 @@ export default function ProfilePage() {
             ) : (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted-foreground)' }}>
                 <Building2 size={40} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
-                <p>No school information is associated with your account.</p>
+                <p>{t('profile.noSchool')}</p>
               </div>
             )}
           </div>

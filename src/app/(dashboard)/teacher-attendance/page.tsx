@@ -408,7 +408,7 @@ export default function TeacherAttendancePage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                       <Search size={40} style={{ color: 'var(--border)', marginBottom: '0.5rem' }} />
                       <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>{t('attendance.noRecords')}</p>
-                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try adjusting your search query or filters.</p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{t('students.tryAdjusting')}</p>
                     </div>
                   </td>
                 </tr>

@@ -230,7 +230,7 @@ export default function RoutinePage() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: '1 1 200px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Teacher</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('common.teacher')}</label>
               <div style={{ position: 'relative' }}>
                 <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
                 <select 
@@ -249,7 +249,7 @@ export default function RoutinePage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: '1 1 200px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('common.class')}</label>
               <div style={{ position: 'relative' }}>
                 <BookOpen size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
                 <select 
@@ -268,7 +268,7 @@ export default function RoutinePage() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: '1 1 200px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Section</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('common.section')}</label>
               <select 
                 className="input" 
                 value={selectedSectionId}
@@ -321,7 +321,7 @@ export default function RoutinePage() {
             <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--muted-foreground)' }}>
               <Calendar size={64} style={{ opacity: 0.15, margin: '0 auto 1.5rem' }} />
               <p style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('routine.noRoutine')}</p>
-              <p style={{ fontSize: '0.95rem', maxWidth: '400px', margin: '0.5rem auto 0' }}>Try adjusting your Class, Section, or Teacher filters above to find what you are looking for.</p>
+              <p style={{ fontSize: '0.95rem', maxWidth: '400px', margin: '0.5rem auto 0' }}>{t('students.tryAdjusting')}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
