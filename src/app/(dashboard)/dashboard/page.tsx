@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Users, GraduationCap, BookOpen, ClipboardList,
-  Calendar, Clock, ChevronRight, ChevronLeft,
+  Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown,
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight, Award,
-  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video, Link as LinkIcon
+  BookCopy, LayoutGrid, ClipboardCheck, Star, MapPin, Video, Link as LinkIcon,
+  MessageCircle, Send, X
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -42,7 +44,24 @@ interface DashboardData {
   currentExam: Exam[];
   upcomingMeeting?: any[];
 }
-interface UserProfile { id: string; name: string; email: string; role: string; schoolId: string; phone: string; avatar: string | null; designation: string | null; }
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  schoolId: string;
+  phone: string;
+  avatar: string | null;
+  designation: string | null;
+  school?: {
+    id?: string;
+    name?: string;
+    avatar?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getToken() {
@@ -359,7 +378,24 @@ export default function DashboardPage() {
   const [perfLoading, setPerfLoading] = useState(true);
   const [hoveredPerfStudent, setHoveredPerfStudent] = useState<any | null>(null);
   const [hoveredPerfTeacher, setHoveredPerfTeacher] = useState<any | null>(null);
+  const [isNovaChatOpen, setIsNovaChatOpen] = useState(false);
+  const [novaMessages, setNovaMessages] = useState<Array<{ role: 'ai' | 'user'; text: string; time: string }>>([
+    {
+      role: 'ai',
+      text: 'Hello! I am Nova AI, your AI Teaching Assistant for SchoolCare. How can I help you with lesson plans, schedules, or classroom insights today?',
+      time: 'Just now'
+    }
+  ]);
+  const [novaInput, setNovaInput] = useState('');
+  const [isNovaTyping, setIsNovaTyping] = useState(false);
+  const [isNovaCardMinimized, setIsNovaCardMinimized] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const today = new Date();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function fetchProfile(): Promise<UserProfile | null> {
     try {
@@ -540,9 +576,61 @@ export default function DashboardPage() {
     })
     .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''));
 
+  const schoolName = userProfile?.school?.name || 'SchoolCare Academy';
 
+  useEffect(() => {
+    if (userProfile?.school?.name) {
+      setNovaMessages(prev => {
+        if (prev.length === 1 && prev[0].role === 'ai') {
+          return [
+            {
+              role: 'ai',
+              text: `Hello! I am Nova AI, your dedicated teaching assistant for ${userProfile.school?.name}, powered by SchoolCare. How can I assist you today?`,
+              time: 'Just now'
+            }
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [userProfile?.school?.name]);
 
+  useEffect(() => {
+    if (isNovaChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [novaMessages, isNovaChatOpen]);
 
+  const handleSendNovaMessage = (overrideText?: string) => {
+    const text = (overrideText || novaInput).trim();
+    if (!text || isNovaTyping) return;
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setNovaMessages(prev => [...prev, { role: 'user', text, time: nowTime }]);
+    if (!overrideText) setNovaInput('');
+    setIsNovaTyping(true);
+
+    setTimeout(() => {
+      let reply = `Here to assist ${schoolName} with SchoolCare!`;
+      const lower = text.toLowerCase();
+      if (lower.includes('schedule') || lower.includes('routine')) {
+        reply = `For today at ${schoolName}, you have ${filteredTodayRoutines.length} classes scheduled. Check the Today's Schedule section on the dashboard for details!`;
+      } else if (lower.includes('lesson') || lower.includes('plan')) {
+        reply = `Nova AI Lesson Tip for ${schoolName}: Structure your upcoming session with: 1) 5-min recap, 2) 15-min core topic teaching, 3) 15-min interactive student activity, and 4) 5-min wrap-up & homework briefing.`;
+      } else if (lower.includes('attendance')) {
+        reply = `Today's attendance at ${schoolName}: Teachers: ${d.attendTeacher?.present ?? 0}/${d.attendTeacher?.totalTeachers ?? 0} (${d.attendTeacher?.attendanceRate ?? 0}%), Students: ${d.attendStudent?.present ?? 0}/${d.attendStudent?.totalStudents ?? 0} (${d.attendStudent?.attendanceRate ?? 0}%).`;
+      } else if (lower.includes('homework')) {
+        reply = `There are ${d.recentHomework?.length || 0} homework assignments posted today for ${schoolName}. All records are synced with SchoolCare.`;
+      } else {
+        reply = `I have noted that for ${schoolName}! SchoolCare Nova AI is learning your classroom preferences to assist you smarter & faster.`;
+      }
+      setNovaMessages(prev => [...prev, {
+        role: 'ai',
+        text: reply,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+      setIsNovaTyping(false);
+    }, 600);
+  };
 
   if (loading) {
     return (
@@ -855,164 +943,6 @@ export default function DashboardPage() {
 
           </div>
           
-          {/* ── Today's Schedule ── */}
-          <div className="nd-section-card" style={{ marginBottom: '1.25rem' }}>
-            <div className="nd-section-head" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} color="#6366f1" />
-                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Today's Schedule</h3>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '999px' }}>
-                  {filteredTodayRoutines.length}
-                </span>
-              </div>
-              <Link href="/routine" className="nd-text-btn" style={{ fontSize: '0.78rem' }}>
-                <Calendar size={14} /> View Timetable
-              </Link>
-            </div>
-
-            {/* Filter controls */}
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <select
-                className="nd-hw-filter"
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
-                value={schedClassFilter}
-                onChange={(e) => {
-                  setSchedClassFilter(e.target.value);
-                  setSchedSectionFilter('All');
-                }}
-              >
-                <option value="All">All Classes</option>
-                {availableClasses.map((c, i) => (
-                  <option key={i} value={c}>{c}</option>
-                ))}
-              </select>
-
-              <select
-                className="nd-hw-filter"
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
-                value={schedSectionFilter}
-                onChange={(e) => setSchedSectionFilter(e.target.value)}
-              >
-                <option value="All">All Sections</option>
-                {availableSections.map((s, i) => (
-                  <option key={i} value={s}>{s}</option>
-                ))}
-              </select>
-
-              <select
-                className="nd-hw-filter"
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
-                value={schedTeacherFilter}
-                onChange={(e) => setSchedTeacherFilter(e.target.value)}
-              >
-                <option value="All">All Teachers</option>
-                {availableTeachers.map((t, i) => (
-                  <option key={i} value={t}>{t}</option>
-                ))}
-              </select>
-
-              <select
-                className="nd-hw-filter"
-                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
-                value={schedSubjectFilter}
-                onChange={(e) => setSchedSubjectFilter(e.target.value)}
-              >
-                <option value="All">All Subjects</option>
-                {availableSubjects.map((sub, i) => (
-                  <option key={i} value={sub}>{sub}</option>
-                ))}
-              </select>
-
-              {(schedClassFilter !== 'All' || schedSectionFilter !== 'All' || schedTeacherFilter !== 'All' || schedSubjectFilter !== 'All') && (
-                <button
-                  onClick={() => {
-                    setSchedClassFilter('All');
-                    setSchedSectionFilter('All');
-                    setSchedTeacherFilter('All');
-                    setSchedSubjectFilter('All');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#6366f1',
-                    fontSize: '0.72rem',
-                    cursor: 'pointer',
-                    padding: '0.2rem 0.5rem',
-                    textDecoration: 'underline',
-                    fontWeight: 600
-                  }}
-                >
-                  Reset filters ({filteredTodayRoutines.length} of {todayRoutines.length})
-                </button>
-              )}
-            </div>
-
-            {/* Routines Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
-              {filteredTodayRoutines.length > 0 ? (
-                filteredTodayRoutines.map((r: any, i: number) => {
-                  const isActive = isRoutineActiveNow(r.startTime, r.endTime);
-                  return (
-                    <div
-                      key={r.id || i}
-                      style={{
-                        border: isActive ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
-                        borderRadius: '0.65rem',
-                        padding: '0.75rem 0.85rem',
-                        background: isActive ? '#f5f3ff' : '#ffffff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.4rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                        transition: 'border-color 0.15s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.subjectEntity?.name || 'Class'}
-                          </h4>
-                          <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.classEntity?.name || 'Class'}{r.sectionEntity?.name ? ` (${r.sectionEntity.name})` : ''}
-                          </p>
-                        </div>
-                        {isActive ? (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#6366f1', color: '#ffffff', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>
-                            Now
-                          </span>
-                        ) : r.roomNumber ? (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
-                            {r.roomNumber}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} color={isActive ? '#6366f1' : '#94a3b8'} />
-                          <span style={{ fontWeight: isActive ? 600 : 500, color: isActive ? '#6366f1' : '#475569' }}>
-                            {formatRoutineTime(r.startTime)} – {formatRoutineTime(r.endTime)}
-                          </span>
-                        </div>
-                        {r.teacherEntity?.name && (
-                          <span style={{ color: '#334155', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.teacherEntity.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b', fontSize: '0.8rem' }}>
-                  {todayRoutines.length === 0 ? `No classes scheduled for today (${todayDayName}).` : 'No classes match the selected filters.'}
-                </div>
-              )}
-            </div>
-          </div>
-
-
-
           {/* ── 3-col grid ── */}
           <div className="nd-3col">
 
@@ -1366,6 +1296,162 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* ── Today's Schedule ── */}
+          <div className="nd-section-card">
+            <div className="nd-section-head" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={18} color="#6366f1" />
+                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Today's Schedule</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '999px' }}>
+                  {filteredTodayRoutines.length}
+                </span>
+              </div>
+              <Link href="/routine" className="nd-text-btn" style={{ fontSize: '0.78rem' }}>
+                <Calendar size={14} /> View Timetable
+              </Link>
+            </div>
+
+            {/* Filter controls */}
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedClassFilter}
+                onChange={(e) => {
+                  setSchedClassFilter(e.target.value);
+                  setSchedSectionFilter('All');
+                }}
+              >
+                <option value="All">All Classes</option>
+                {availableClasses.map((c, i) => (
+                  <option key={i} value={c}>{c}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedSectionFilter}
+                onChange={(e) => setSchedSectionFilter(e.target.value)}
+              >
+                <option value="All">All Sections</option>
+                {availableSections.map((s, i) => (
+                  <option key={i} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedTeacherFilter}
+                onChange={(e) => setSchedTeacherFilter(e.target.value)}
+              >
+                <option value="All">All Teachers</option>
+                {availableTeachers.map((t, i) => (
+                  <option key={i} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <select
+                className="nd-hw-filter"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                value={schedSubjectFilter}
+                onChange={(e) => setSchedSubjectFilter(e.target.value)}
+              >
+                <option value="All">All Subjects</option>
+                {availableSubjects.map((sub, i) => (
+                  <option key={i} value={sub}>{sub}</option>
+                ))}
+              </select>
+
+              {(schedClassFilter !== 'All' || schedSectionFilter !== 'All' || schedTeacherFilter !== 'All' || schedSubjectFilter !== 'All') && (
+                <button
+                  onClick={() => {
+                    setSchedClassFilter('All');
+                    setSchedSectionFilter('All');
+                    setSchedTeacherFilter('All');
+                    setSchedSubjectFilter('All');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#6366f1',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    padding: '0.2rem 0.5rem',
+                    textDecoration: 'underline',
+                    fontWeight: 600
+                  }}
+                >
+                  Reset filters ({filteredTodayRoutines.length} of {todayRoutines.length})
+                </button>
+              )}
+            </div>
+
+            {/* Routines Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+              {filteredTodayRoutines.length > 0 ? (
+                filteredTodayRoutines.map((r: any, i: number) => {
+                  const isActive = isRoutineActiveNow(r.startTime, r.endTime);
+                  return (
+                    <div
+                      key={r.id || i}
+                      style={{
+                        border: isActive ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                        borderRadius: '0.65rem',
+                        padding: '0.75rem 0.85rem',
+                        background: isActive ? '#f5f3ff' : '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'border-color 0.15s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.subjectEntity?.name || 'Class'}
+                          </h4>
+                          <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.classEntity?.name || 'Class'}{r.sectionEntity?.name ? ` (${r.sectionEntity.name})` : ''}
+                          </p>
+                        </div>
+                        {isActive ? (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#6366f1', color: '#ffffff', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>
+                            Now
+                          </span>
+                        ) : r.roomNumber ? (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                            {r.roomNumber}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={12} color={isActive ? '#6366f1' : '#94a3b8'} />
+                          <span style={{ fontWeight: isActive ? 600 : 500, color: isActive ? '#6366f1' : '#475569' }}>
+                            {formatRoutineTime(r.startTime)} – {formatRoutineTime(r.endTime)}
+                          </span>
+                        </div>
+                        {r.teacherEntity?.name && (
+                          <span style={{ color: '#334155', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.teacherEntity.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b', fontSize: '0.8rem' }}>
+                  {todayRoutines.length === 0 ? `No classes scheduled for today (${todayDayName}).` : 'No classes match the selected filters.'}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ── 2-col grid: Upcoming Meetings & Upcoming Exams ── */}
           <div className="nd-2col">
 
@@ -1547,7 +1633,7 @@ export default function DashboardPage() {
                   .sort((a, b) => {
                     const avgA = ((a.attendance?.percentage ?? 0) + (a.exams?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 3;
                     const avgB = ((b.attendance?.percentage ?? 0) + (b.exams?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 3;
-                    return avgA - avgB;
+                    return avgB - avgA;
                   })
                   .map((s: any, i: number) => {
                     const att = s.attendance?.percentage ?? 0;
@@ -1656,7 +1742,7 @@ export default function DashboardPage() {
                   .sort((a, b) => {
                     const avgA = ((a.attendance?.percentage ?? 0) + (a.homework?.percentage ?? 0)) / 2;
                     const avgB = ((b.attendance?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 2;
-                    return avgA - avgB;
+                    return avgB - avgA;
                   })
                   .map((t: any, i: number) => {
                     const att = t.attendance?.percentage ?? 0;
@@ -1813,6 +1899,350 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Always Fixed on Right Bottom (Never Scrolls) ── */}
+      {mounted && createPortal(
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
+          {isNovaChatOpen ? (
+            <div
+              style={{
+                width: '370px',
+                maxWidth: 'calc(100vw - 32px)',
+                height: '520px',
+                maxHeight: 'calc(100vh - 110px)',
+                background: '#ffffff',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                animation: 'nd-fade-in 0.2s ease',
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '0.85rem 1rem',
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Sparkles size={18} color="#ffffff" />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: '#ffffff' }}>Nova AI</h4>
+                    <p style={{ fontSize: '0.68rem', opacity: 0.9, margin: 0 }}>
+                      SchoolCare • {schoolName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsNovaChatOpen(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 28, height: 28,
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                  title="Close chat"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                background: '#f8fafc',
+              }}>
+                {novaMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: '82%',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        background: msg.role === 'user' ? '#4f46e5' : '#ffffff',
+                        color: msg.role === 'user' ? '#ffffff' : '#1e293b',
+                        fontSize: '0.78rem',
+                        lineHeight: 1.45,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                        border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {msg.text}
+                    </div>
+                    <span style={{ fontSize: '0.6rem', color: '#94a3b8', marginTop: '2px', padding: '0 4px' }}>
+                      {msg.time}
+                    </span>
+                  </div>
+                ))}
+                {isNovaTyping && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6366f1', fontSize: '0.75rem', padding: '0.4rem 0.6rem' }}>
+                    <Loader2 size={14} style={{ animation: 'nd-spin 1s linear infinite' }} />
+                    <span>Nova AI is thinking...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Quick Prompts */}
+              <div style={{
+                padding: '0.4rem 0.75rem',
+                background: '#ffffff',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                gap: '0.4rem',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+              }}>
+                {[
+                  "📅 Today's Schedule",
+                  "📝 Lesson Plan",
+                  "📊 Attendance",
+                  "💡 Homework Idea"
+                ].map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendNovaMessage(prompt)}
+                    style={{
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.66rem',
+                      padding: '3px 8px',
+                      borderRadius: '999px',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      color: '#475569',
+                      cursor: 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input Box */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendNovaMessage();
+                }}
+                style={{
+                  padding: '0.65rem 0.75rem',
+                  background: '#ffffff',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                }}
+              >
+                <input
+                  type="text"
+                  value={novaInput}
+                  onChange={(e) => setNovaInput(e.target.value)}
+                  placeholder="Ask Nova AI anything..."
+                  style={{
+                    flex: 1,
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.78rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!novaInput.trim() || isNovaTyping}
+                  style={{
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    width: 34,
+                    height: 34,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: !novaInput.trim() || isNovaTyping ? 'not-allowed' : 'pointer',
+                    opacity: !novaInput.trim() || isNovaTyping ? 0.6 : 1,
+                  }}
+                >
+                  <Send size={15} />
+                </button>
+              </form>
+            </div>
+          ) : isNovaCardMinimized ? (
+            <button
+              onClick={() => setIsNovaCardMinimized(false)}
+              aria-label="Open Nova AI"
+              style={{
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                color: '#ffffff',
+                borderRadius: '999px',
+                padding: '0.65rem 1.15rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 8px 24px rgba(79, 70, 229, 0.35)',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 12px 28px rgba(79, 70, 229, 0.45)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(79, 70, 229, 0.35)';
+              }}
+            >
+              <Sparkles size={16} />
+              <span>Meet Nova AI • {schoolName}</span>
+            </button>
+          ) : (
+            <div
+              style={{
+                width: '300px',
+                maxWidth: 'calc(100vw - 32px)',
+                background: 'linear-gradient(145deg, #ffffff 0%, #f5f7ff 100%)',
+                border: '1px solid #c7d2fe',
+                borderRadius: '16px',
+                boxShadow: '0 16px 40px -6px rgba(79, 70, 229, 0.28), 0 4px 12px rgba(0,0,0,0.08)',
+                overflow: 'hidden',
+                padding: '1rem',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(79, 70, 229, 0.25)'
+                  }}>
+                    <Sparkles size={16} color="#ffffff" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0, color: '#1e293b' }}>
+                      Meet Nova AI
+                    </h3>
+                    <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: 600 }}>
+                      SchoolCare Assistant
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{
+                    fontSize: '0.62rem', fontWeight: 700, background: '#e0e7ff',
+                    color: '#4338ca', padding: '2px 7px', borderRadius: '999px',
+                    border: '1px solid #c7d2fe'
+                  }}>
+                    Online
+                  </span>
+                  <button
+                    onClick={() => setIsNovaCardMinimized(true)}
+                    title="Minimize"
+                    style={{
+                      background: 'rgba(0,0,0,0.04)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      width: 22, height: 22,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Description */}
+              <p style={{
+                fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
+                margin: '0 0 0.85rem'
+              }}>
+                Your AI Teaching Assistant for <strong style={{ color: '#1e293b' }}>{schoolName}</strong>, powered by <strong style={{ color: '#4f46e5' }}>SchoolCare</strong> for smarter & faster teaching.
+              </p>
+
+              {/* Bot Icon */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.85rem' }}>
+                <div style={{
+                  width: 46, height: 46, borderRadius: '50%',
+                  background: '#ffffff',
+                  border: '2px solid #e0e7ff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.12)',
+                  position: 'relative'
+                }}>
+                  <MessageCircle size={24} color="#6366f1" fill="#eef2ff" />
+                  <span style={{
+                    position: 'absolute', bottom: 1, right: 1, width: 10, height: 10,
+                    borderRadius: '50%', background: '#10b981', border: '2px solid white'
+                  }} />
+                </div>
+              </div>
+
+              {/* Chat Button */}
+              <button
+                onClick={() => setIsNovaChatOpen(true)}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.65rem 1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+              >
+                <Sparkles size={14} /> Chat with Nova AI
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
 
       <style>{`
         @keyframes nd-spin { to { transform: rotate(360deg); } }

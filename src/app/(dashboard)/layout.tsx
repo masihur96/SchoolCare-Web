@@ -14,7 +14,7 @@ export default function DashboardLayout({
         <Sidebar />
         <div className="main-content">
           <Navbar />
-          <main className="page-content animate-fade-in">
+          <main className="page-content">
             {children}
           </main>
         </div>

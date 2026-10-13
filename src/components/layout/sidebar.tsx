@@ -140,17 +140,6 @@ export function Sidebar() {
 
         {/* Footer Area */}
         <div className="nd-sidebar-footer">
-          {/* AI Banner */}
-          {!isCollapsed && (
-            <div className="nd-ai-banner">
-              <p className="nd-ai-title">Meet Nova AI</p>
-              <p className="nd-ai-desc">Your AI Teaching Assistant for smarter & faster teaching.</p>
-              <div className="nd-ai-bot-icon">
-                <MessageCircle size={28} color="#6366f1" fill="#eef2ff" />
-              </div>
-              <button className="nd-ai-btn">Chat with Nova AI</button>
-            </div>
-          )}
 
           {/* Bottom Actions */}
           <div className="nd-bottom-actions" ref={profileRef} style={{ position: 'relative' }}>
