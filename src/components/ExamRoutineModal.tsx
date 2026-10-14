@@ -672,16 +672,20 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         }
       });
 
-      // Collect all subjects belonging to these relevant classes (in routine order)
-      interface ClassSubjectCol {
-        classId: string;
-        className: string;
-        subjectId: string;
+      // Collect all subjects belonging to these relevant classes (in routine order),
+      // merging same-named subjects across classes into a single column.
+      interface MergedSubjectCol {
         subjectName: string;
+        // All subjectIds that share this name (across different classes)
+        subjectIds: string[];
+        // All classNames that have this subject (for header label)
+        classNames: string[];
       }
 
-      const relevantCols: ClassSubjectCol[] = [];
       const isMultiClass = relevantClassIds.size > 1;
+
+      // Build ordered merged columns: one entry per unique subject name
+      const mergedColMap = new Map<string, MergedSubjectCol>();
 
       Array.from(relevantClassIds).forEach(classId => {
         const asgns = exam.assignments
@@ -690,27 +694,47 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         const className = asgns[0]?.class?.name || uniqueClasses.find(c => c.uuid === classId)?.name || 'Class';
 
         asgns.forEach(a => {
-          if (a.subject?.uuid && !relevantCols.some(c => c.subjectId === a.subject.uuid)) {
-            relevantCols.push({
-              classId,
-              className,
-              subjectId: a.subject.uuid,
-              subjectName: a.subject.name || 'Subject'
-            });
+          if (!a.subject?.uuid) return;
+          const sName = (a.subject.name || 'Subject').trim();
+          if (!mergedColMap.has(sName)) {
+            mergedColMap.set(sName, { subjectName: sName, subjectIds: [], classNames: [] });
           }
+          const col = mergedColMap.get(sName)!;
+          if (!col.subjectIds.includes(a.subject.uuid)) col.subjectIds.push(a.subject.uuid);
+          if (!col.classNames.includes(className)) col.classNames.push(className);
         });
       });
 
-      // Column header labels: full subject name (+ class suffix for multi-class)
-      const subjectHeaderLabels = relevantCols.map(col =>
-        isMultiClass ? `${col.subjectName}\n(${col.className})` : col.subjectName
-      );
+      const relevantCols: MergedSubjectCol[] = Array.from(mergedColMap.values());
+
+      // Determine all class names involved (for deciding header labels)
+      const allClassNames = Array.from(new Set(
+        Array.from(relevantClassIds).map(cid => {
+          const asgns = exam.assignments.filter(a => a.class?.uuid === cid);
+          return asgns[0]?.class?.name || uniqueClasses.find(c => c.uuid === cid)?.name || 'Class';
+        })
+      ));
+
+      // Column header labels:
+      // - Single class: just subject name
+      // - Multi-class, subject shared by all classes: just subject name
+      // - Multi-class, subject unique to some classes: "SubjectName\n(Class1, Class2)"
+      const subjectHeaderLabels = relevantCols.map(col => {
+        if (!isMultiClass) return col.subjectName;
+        if (col.classNames.length < allClassNames.length) {
+          return `${col.subjectName}\n(${col.classNames.join(', ')})`;
+        }
+        return col.subjectName;
+      });
 
       // ── Build per-student data ──────────────────────────────────────────────
       const studentData = students.map(st => {
         let totalObt = 0, totalMax = 0, hasAny = false;
         const markCells = relevantCols.map(col => {
-          const m = latestMarks.find((x: any) => x.studentId === st.id && x.subjectId === col.subjectId);
+          // Search across all subjectIds that belong to this merged column
+          const m = latestMarks.find((x: any) =>
+            x.studentId === st.id && col.subjectIds.includes(x.subjectId)
+          );
           if (m && m.marksObtained != null) {
             totalObt += Number(m.marksObtained);
             totalMax += Number(m.totalMarks);
@@ -763,7 +787,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       doc.setTextColor(147, 197, 253);
       doc.text('COMPREHENSIVE CLASS EXAMINATION RESULT SHEET', W / 2, 31, { align: 'center' });
 
-      const displayedClasses = Array.from(new Set(relevantCols.map(c => c.className))).join(', ') || selClass?.name || '—';
+      const displayedClasses = Array.from(new Set(relevantCols.flatMap(c => c.classNames))).join(', ') || selClass?.name || '—';
 
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
       doc.setTextColor(203, 213, 225);
