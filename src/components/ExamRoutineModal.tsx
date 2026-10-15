@@ -747,8 +747,34 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         return { st, markCells, totalObt, totalMax, pct, hasAny, passed: pct !== null && pct >= 33 };
       });
 
+      // ── Drop columns where NO student has any mark ──────────────────────────
+      // Find which column indices have at least one non-null mark
+      const activeColIndices = relevantCols
+        .map((_, ci) => ci)
+        .filter(ci => studentData.some(sd => sd.markCells[ci] !== null));
+
+      // Rebuild studentData with only the active columns, recalculating totals
+      const prunedStudentData = studentData.map(sd => {
+        let totalObt = 0, totalMax = 0, hasAny = false;
+        const markCells = activeColIndices.map(ci => {
+          const cell = sd.markCells[ci];
+          if (cell) {
+            totalObt += cell.obtained;
+            totalMax += cell.total;
+            hasAny = true;
+          }
+          return cell;
+        });
+        const pct = hasAny && totalMax > 0 ? (totalObt / totalMax) * 100 : null;
+        return { st: sd.st, markCells, totalObt, totalMax, pct, hasAny, passed: pct !== null && pct >= 33 };
+      });
+
+      // Update relevantCols and headers to only active columns
+      const activeRelevantCols   = activeColIndices.map(ci => relevantCols[ci]);
+      const activeHeaderLabels   = activeColIndices.map(ci => subjectHeaderLabels[ci]);
+
       // Sort for ranking
-      const sorted = [...studentData].sort((a, b) => {
+      const sorted = [...prunedStudentData].sort((a, b) => {
         if (!a.hasAny && !b.hasAny) return 0;
         if (!a.hasAny) return 1;
         if (!b.hasAny) return -1;
@@ -761,7 +787,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       });
 
       // ── Summary stats ───────────────────────────────────────────────────────
-      const withMarks  = studentData.filter(s => s.hasAny);
+      const withMarks  = prunedStudentData.filter(s => s.hasAny);
       const avgPct     = withMarks.length ? withMarks.reduce((a,b) => a + (b.pct??0), 0) / withMarks.length : 0;
       const highestPct = withMarks.length ? Math.max(...withMarks.map(s => s.pct??0)) : 0;
       const lowestPct  = withMarks.length ? Math.min(...withMarks.map(s => s.pct??0)) : 0;
@@ -769,7 +795,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       const passRate   = withMarks.length ? (passCount / withMarks.length) * 100 : 0;
 
       // ── Choose page format dynamically (A3 when many subjects) ─────────────
-      const useA3 = relevantCols.length > 9;
+      const useA3 = activeRelevantCols.length > 9;
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: useA3 ? 'a3' : 'a4' });
       const W   = doc.internal.pageSize.width;
       const H   = doc.internal.pageSize.height;
@@ -787,7 +813,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       doc.setTextColor(147, 197, 253);
       doc.text('COMPREHENSIVE CLASS EXAMINATION RESULT SHEET', W / 2, 31, { align: 'center' });
 
-      const displayedClasses = Array.from(new Set(relevantCols.flatMap(c => c.classNames))).join(', ') || selClass?.name || '—';
+      const displayedClasses = Array.from(new Set(activeRelevantCols.flatMap(c => c.classNames))).join(', ') || selClass?.name || '—';
 
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
       doc.setTextColor(203, 213, 225);
@@ -827,12 +853,12 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       y += cardH + 7;
 
       // ── RESULTS TABLE ───────────────────────────────────────────────────────
-      const numCols  = 3 + subjectHeaderLabels.length + 3;
+      const numCols  = 3 + activeHeaderLabels.length + 3;
       const gradeCI  = numCols - 1;
       const pctCI    = numCols - 2;
       const totalCI  = numCols - 3;
 
-      const tHead = ['Rank', 'Roll', 'Student Name', ...subjectHeaderLabels, 'Total', '%', 'Grade'];
+      const tHead = ['Rank', 'Roll', 'Student Name', ...activeHeaderLabels, 'Total', '%', 'Grade'];
       const tBody = ranked.map(row => {
         const subCells = row.markCells.map(m => m ? `${m.obtained}/${m.total}` : '—');
         return [
@@ -849,8 +875,8 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       // Dynamic subject column width — fills available space
       const fixedW      = 12 + 14 + 36 + 22 + 14 + 13;
       const availForSub = W - 28 - fixedW;
-      const subColW     = relevantCols.length > 0
-        ? Math.max(18, Math.min(30, availForSub / relevantCols.length))
+      const subColW     = activeRelevantCols.length > 0
+        ? Math.max(18, Math.min(30, availForSub / activeRelevantCols.length))
         : 22;
 
       const colStyles: Record<number, object> = {
@@ -861,7 +887,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         [pctCI]:   { halign: 'center', cellWidth: 14 },
         [gradeCI]: { halign: 'center', cellWidth: 13, fontStyle: 'bold' },
       };
-      for (let si = 0; si < relevantCols.length; si++) {
+      for (let si = 0; si < activeRelevantCols.length; si++) {
         colStyles[3 + si] = { halign: 'center', cellWidth: subColW };
       }
 
