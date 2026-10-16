@@ -319,7 +319,7 @@ export default function ClassesPage() {
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
     if (filteredAndSortedClasses.length === 0) return;
-    const headers = ['#', 'Class Name', 'Description', 'Sections', 'Subjects Count', 'Students Count'];
+    const headers = ['#', t('classes.className'), t('classes.descriptionLabel'), t('classes.totalSections'), t('classes.totalSubjects'), t('classes.assignedStudents')];
     const rows = filteredAndSortedClasses.map((c, i) => [
       (i + 1).toString(),
       `"${c.name.replace(/"/g, '""')}"`,
@@ -368,17 +368,17 @@ export default function ClassesPage() {
 
     doc.setFontSize(15);
     doc.setTextColor(50, 50, 50);
-    doc.text('Classes & Curriculum Report', 14, y);
+    doc.text(t('classes.curriculumReportTitle'), 14, y);
     y += 7;
 
     autoTable(doc, {
-      head: [['#', 'Class Name', 'Description', 'Sections', 'Subjects', 'Enrolled Students']],
+      head: [['#', t('classes.className'), t('classes.descriptionLabel'), t('classes.totalSections'), t('classes.totalSubjects'), t('classes.assignedStudents')]],
       body: filteredAndSortedClasses.map((c, i) => [
         (i + 1).toString(),
         c.name,
         c.description || '—',
-        c.sections.map((s) => s.name).join(', ') || 'None',
-        `${c.subjects.length} Subjects`,
+        c.sections.map((s) => s.name).join(', ') || t('students.none'),
+        `${c.subjects.length} ${c.subjects.length === 1 ? t('classes.subjectSingle') : t('classes.subjectPlural')}`,
         c.students.toString(),
       ]),
       startY: y,
@@ -389,7 +389,7 @@ export default function ClassesPage() {
         const pages = (doc.internal as any).getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${data.pageNumber} of ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+        doc.text(`${t('students.page')} ${data.pageNumber} ${t('students.of')} ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
       },
     });
@@ -411,10 +411,10 @@ export default function ClassesPage() {
         setNewClass({ name: '', description: '' });
         fetchData();
       } else {
-        alert('Failed to add class.');
+        alert(t('classes.failedToAddClass'));
       }
     } catch (err) {
-      alert('Error adding class.');
+      alert(t('classes.errorAddingClass'));
     } finally {
       setActionLoading(false);
     }
@@ -434,10 +434,10 @@ export default function ClassesPage() {
         setIsEditModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to update class.');
+        alert(t('classes.failedToUpdateClass'));
       }
     } catch (err) {
-      alert('Error updating class.');
+      alert(t('classes.errorUpdatingClass'));
     } finally {
       setActionLoading(false);
     }
@@ -455,10 +455,10 @@ export default function ClassesPage() {
         setIsDeleteModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to delete class.');
+        alert(t('classes.failedToDeleteClass'));
       }
     } catch (err) {
-      alert('Error deleting class.');
+      alert(t('classes.errorDeletingClass'));
     } finally {
       setActionLoading(false);
     }
@@ -479,10 +479,10 @@ export default function ClassesPage() {
         setNewSection({ name: '', classId: '' });
         fetchData();
       } else {
-        alert('Failed to add section.');
+        alert(t('classes.failedToAddSection'));
       }
     } catch (err) {
-      alert('Error adding section.');
+      alert(t('classes.errorAddingSection'));
     } finally {
       setActionLoading(false);
     }
@@ -502,10 +502,10 @@ export default function ClassesPage() {
         setIsEditSectionModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to update section.');
+        alert(t('classes.failedToUpdateSection'));
       }
     } catch (err) {
-      alert('Error updating section.');
+      alert(t('classes.errorUpdatingSection'));
     } finally {
       setActionLoading(false);
     }
@@ -523,10 +523,10 @@ export default function ClassesPage() {
         setIsDeleteSectionModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to delete section.');
+        alert(t('classes.failedToDeleteSection'));
       }
     } catch (err) {
-      alert('Error deleting section.');
+      alert(t('classes.errorDeletingSection'));
     } finally {
       setActionLoading(false);
     }
@@ -547,10 +547,10 @@ export default function ClassesPage() {
         setNewSubject({ name: '', code: '', classId: '' });
         fetchData();
       } else {
-        alert('Failed to add subject.');
+        alert(t('classes.failedToAddSubject'));
       }
     } catch (err) {
-      alert('Error adding subject.');
+      alert(t('classes.errorAddingSubject'));
     } finally {
       setActionLoading(false);
     }
@@ -570,10 +570,10 @@ export default function ClassesPage() {
         setIsEditSubjectModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to update subject.');
+        alert(t('classes.failedToUpdateSubject'));
       }
     } catch (err) {
-      alert('Error updating subject.');
+      alert(t('classes.errorUpdatingSubject'));
     } finally {
       setActionLoading(false);
     }
@@ -591,10 +591,10 @@ export default function ClassesPage() {
         setIsDeleteSubjectModalOpen(false);
         fetchData();
       } else {
-        alert('Failed to delete subject.');
+        alert(t('classes.failedToDeleteSubject'));
       }
     } catch (err) {
-      alert('Error deleting subject.');
+      alert(t('classes.errorDeletingSubject'));
     } finally {
       setActionLoading(false);
     }
@@ -635,13 +635,13 @@ export default function ClassesPage() {
       if (response.ok) {
         setIsAssignUserModalOpen(false);
         fetchStudentsList();
-        alert('Student successfully assigned!');
+        alert(t('classes.studentAssignedSuccess'));
       } else {
         const err = await response.json();
-        alert(`Failed to assign student: ${err.message || 'Unknown'}`);
+        alert(`${t('classes.failedToAssignStudent')}: ${err.message || 'Unknown'}`);
       }
     } catch (e: any) {
-      alert(`Error assigning student: ${e.message}`);
+      alert(`${t('classes.errorAssigningStudent')}: ${e.message}`);
     } finally {
       setAssignActionLoading(false);
     }
@@ -680,13 +680,13 @@ export default function ClassesPage() {
       if (response.ok) {
         setIsAssignTeacherModalOpen(false);
         fetchStudentsList();
-        alert('Teacher successfully assigned!');
+        alert(t('classes.teacherAssignedSuccess'));
       } else {
         const err = await response.json();
-        alert(`Failed to assign teacher: ${err.message || 'Unknown'}`);
+        alert(`${t('classes.failedToAssignTeacher')}: ${err.message || 'Unknown'}`);
       }
     } catch (e: any) {
-      alert(`Error assigning teacher: ${e.message}`);
+      alert(`${t('classes.errorAssigningTeacher')}: ${e.message}`);
     } finally {
       setAssignActionLoading(false);
     }
@@ -707,10 +707,10 @@ export default function ClassesPage() {
           }}
         >
           {[
-            { label: 'Total Classes', value: summaryMetrics.totalClasses, color: 'var(--primary)', icon: <BookOpen size={16} /> },
-            { label: 'Total Sections', value: summaryMetrics.totalSections, color: '#10b981', icon: <Layers size={16} /> },
-            { label: 'Total Subjects', value: summaryMetrics.totalSubjects, color: '#8b5cf6', icon: <GraduationCap size={16} /> },
-            { label: 'Assigned Students', value: summaryMetrics.totalStudents, color: '#f59e0b', icon: <Users size={16} /> },
+            { label: t('classes.totalClasses'), value: summaryMetrics.totalClasses, color: 'var(--primary)', icon: <BookOpen size={16} /> },
+            { label: t('classes.totalSections'), value: summaryMetrics.totalSections, color: '#10b981', icon: <Layers size={16} /> },
+            { label: t('classes.totalSubjects'), value: summaryMetrics.totalSubjects, color: '#8b5cf6', icon: <GraduationCap size={16} /> },
+            { label: t('classes.assignedStudents'), value: summaryMetrics.totalStudents, color: '#f59e0b', icon: <Users size={16} /> },
           ].map((s) => (
             <div
               key={s.label}
@@ -776,7 +776,7 @@ export default function ClassesPage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search class name, section, or subject..."
+                  placeholder={t('classes.searchPlaceholder')}
                   style={{
                     border: 'none',
                     outline: 'none',
@@ -826,7 +826,7 @@ export default function ClassesPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('students.filters')}</span>
                 {activeFiltersCount > 0 && (
                   <span
                     style={{
@@ -866,7 +866,7 @@ export default function ClassesPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('common.export')}</span>
                   <ChevronDown
                     size={14}
                     style={{
@@ -896,8 +896,8 @@ export default function ClassesPage() {
                     }}
                   >
                     {[
-                      { label: 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
-                      { label: 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
+                      { label: t('students.exportCsv'), icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
+                      { label: t('students.exportPdf'), icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
                     ].map((item) => (
                       <button
                         key={item.label}
@@ -948,7 +948,7 @@ export default function ClassesPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Add Section</span>
+                <span>{t('classes.addSection')}</span>
               </button>
 
               {/* Add Subject Button */}
@@ -970,7 +970,7 @@ export default function ClassesPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Add Subject</span>
+                <span>{t('classes.addSubject')}</span>
               </button>
 
               {/* Add Class Button */}
@@ -990,7 +990,7 @@ export default function ClassesPage() {
                 }}
               >
                 <Plus size={18} />
-                <span>Add Class</span>
+                <span>{t('classes.addClass')}</span>
               </button>
 
               {/* Refresh Button */}
@@ -1000,7 +1000,7 @@ export default function ClassesPage() {
                   fetchData();
                   fetchStudentsList();
                 }}
-                title="Refresh"
+                title={t('common.refresh')}
                 style={{
                   height: '42px',
                   width: '42px',
@@ -1030,7 +1030,7 @@ export default function ClassesPage() {
                   background: 'var(--background)',
                 }}
               >
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('students.show')}</span>
                 <select
                   value={limit}
                   onChange={(e) => {
@@ -1065,7 +1065,7 @@ export default function ClassesPage() {
                     textDecoration: 'underline',
                   }}
                 >
-                  Clear all
+                  {t('students.clearAll')}
                 </button>
               )}
             </div>
@@ -1088,7 +1088,7 @@ export default function ClassesPage() {
               {/* Filter by Sections */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Filter by Section Status
+                  {t('classes.filterBySectionStatus')}
                 </label>
                 <select
                   className="input"
@@ -1099,16 +1099,16 @@ export default function ClassesPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="all">All Classes</option>
-                  <option value="with-sections">Has Assigned Sections</option>
-                  <option value="without-sections">No Sections Yet</option>
+                  <option value="all">{t('common.allClasses')}</option>
+                  <option value="with-sections">{t('classes.hasSections')}</option>
+                  <option value="without-sections">{t('classes.noSectionsYet')}</option>
                 </select>
               </div>
 
               {/* Sort Order */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Sort Order
+                  {t('classes.sortOrder')}
                 </label>
                 <select
                   className="input"
@@ -1119,10 +1119,10 @@ export default function ClassesPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="name-asc">Name: A → Z</option>
-                  <option value="name-desc">Name: Z → A</option>
-                  <option value="students-desc">Most Students</option>
-                  <option value="sections-desc">Most Sections</option>
+                  <option value="name-asc">{t('classes.nameAsc')}</option>
+                  <option value="name-desc">{t('classes.nameDesc')}</option>
+                  <option value="students-desc">{t('classes.mostStudents')}</option>
+                  <option value="sections-desc">{t('classes.mostSections')}</option>
                 </select>
               </div>
             </div>
@@ -1136,11 +1136,11 @@ export default function ClassesPage() {
               <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                 {[
                   { label: '#', w: '52px' },
-                  { label: 'Class & Details' },
-                  { label: 'Sections' },
-                  { label: 'Subjects', w: '160px' },
-                  { label: 'Students', w: '140px' },
-                  { label: 'Actions', w: '140px', align: 'right' as const },
+                  { label: t('classes.classAndDetails') },
+                  { label: t('classes.totalSections') },
+                  { label: t('classes.totalSubjects'), w: '160px' },
+                  { label: t('classes.assignedStudents'), w: '140px' },
+                  { label: t('common.actions'), w: '140px', align: 'right' as const },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -1246,7 +1246,7 @@ export default function ClassesPage() {
                                 setViewingClass(c);
                                 setIsViewModalOpen(true);
                               }}
-                              title="Click to view full class overview"
+                              title={t('classes.viewOverview')}
                             >
                               {c.name}
                             </span>
@@ -1256,7 +1256,7 @@ export default function ClassesPage() {
                               </span>
                             ) : (
                               <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
-                                No description
+                                {t('classes.noDescription')}
                               </span>
                             )}
                           </div>
@@ -1305,7 +1305,7 @@ export default function ClassesPage() {
                                 gap: '0.3rem',
                               }}
                             >
-                              <Plus size={12} /> Add section
+                              <Plus size={12} /> {t('classes.addSectionShort')}
                             </button>
                           )}
                         </div>
@@ -1319,7 +1319,7 @@ export default function ClassesPage() {
                             {c.subjects.length}
                           </span>
                           <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                            {c.subjects.length === 1 ? 'subject' : 'subjects'}
+                            {c.subjects.length === 1 ? t('classes.subjectSingle') : t('classes.subjectPlural')}
                           </span>
                         </div>
                       </td>
@@ -1332,7 +1332,7 @@ export default function ClassesPage() {
                             {c.students}
                           </span>
                           <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                            {c.students === 1 ? 'student' : 'students'}
+                            {c.students === 1 ? t('classes.studentSingle') : t('classes.studentPlural')}
                           </span>
                         </div>
                       </td>
@@ -1342,7 +1342,7 @@ export default function ClassesPage() {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           <button
                             className="action-btn"
-                            title="View Class Overview & Manage"
+                            title={t('classes.viewClassTooltip')}
                             onClick={() => {
                               setViewingClass(c);
                               setIsViewModalOpen(true);
@@ -1364,7 +1364,7 @@ export default function ClassesPage() {
                           </button>
                           <button
                             className="action-btn"
-                            title="Edit Class"
+                            title={t('classes.editClassTooltip')}
                             onClick={() => {
                               setEditingClass({ id: c.id, name: c.name, description: c.description });
                               setIsEditModalOpen(true);
@@ -1386,7 +1386,7 @@ export default function ClassesPage() {
                           </button>
                           <button
                             className="action-btn"
-                            title="Delete Class"
+                            title={t('classes.deleteClassTooltip')}
                             onClick={() => {
                               setDeletingClassId(c.id);
                               setIsDeleteModalOpen(true);
@@ -1430,12 +1430,12 @@ export default function ClassesPage() {
                         <Layers size={28} />
                       </div>
                       <p style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                        {t('classes.noClasses') || 'No classes found'}
+                        {t('classes.noClasses')}
                       </p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {activeFiltersCount > 0
-                          ? 'Try adjusting your search query or reset your filters.'
-                          : 'No classes have been created yet. Click "Add Class" to start building your school curriculum.'}
+                          ? t('classes.tryAdjusting')
+                          : t('classes.noClassesYet')}
                       </p>
                       {activeFiltersCount > 0 && (
                         <button
@@ -1448,7 +1448,7 @@ export default function ClassesPage() {
                             fontSize: '0.85rem',
                           }}
                         >
-                          Clear Filters
+                          {t('students.clearFilters')}
                         </button>
                       )}
                     </div>
@@ -1474,14 +1474,14 @@ export default function ClassesPage() {
             }}
           >
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> classes
+              {t('students.showing')} <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> {t('students.to')}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> {t('students.of')}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> {t('classes.classesCount')}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('students.page')} {page} {t('students.of')} {totalPages}
               </span>
 
               <button
@@ -1496,7 +1496,7 @@ export default function ClassesPage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('students.prevPage')}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1513,7 +1513,7 @@ export default function ClassesPage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('students.nextPage')}
               >
                 <ChevronRight size={16} />
               </button>
@@ -1580,10 +1580,10 @@ export default function ClassesPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                    {viewingClass.name} — Curriculum Overview
+                    {viewingClass.name} — {t('classes.curriculumOverview')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
-                    Manage sections, subjects, and member assignments
+                    {t('classes.manageCurriculumSub')}
                   </p>
                 </div>
               </div>
@@ -1611,7 +1611,7 @@ export default function ClassesPage() {
             <div style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {viewingClass.description && (
                 <div style={{ padding: '0.85rem 1rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Description</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{t('classes.descriptionLabel')}</span>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--foreground)' }}>{viewingClass.description}</p>
                 </div>
               )}
@@ -1631,7 +1631,7 @@ export default function ClassesPage() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
-                      <Layers size={16} style={{ color: 'var(--primary)' }} /> Sections ({viewingClass.sections.length})
+                      <Layers size={16} style={{ color: 'var(--primary)' }} /> {t('classes.totalSections')} ({viewingClass.sections.length})
                     </h4>
                     <button
                       className="btn btn-primary"
@@ -1641,7 +1641,7 @@ export default function ClassesPage() {
                       }}
                       style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                     >
-                      <Plus size={13} /> Add
+                      <Plus size={13} /> {t('common.add')}
                     </button>
                   </div>
 
@@ -1666,7 +1666,7 @@ export default function ClassesPage() {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 700, color: 'var(--foreground)' }}>Section {s.name}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--foreground)' }}>{t('common.section')} {s.name}</span>
                               <div style={{ display: 'flex', gap: '0.35rem' }}>
                                 <button
                                   onClick={() => {
@@ -1674,7 +1674,7 @@ export default function ClassesPage() {
                                     setIsAssignUserModalOpen(true);
                                   }}
                                   style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
-                                  title="Assign Student"
+                                  title={t('classes.assignStudent')}
                                 >
                                   <UserPlus size={15} />
                                 </button>
@@ -1684,7 +1684,7 @@ export default function ClassesPage() {
                                     setIsAssignTeacherModalOpen(true);
                                   }}
                                   style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
-                                  title="Assign Teacher"
+                                  title={t('classes.assignTeacher')}
                                 >
                                   <UserCog size={15} />
                                 </button>
@@ -1694,7 +1694,7 @@ export default function ClassesPage() {
                                     setIsEditSectionModalOpen(true);
                                   }}
                                   style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}
-                                  title="Edit Section"
+                                  title={t('classes.editSection')}
                                 >
                                   <Edit3 size={15} />
                                 </button>
@@ -1704,7 +1704,7 @@ export default function ClassesPage() {
                                     setIsDeleteSectionModalOpen(true);
                                   }}
                                   style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}
-                                  title="Delete Section"
+                                  title={t('classes.deleteSection')}
                                 >
                                   <Trash2 size={15} />
                                 </button>
@@ -1715,14 +1715,14 @@ export default function ClassesPage() {
                               <div style={{ paddingTop: '0.4rem', borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                 {assignedTeachers.length > 0 && (
                                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                                    <strong style={{ color: 'var(--foreground)' }}>Teachers:</strong> {assignedTeachers.map((t) => t.name).join(', ')}
+                                    <strong style={{ color: 'var(--foreground)' }}>{t('classes.teachersLabel')}:</strong> {assignedTeachers.map((t) => t.name).join(', ')}
                                   </div>
                                 )}
                                 {assignedStudents.length > 0 && (
                                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                                    <strong style={{ color: 'var(--foreground)' }}>Students ({assignedStudents.length}):</strong>{' '}
+                                    <strong style={{ color: 'var(--foreground)' }}>{t('classes.studentsLabel')} ({assignedStudents.length}):</strong>{' '}
                                     {assignedStudents.slice(0, 3).map((st) => st.name).join(', ')}
-                                    {assignedStudents.length > 3 ? ` +${assignedStudents.length - 3} more` : ''}
+                                    {assignedStudents.length > 3 ? ` +${assignedStudents.length - 3} ${t('classes.moreCount')}` : ''}
                                   </div>
                                 )}
                               </div>
@@ -1732,7 +1732,7 @@ export default function ClassesPage() {
                       })
                     ) : (
                       <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', margin: 0, padding: '0.5rem 0' }}>
-                        No sections created for this class yet.
+                        {t('classes.noSectionsInClass')}
                       </p>
                     )}
                   </ul>
@@ -1752,7 +1752,7 @@ export default function ClassesPage() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
-                      <BookOpen size={16} style={{ color: 'var(--primary)' }} /> Subjects ({viewingClass.subjects.length})
+                      <BookOpen size={16} style={{ color: 'var(--primary)' }} /> {t('classes.totalSubjects')} ({viewingClass.subjects.length})
                     </h4>
                     <button
                       className="btn btn-primary"
@@ -1762,7 +1762,7 @@ export default function ClassesPage() {
                       }}
                       style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                     >
-                      <Plus size={13} /> Add
+                      <Plus size={13} /> {t('common.add')}
                     </button>
                   </div>
 
@@ -1795,6 +1795,7 @@ export default function ClassesPage() {
                                   fontWeight: 700,
                                   fontFamily: 'monospace',
                                   marginRight: '0.45rem',
+                                  verticalAlign: 'middle',
                                 }}
                               >
                                 {sub.code}
@@ -1809,7 +1810,7 @@ export default function ClassesPage() {
                                 setIsEditSubjectModalOpen(true);
                               }}
                               style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}
-                              title="Edit Subject"
+                              title={t('classes.editSubject')}
                             >
                               <Edit3 size={15} />
                             </button>
@@ -1819,7 +1820,7 @@ export default function ClassesPage() {
                                 setIsDeleteSubjectModalOpen(true);
                               }}
                               style={{ padding: '0.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}
-                              title="Delete Subject"
+                              title={t('classes.deleteSubject')}
                             >
                               <Trash2 size={15} />
                             </button>
@@ -1828,7 +1829,7 @@ export default function ClassesPage() {
                       ))
                     ) : (
                       <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', margin: 0, padding: '0.5rem 0' }}>
-                        No subjects assigned to this class yet.
+                        {t('classes.noSubjectsInClass')}
                       </p>
                     )}
                   </ul>
@@ -1844,18 +1845,18 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Add New Class</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.addClassModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsAddClassModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddClass} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Class Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.className')}</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. Grade 10 or Class 1"
+                  placeholder={t('classes.classNamePlaceholder')}
                   value={newClass.name}
                   onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
                   required
@@ -1864,11 +1865,11 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Description (Optional)</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.descriptionOptional')}</label>
                 <textarea
                   className="input"
                   style={{ minHeight: '80px', padding: '0.75rem', resize: 'vertical', borderRadius: '0.5rem' }}
-                  placeholder="Additional details about this class curriculum..."
+                  placeholder={t('classes.descriptionPlaceholder')}
                   value={newClass.description}
                   onChange={(e) => setNewClass({ ...newClass, description: e.target.value })}
                   disabled={actionLoading}
@@ -1876,11 +1877,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAddClassModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Create Class
+                  {t('classes.createClassBtn')}
                 </button>
               </div>
             </form>
@@ -1893,18 +1894,18 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Add New Section</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.addSectionModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsAddSectionModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddSection} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Section Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.sectionName')}</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. A, B, Rose, or Science"
+                  placeholder={t('classes.sectionNamePlaceholder')}
                   value={newSection.name}
                   onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
                   required
@@ -1913,7 +1914,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Assign to Class</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.assignToClass')}</label>
                 <select
                   className="input"
                   value={newSection.classId}
@@ -1922,7 +1923,7 @@ export default function ClassesPage() {
                   disabled={actionLoading}
                   style={{ height: '40px', borderRadius: '0.5rem' }}
                 >
-                  <option value="" disabled>-- Choose a Class --</option>
+                  <option value="" disabled>{t('classes.chooseClass')}</option>
                   {classesData.map((cls) => (
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
@@ -1930,11 +1931,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAddSectionModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Add Section
+                  {t('classes.addSectionBtn')}
                 </button>
               </div>
             </form>
@@ -1947,18 +1948,18 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Add New Subject</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.addSubjectModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsAddSubjectModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAddSubject} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Subject Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.subjectName')}</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. Mathematics, English, Physics"
+                  placeholder={t('classes.subjectNamePlaceholder')}
                   value={newSubject.name}
                   onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
                   required
@@ -1967,11 +1968,11 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Subject Code (Optional)</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.subjectCodeOptional')}</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. MATH101, ENG01"
+                  placeholder={t('classes.subjectCodePlaceholder')}
                   value={newSubject.code}
                   onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
                   disabled={actionLoading}
@@ -1979,7 +1980,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Assign to Class</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.assignToClass')}</label>
                 <select
                   className="input"
                   value={newSubject.classId}
@@ -1988,7 +1989,7 @@ export default function ClassesPage() {
                   disabled={actionLoading}
                   style={{ height: '40px', borderRadius: '0.5rem' }}
                 >
-                  <option value="" disabled>-- Choose a Class --</option>
+                  <option value="" disabled>{t('classes.chooseClass')}</option>
                   {classesData.map((cls) => (
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
@@ -1996,11 +1997,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAddSubjectModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Add Subject
+                  {t('classes.addSubjectBtn')}
                 </button>
               </div>
             </form>
@@ -2013,14 +2014,14 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Edit Class</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.editClassModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsEditModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleEditSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Class Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.className')}</label>
                 <input
                   type="text"
                   className="input"
@@ -2032,7 +2033,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Description</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.descriptionLabel')}</label>
                 <textarea
                   className="input"
                   style={{ minHeight: '80px', padding: '0.75rem', resize: 'vertical', borderRadius: '0.5rem' }}
@@ -2043,11 +2044,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsEditModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Save Changes
+                  {t('common.saveChanges')}
                 </button>
               </div>
             </form>
@@ -2060,14 +2061,14 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 130, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Edit Section</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.editSectionModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsEditSectionModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleEditSectionSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Section Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.sectionName')}</label>
                 <input
                   type="text"
                   className="input"
@@ -2079,7 +2080,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Class</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('common.class')}</label>
                 <select
                   className="input"
                   value={editingSection.classId || ''}
@@ -2095,11 +2096,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsEditSectionModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Save Section
+                  {t('classes.saveSectionBtn')}
                 </button>
               </div>
             </form>
@@ -2112,14 +2113,14 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 130, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Edit Subject</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.editSubjectModalTitle')}</h2>
               <button className="action-btn" onClick={() => setIsEditSubjectModalOpen(false)} disabled={actionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleEditSubjectSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Subject Name</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.subjectName')}</label>
                 <input
                   type="text"
                   className="input"
@@ -2131,7 +2132,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Subject Code</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.subjectCode')}</label>
                 <input
                   type="text"
                   className="input"
@@ -2142,7 +2143,7 @@ export default function ClassesPage() {
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Class</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('common.class')}</label>
                 <select
                   className="input"
                   value={editingSubject.classId || ''}
@@ -2158,11 +2159,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsEditSubjectModalOpen(false)} disabled={actionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Save Subject
+                  {t('classes.saveSubjectBtn')}
                 </button>
               </div>
             </form>
@@ -2178,17 +2179,17 @@ export default function ClassesPage() {
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
                 <Trash2 size={26} />
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Delete Class</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>{t('classes.deleteClassHeading')}</h2>
               <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
-                Are you sure you want to delete this class? All associated sections and curriculum items may be affected.
+                {t('classes.deleteClassConfirm')}
               </p>
             </div>
             <div style={{ padding: '1.25rem 1.5rem', background: 'var(--background)', display: 'flex', gap: '0.75rem', borderTop: '1px solid var(--border)' }}>
               <button className="btn" style={{ flex: 1, border: '1px solid var(--border)' }} onClick={() => setIsDeleteModalOpen(false)} disabled={actionLoading}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn" style={{ flex: 1, background: '#ef4444', color: 'white' }} onClick={handleDeleteConfirm} disabled={actionLoading}>
-                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} Confirm Delete
+                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} {t('classes.confirmDelete')}
               </button>
             </div>
           </div>
@@ -2202,17 +2203,17 @@ export default function ClassesPage() {
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
                 <Trash2 size={26} />
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Delete Section</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>{t('classes.deleteSectionHeading')}</h2>
               <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-                Are you sure you want to delete this section?
+                {t('classes.deleteSectionConfirm')}
               </p>
             </div>
             <div style={{ padding: '1.25rem 1.5rem', background: 'var(--background)', display: 'flex', gap: '0.75rem', borderTop: '1px solid var(--border)' }}>
               <button className="btn" style={{ flex: 1, border: '1px solid var(--border)' }} onClick={() => setIsDeleteSectionModalOpen(false)} disabled={actionLoading}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn" style={{ flex: 1, background: '#ef4444', color: 'white' }} onClick={handleDeleteSectionConfirm} disabled={actionLoading}>
-                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} Confirm Delete
+                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} {t('classes.confirmDelete')}
               </button>
             </div>
           </div>
@@ -2226,17 +2227,17 @@ export default function ClassesPage() {
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
                 <Trash2 size={26} />
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Delete Subject</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>{t('classes.deleteSubjectHeading')}</h2>
               <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-                Are you sure you want to delete this subject?
+                {t('classes.deleteSubjectConfirm')}
               </p>
             </div>
             <div style={{ padding: '1.25rem 1.5rem', background: 'var(--background)', display: 'flex', gap: '0.75rem', borderTop: '1px solid var(--border)' }}>
               <button className="btn" style={{ flex: 1, border: '1px solid var(--border)' }} onClick={() => setIsDeleteSubjectModalOpen(false)} disabled={actionLoading}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn" style={{ flex: 1, background: '#ef4444', color: 'white' }} onClick={handleDeleteSubjectConfirm} disabled={actionLoading}>
-                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} Confirm Delete
+                {actionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />} {t('classes.confirmDelete')}
               </button>
             </div>
           </div>
@@ -2248,14 +2249,14 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 130, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Assign Student to Section</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.assignStudentTitle')}</h2>
               <button className="action-btn" onClick={() => setIsAssignUserModalOpen(false)} disabled={assignActionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAssignStudentSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Select Student</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.selectStudent')}</label>
                 <select
                   className="input"
                   value={assignUserForm.userId}
@@ -2264,18 +2265,18 @@ export default function ClassesPage() {
                   disabled={assignActionLoading}
                   style={{ height: '40px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">-- Choose Student --</option>
+                  <option value="">{t('classes.chooseStudent')}</option>
                   {studentsList.map((st: any) => (
                     <option key={st.id} value={st.id}>{st.name} {st.email ? `(${st.email})` : ''}</option>
                   ))}
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Roll Number</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.rollNumber')}</label>
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. 101"
+                  placeholder={t('classes.rollNumberPlaceholder')}
                   value={assignUserForm.rollNumber}
                   onChange={(e) => setAssignUserForm({ ...assignUserForm, rollNumber: e.target.value })}
                   required
@@ -2285,11 +2286,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAssignUserModalOpen(false)} disabled={assignActionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={assignActionLoading}>
                   {assignActionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Assign Student
+                  {t('classes.assignStudentBtn')}
                 </button>
               </div>
             </form>
@@ -2302,14 +2303,14 @@ export default function ClassesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 130, padding: '1rem' }}>
           <div className="glass-card animate-fade-in" style={{ background: 'var(--card)', width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Assign Teacher to Section</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{t('classes.assignTeacherTitle')}</h2>
               <button className="action-btn" onClick={() => setIsAssignTeacherModalOpen(false)} disabled={assignActionLoading} style={{ borderRadius: '50%', width: 32, height: 32 }}>
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleAssignTeacherSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Select Teacher</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('classes.selectTeacher')}</label>
                 <select
                   className="input"
                   value={assignTeacherForm.userId}
@@ -2318,7 +2319,7 @@ export default function ClassesPage() {
                   disabled={assignActionLoading}
                   style={{ height: '40px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">-- Choose Teacher --</option>
+                  <option value="">{t('classes.chooseTeacher')}</option>
                   {teachersList.map((st: any) => (
                     <option key={st.id} value={st.id}>{st.name} {st.designation ? `(${st.designation})` : ''}</option>
                   ))}
@@ -2326,11 +2327,11 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn" style={{ border: '1px solid var(--border)' }} onClick={() => setIsAssignTeacherModalOpen(false)} disabled={assignActionLoading}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={assignActionLoading}>
                   {assignActionLoading && <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />}
-                  Assign Teacher
+                  {t('classes.assignTeacherBtn')}
                 </button>
               </div>
             </form>

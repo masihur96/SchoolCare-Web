@@ -50,7 +50,7 @@ interface Exam {
 type StatusCategory = 'in-progress' | 'completed' | 'upcoming' | 'draft';
 
 export default function ExamsPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [exams, setExams] = useState<Exam[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolEntity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +159,7 @@ export default function ExamsPage() {
     if (!exam.isPublished) {
       return {
         category: 'draft',
-        label: 'Draft',
+        label: t('exams.status.draft') || 'Draft',
         bg: 'rgba(107, 114, 128, 0.1)',
         color: '#6b7280',
         border: 'rgba(107, 114, 128, 0.25)',
@@ -171,7 +171,7 @@ export default function ExamsPage() {
     if (!exam.start_date || !exam.end_date) {
       return {
         category: 'upcoming',
-        label: 'Dates TBA',
+        label: t('exams.status.datesTba') || 'Dates TBA',
         bg: 'rgba(245, 158, 11, 0.1)',
         color: '#f59e0b',
         border: 'rgba(245, 158, 11, 0.25)',
@@ -187,7 +187,7 @@ export default function ExamsPage() {
     if (today > end) {
       return {
         category: 'completed',
-        label: 'Completed',
+        label: t('exams.status.completed') || 'Completed',
         bg: 'rgba(79, 70, 229, 0.1)',
         color: '#4f46e5',
         border: 'rgba(79, 70, 229, 0.25)',
@@ -197,7 +197,7 @@ export default function ExamsPage() {
     } else if (today >= start && today <= end) {
       return {
         category: 'in-progress',
-        label: 'In Progress',
+        label: t('exams.status.inProgress') || 'In Progress',
         bg: 'rgba(16, 185, 129, 0.1)',
         color: '#10b981',
         border: 'rgba(16, 185, 129, 0.25)',
@@ -206,9 +206,11 @@ export default function ExamsPage() {
       };
     } else {
       const diffDays = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+      const daysStr = language === 'bn' ? diffDays.toLocaleString('bn-BD') : diffDays.toString();
+      const startsInLabel = (t('exams.status.startsInDays') || 'Starts in {days} days').replace('{days}', daysStr);
       return {
         category: 'upcoming',
-        label: diffDays === 1 ? 'Starts Tomorrow' : `Starts in ${diffDays} days`,
+        label: diffDays === 1 ? (t('exams.status.startsTomorrow') || 'Starts Tomorrow') : startsInLabel,
         bg: 'rgba(245, 158, 11, 0.1)',
         color: '#f59e0b',
         border: 'rgba(245, 158, 11, 0.25)',
@@ -222,7 +224,7 @@ export default function ExamsPage() {
     if (!dateString) return '—';
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return dateString;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -337,7 +339,8 @@ export default function ExamsPage() {
 
   // Delete Exam Handler
   const handleDeleteExam = async (examId: string, examName: string) => {
-    if (!confirm(`Are you sure you want to delete "${examName}"? All associated routine items and student grades will be permanently deleted.`)) return;
+    const confirmMsg = (t('exams.deleteConfirm') || 'Are you sure you want to delete "{name}"? All associated routine items and student grades will be permanently deleted.').replace('{name}', examName);
+    if (!confirm(confirmMsg)) return;
 
     try {
       const res = await fetch(`${API_BASE_URL}/admin/exams/${examId}`, {
@@ -352,11 +355,11 @@ export default function ExamsPage() {
         fetchExams();
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Failed to delete exam: ${err.message || 'Unknown error'}`);
+        alert(`${t('exams.deleteFailed') || 'Failed to delete exam:'} ${err.message || 'Unknown error'}`);
       }
     } catch (e) {
       console.error(e);
-      alert('Error deleting exam.');
+      alert(t('exams.deleteError') || 'Error deleting exam.');
     }
   };
 
@@ -482,10 +485,10 @@ export default function ExamsPage() {
           }}
         >
           {[
-            { label: 'Total Assessments', value: summaryMetrics.total, color: 'var(--primary)', icon: <Award size={16} /> },
-            { label: 'In Progress', value: summaryMetrics.inProgress, color: '#10b981', icon: <Activity size={16} /> },
-            { label: 'Completed', value: summaryMetrics.completed, color: '#4f46e5', icon: <CheckCircle2 size={16} /> },
-            { label: 'Upcoming / Draft', value: summaryMetrics.upcomingOrDraft, color: '#f59e0b', icon: <Calendar size={16} /> },
+            { label: t('exams.stats.totalAssessments') || 'Total Assessments', value: language === 'bn' ? summaryMetrics.total.toLocaleString('bn-BD') : summaryMetrics.total, color: 'var(--primary)', icon: <Award size={16} /> },
+            { label: t('exams.stats.inProgress') || 'In Progress', value: language === 'bn' ? summaryMetrics.inProgress.toLocaleString('bn-BD') : summaryMetrics.inProgress, color: '#10b981', icon: <Activity size={16} /> },
+            { label: t('exams.stats.completed') || 'Completed', value: language === 'bn' ? summaryMetrics.completed.toLocaleString('bn-BD') : summaryMetrics.completed, color: '#4f46e5', icon: <CheckCircle2 size={16} /> },
+            { label: t('exams.stats.upcomingDraft') || 'Upcoming / Draft', value: language === 'bn' ? summaryMetrics.upcomingOrDraft.toLocaleString('bn-BD') : summaryMetrics.upcomingOrDraft, color: '#f59e0b', icon: <Calendar size={16} /> },
           ].map((s) => (
             <div
               key={s.label}
@@ -551,7 +554,7 @@ export default function ExamsPage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search exam name, subject, or class..."
+                  placeholder={t('exams.searchPlaceholder') || 'Search exam name, subject, or class...'}
                   style={{
                     border: 'none',
                     outline: 'none',
@@ -611,10 +614,10 @@ export default function ExamsPage() {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
-                  title="Table View"
+                  title={t('exams.view.table') || 'Table View'}
                 >
                   <TableIcon size={15} />
-                  <span>Table</span>
+                  <span>{t('exams.view.table') || 'Table'}</span>
                 </button>
                 <button
                   onClick={() => setViewMode('grid')}
@@ -633,10 +636,10 @@ export default function ExamsPage() {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
-                  title="Cards View"
+                  title={t('exams.view.cards') || 'Cards View'}
                 >
                   <LayoutGrid size={15} />
-                  <span>Cards</span>
+                  <span>{t('exams.view.cards') || 'Cards'}</span>
                 </button>
               </div>
 
@@ -659,7 +662,7 @@ export default function ExamsPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('exams.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span
                     style={{
@@ -671,7 +674,7 @@ export default function ExamsPage() {
                       fontWeight: 700,
                     }}
                   >
-                    {activeFiltersCount}
+                    {language === 'bn' ? activeFiltersCount.toLocaleString('bn-BD') : activeFiltersCount}
                   </span>
                 )}
               </button>
@@ -699,7 +702,7 @@ export default function ExamsPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('exams.export') || 'Export'}</span>
                   <ChevronDown
                     size={14}
                     style={{
@@ -729,8 +732,8 @@ export default function ExamsPage() {
                     }}
                   >
                     {[
-                      { label: 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
-                      { label: 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
+                      { label: t('exams.exportCSV') || 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
+                      { label: t('exams.exportPDF') || 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
                     ].map((item) => (
                       <button
                         key={item.label}
@@ -782,14 +785,14 @@ export default function ExamsPage() {
                 }}
               >
                 <Plus size={18} />
-                <span>Create Exam</span>
+                <span>{t('exams.createExam') || 'Create Exam'}</span>
               </button>
 
               {/* Refresh Button */}
               <button
                 className="btn"
                 onClick={fetchExams}
-                title="Refresh"
+                title={t('exams.refresh') || 'Refresh'}
                 style={{
                   height: '42px',
                   width: '42px',
@@ -820,7 +823,9 @@ export default function ExamsPage() {
                     background: 'var(--background)',
                   }}
                 >
-                  <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                  <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                    {t('exams.show') || 'Show:'}
+                  </span>
                   <select
                     value={limit}
                     onChange={(e) => {
@@ -837,9 +842,9 @@ export default function ExamsPage() {
                       fontWeight: 600,
                     }}
                   >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
+                    <option value={10}>{language === 'bn' ? (10).toLocaleString('bn-BD') : 10}</option>
+                    <option value={20}>{language === 'bn' ? (20).toLocaleString('bn-BD') : 20}</option>
+                    <option value={50}>{language === 'bn' ? (50).toLocaleString('bn-BD') : 50}</option>
                   </select>
                 </div>
               )}
@@ -856,7 +861,7 @@ export default function ExamsPage() {
                     textDecoration: 'underline',
                   }}
                 >
-                  Clear all
+                  {t('exams.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -879,7 +884,7 @@ export default function ExamsPage() {
               {/* Status Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Filter by Status
+                  {t('exams.filterByStatus') || 'Filter by Status'}
                 </label>
                 <select
                   className="input"
@@ -890,18 +895,18 @@ export default function ExamsPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="all">All Statuses</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="draft">Draft (Unpublished)</option>
+                  <option value="all">{t('exams.allStatuses') || 'All Statuses'}</option>
+                  <option value="in-progress">{t('exams.status.inProgress') || 'In Progress'}</option>
+                  <option value="completed">{t('exams.status.completed') || 'Completed'}</option>
+                  <option value="upcoming">{t('exams.statusUpcoming') || 'Upcoming'}</option>
+                  <option value="draft">{t('exams.statusDraft') || 'Draft (Unpublished)'}</option>
                 </select>
               </div>
 
               {/* Class Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Filter by Class
+                  {t('exams.filterByClass') || 'Filter by Class'}
                 </label>
                 <select
                   className="input"
@@ -912,7 +917,7 @@ export default function ExamsPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="all">All Classes</option>
+                  <option value="all">{t('exams.allClasses') || 'All Classes'}</option>
                   {allClasses.map((cls) => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
@@ -922,7 +927,7 @@ export default function ExamsPage() {
               {/* Sort Order */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Sort Order
+                  {t('exams.sortOrder') || 'Sort Order'}
                 </label>
                 <select
                   className="input"
@@ -933,10 +938,10 @@ export default function ExamsPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="name-asc">Exam Name: A → Z</option>
-                  <option value="name-desc">Exam Name: Z → A</option>
+                  <option value="newest">{t('exams.sort.newest') || 'Newest First'}</option>
+                  <option value="oldest">{t('exams.sort.oldest') || 'Oldest First'}</option>
+                  <option value="name-asc">{t('exams.sort.nameAsc') || 'Exam Name: A → Z'}</option>
+                  <option value="name-desc">{t('exams.sort.nameDesc') || 'Exam Name: Z → A'}</option>
                 </select>
               </div>
             </div>
@@ -951,12 +956,12 @@ export default function ExamsPage() {
               <thead>
                 <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                   {[
-                    { label: '#', w: '52px' },
-                    { label: 'Exam Name & Details' },
-                    { label: 'Timeline', w: '230px' },
-                    { label: 'Assigned Classes & Subjects' },
-                    { label: 'Status', w: '140px' },
-                    { label: 'Actions', w: '180px', align: 'right' as const },
+                    { label: t('exams.th.serial') || '#', w: '52px' },
+                    { label: t('exams.th.examNameDetails') || 'Exam Name & Details' },
+                    { label: t('exams.th.timeline') || 'Timeline', w: '230px' },
+                    { label: t('exams.th.classesSubjects') || 'Assigned Classes & Subjects' },
+                    { label: t('exams.th.status') || 'Status', w: '140px' },
+                    { label: t('exams.th.actions') || 'Actions', w: '180px', align: 'right' as const },
                   ].map((col) => (
                     <th
                       key={col.label}
@@ -1029,7 +1034,7 @@ export default function ExamsPage() {
                       >
                         {/* SL */}
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                          {sl}
+                          {language === 'bn' ? sl.toLocaleString('bn-BD') : sl}
                         </td>
 
                         {/* Exam Name & Details */}
@@ -1060,7 +1065,7 @@ export default function ExamsPage() {
                                   cursor: 'pointer',
                                 }}
                                 onClick={() => setExamForRoutine(exam)}
-                                title="Click to view routine and results"
+                                title={t('exams.clickToView') || 'Click to view routine and results'}
                               >
                                 {exam.exam_name}
                               </span>
@@ -1070,7 +1075,7 @@ export default function ExamsPage() {
                                 </span>
                               ) : (
                                 <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
-                                  No description
+                                  {t('exams.noDescription') || 'No description'}
                                 </span>
                               )}
                             </div>
@@ -1134,17 +1139,22 @@ export default function ExamsPage() {
                                   </span>
                                 ))
                               ) : (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Unassigned</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                                  {t('exams.unassigned') || 'Unassigned'}
+                                </span>
                               )}
                               {uniqueClasses.length > 3 && (
                                 <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                                  +{uniqueClasses.length - 3}
+                                  +{language === 'bn' ? (uniqueClasses.length - 3).toLocaleString('bn-BD') : (uniqueClasses.length - 3)}
                                 </span>
                               )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                               <BookOpen size={12} />
-                              <span>{uniqueSubjects.length} {uniqueSubjects.length === 1 ? 'subject' : 'subjects'} scheduled</span>
+                              <span>
+                                {language === 'bn' ? uniqueSubjects.length.toLocaleString('bn-BD') : uniqueSubjects.length}{' '}
+                                {uniqueSubjects.length === 1 ? (t('exams.subjectScheduled') || 'subject scheduled') : (t('exams.subjectsScheduled') || 'subjects scheduled')}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -1176,7 +1186,7 @@ export default function ExamsPage() {
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                             <button
                               className="action-btn"
-                              title="Routine & Results"
+                              title={t('exams.routineAndResults') || 'Routine & Results'}
                               onClick={() => setExamForRoutine(exam)}
                               style={{
                                 padding: '0.35rem 0.65rem',
@@ -1193,12 +1203,12 @@ export default function ExamsPage() {
                               }}
                             >
                               <FileText size={13} />
-                              <span>Results</span>
+                              <span>{t('exams.results') || 'Results'}</span>
                             </button>
 
                             <button
                               className="action-btn"
-                              title="Edit Exam"
+                              title={t('exams.editExam') || 'Edit Exam'}
                               onClick={() => {
                                 setExamToEdit(exam);
                                 setIsCreateModalOpen(true);
@@ -1221,7 +1231,7 @@ export default function ExamsPage() {
 
                             <button
                               className="action-btn"
-                              title="Delete Exam"
+                              title={t('exams.deleteExam') || 'Delete Exam'}
                               onClick={() => handleDeleteExam(exam.id, exam.exam_name)}
                               style={{
                                 width: '32px',
@@ -1266,8 +1276,8 @@ export default function ExamsPage() {
                         </p>
                         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                           {activeFiltersCount > 0
-                            ? 'Try adjusting your search query or reset your filters.'
-                            : 'No assessment exams have been configured yet. Click "Create Exam" to schedule your first exam.'}
+                            ? (t('exams.emptyFiltered') || 'Try adjusting your search query or reset your filters.')
+                            : (t('exams.emptyDefault') || 'No assessment exams have been configured yet. Click "Create Exam" to schedule your first exam.')}
                         </p>
                         {activeFiltersCount > 0 && (
                           <button
@@ -1280,7 +1290,7 @@ export default function ExamsPage() {
                               fontSize: '0.85rem',
                             }}
                           >
-                            Clear Filters
+                            {t('exams.clearFilters') || 'Clear Filters'}
                           </button>
                         )}
                       </div>
@@ -1312,7 +1322,9 @@ export default function ExamsPage() {
                     {t('exams.noExams') || 'No exams found'}
                   </p>
                   <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-                    {activeFiltersCount > 0 ? 'Try clearing your filters.' : 'Click "Create Exam" to begin.'}
+                    {activeFiltersCount > 0
+                      ? (t('exams.emptyFilteredCards') || 'Try clearing your filters.')
+                      : (t('exams.emptyDefaultCards') || 'Click "Create Exam" to begin.')}
                   </p>
                 </div>
               </div>
@@ -1394,7 +1406,7 @@ export default function ExamsPage() {
                         >
                           <div>
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                              Starts
+                              {t('exams.starts') || 'Starts'}
                             </span>
                             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem' }}>
                               {formatDate(exam.start_date)}
@@ -1402,7 +1414,7 @@ export default function ExamsPage() {
                           </div>
                           <div>
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                              Ends
+                              {t('exams.ends') || 'Ends'}
                             </span>
                             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem' }}>
                               {formatDate(exam.end_date)}
@@ -1414,7 +1426,7 @@ export default function ExamsPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <School size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                            <span>Classes:</span>
+                            <span>{t('exams.classesLabel') || 'Classes:'}</span>
                             {uniqueClasses.length > 0 ? (
                               uniqueClasses.slice(0, 3).map((c, i) => (
                                 <span key={i} style={{ padding: '0.1rem 0.4rem', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--foreground)' }}>
@@ -1422,13 +1434,18 @@ export default function ExamsPage() {
                                 </span>
                               ))
                             ) : (
-                              <span>None</span>
+                              <span>{t('exams.none') || 'None'}</span>
                             )}
-                            {uniqueClasses.length > 3 && <span>+{uniqueClasses.length - 3}</span>}
+                            {uniqueClasses.length > 3 && (
+                              <span>+{language === 'bn' ? (uniqueClasses.length - 3).toLocaleString('bn-BD') : (uniqueClasses.length - 3)}</span>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <BookOpen size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                            <span>{uniqueSubjects.length} Subjects scheduled</span>
+                            <span>
+                              {language === 'bn' ? uniqueSubjects.length.toLocaleString('bn-BD') : uniqueSubjects.length}{' '}
+                              {uniqueSubjects.length === 1 ? (t('exams.subjectScheduled') || 'subject scheduled') : (t('exams.subjectsScheduled') || 'subjects scheduled')}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1454,7 +1471,7 @@ export default function ExamsPage() {
                           }}
                         >
                           <FileText size={15} />
-                          <span>Routine & Results</span>
+                          <span>{t('exams.routineAndResults') || 'Routine & Results'}</span>
                         </button>
                         <button
                           onClick={() => {
@@ -1472,7 +1489,7 @@ export default function ExamsPage() {
                             cursor: 'pointer',
                             color: 'var(--foreground)',
                           }}
-                          title="Edit Exam"
+                          title={t('exams.editExam') || 'Edit Exam'}
                         >
                           <Edit3 size={15} />
                         </button>
@@ -1488,7 +1505,7 @@ export default function ExamsPage() {
                             cursor: 'pointer',
                             color: '#ef4444',
                           }}
-                          title="Delete Exam"
+                          title={t('exams.deleteExam') || 'Delete Exam'}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -1516,14 +1533,24 @@ export default function ExamsPage() {
             }}
           >
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> exams
+              {t('exams.showing') || 'Showing'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? (((page - 1) * limit) + 1).toLocaleString('bn-BD') : (((page - 1) * limit) + 1)}
+              </strong>{' '}
+              {t('exams.to') || 'to'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? Math.min(page * limit, total).toLocaleString('bn-BD') : Math.min(page * limit, total)}
+              </strong>{' '}
+              {t('exams.of') || 'of'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? total.toLocaleString('bn-BD') : total}
+              </strong>{' '}
+              {t('exams.examsCount') || 'exams'}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('exams.page') || 'Page'} {language === 'bn' ? page.toLocaleString('bn-BD') : page} {t('exams.of') || 'of'} {language === 'bn' ? totalPages.toLocaleString('bn-BD') : totalPages}
               </span>
 
               <button
@@ -1538,7 +1565,7 @@ export default function ExamsPage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('exams.previousPage') || 'Previous page'}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1555,7 +1582,7 @@ export default function ExamsPage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('exams.nextPage') || 'Next page'}
               >
                 <ChevronRight size={16} />
               </button>

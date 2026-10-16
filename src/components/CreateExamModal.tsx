@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Check, AlertCircle, Plus, Trash2, Calendar } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -62,6 +63,7 @@ interface CreateExamModalProps {
 }
 
 export default function CreateExamModal({ examToEdit, onClose, onSuccess }: CreateExamModalProps) {
+  const { t, language } = useLanguage();
   const [examName, setExamName] = useState(examToEdit?.exam_name || '');
   const [description, setDescription] = useState(examToEdit?.description || '');
   const [startDate, setStartDate] = useState(examToEdit?.start_date?.split('T')[0] || '');
@@ -144,7 +146,7 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
         setTeachers(fetchedTeachers);
       } catch (err) {
         console.error(err);
-        setErrorMsg('Failed to load classes, subjects, or teachers.');
+        setErrorMsg(t('exams.modal.loadFailed') || 'Failed to load classes, subjects, or teachers.');
       } finally {
         setLoadingData(false);
       }
@@ -185,7 +187,7 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
 
   const handleSubmit = async () => {
     if (!examName || !startDate || !endDate) {
-      setErrorMsg('Please fill in exam name, start date, and end date.');
+      setErrorMsg(t('exams.modal.fillRequired') || 'Please fill in exam name, start date, and end date.');
       return;
     }
 
@@ -193,7 +195,8 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
     for (let i = 0; i < assignments.length; i++) {
       const a = assignments[i];
       if (!a.class_uid || !a.subject_uid || !a.examiner_uid || !a.date) {
-        setErrorMsg(`Please fill in all required fields for assignment #${i + 1}`);
+        const numStr = language === 'bn' ? (i + 1).toLocaleString('bn-BD') : (i + 1).toString();
+        setErrorMsg((t('exams.modal.fillAssignment') || 'Please fill in all required fields for assignment #{num}').replace('{num}', numStr));
         return;
       }
     }
@@ -244,7 +247,7 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
         throw new Error(json.message || `Failed to ${examToEdit ? 'update' : 'create'} exam`);
       }
       
-      setSuccessMsg(`Exam ${examToEdit ? 'updated' : 'created'} successfully!`);
+      setSuccessMsg(examToEdit ? (t('exams.modal.successUpdated') || 'Exam updated successfully!') : (t('exams.modal.successCreated') || 'Exam created successfully!'));
       setTimeout(() => {
         onSuccess();
       }, 1500);
@@ -273,10 +276,10 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
             </div>
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                {examToEdit ? 'Edit Exam' : 'Create New Exam'}
+                {examToEdit ? (t('exams.modal.editTitle') || 'Edit Exam') : (t('exams.modal.createTitle') || 'Create New Exam')}
               </h2>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-                {examToEdit ? 'Update exam details and routines.' : 'Set up exam details and attach class/subject routines.'}
+                {examToEdit ? (t('exams.modal.editSubtitle') || 'Update exam details and routines.') : (t('exams.modal.createSubtitle') || 'Set up exam details and attach class/subject routines.')}
               </p>
             </div>
           </div>
@@ -302,7 +305,7 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
           {loadingData ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 0', gap: '1rem' }}>
               <Loader2 size={32} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
-              <p style={{ color: 'var(--muted-foreground)' }}>Loading form data...</p>
+              <p style={{ color: 'var(--muted-foreground)' }}>{t('exams.modal.loadingData') || 'Loading form data...'}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -310,34 +313,46 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
               {/* Main Exam Info */}
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: '0.75rem' }}>1</span>
-                  Exam Details
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: '0.75rem' }}>
+                    {language === 'bn' ? (1).toLocaleString('bn-BD') : 1}
+                  </span>
+                  {t('exams.modal.step1') || 'Exam Details'}
                 </h3>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', background: 'var(--card)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Exam Name *</label>
-                    <input type="text" className="input" value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="e.g. Mid-Term Exam 2026" />
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('exams.modal.examName') || 'Exam Name'} *
+                    </label>
+                    <input type="text" className="input" value={examName} onChange={(e) => setExamName(e.target.value)} placeholder={t('exams.modal.examNamePlaceholder') || 'e.g. Mid-Term Exam 2026'} />
                   </div>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Description</label>
-                    <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Briefly describe this exam..." style={{ minHeight: '80px', padding: '0.75rem' }} />
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('exams.modal.description') || 'Description'}
+                    </label>
+                    <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('exams.modal.descriptionPlaceholder') || 'Briefly describe this exam...'} style={{ minHeight: '80px', padding: '0.75rem' }} />
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Start Date *</label>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('exams.modal.startDate') || 'Start Date'} *
+                    </label>
                     <input type="date" className="input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   </div>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>End Date *</label>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('exams.modal.endDate') || 'End Date'} *
+                    </label>
                     <input type="date" className="input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', gridColumn: '1 / -1', marginTop: '0.5rem' }}>
                     <input type="checkbox" id="isPublished" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }} />
-                    <label htmlFor="isPublished" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>Publish Immediately (Visible to students/teachers)</label>
+                    <label htmlFor="isPublished" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>
+                      {t('exams.modal.publishImmediately') || 'Publish Immediately (Visible to students/teachers)'}
+                    </label>
                   </div>
                 </div>
               </div>
@@ -346,11 +361,13 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', color: 'white', fontSize: '0.75rem' }}>2</span>
-                    Assignments & Routines
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', color: 'white', fontSize: '0.75rem' }}>
+                      {language === 'bn' ? (2).toLocaleString('bn-BD') : 2}
+                    </span>
+                    {t('exams.modal.step2') || 'Assignments & Routines'}
                   </h3>
                   <button onClick={handleAddAssignment} className="btn" style={{ background: 'rgba(var(--primary-rgb), 0.1)', color: 'var(--primary)', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.4rem 0.75rem' }}>
-                    <Plus size={16} /> Add Class
+                    <Plus size={16} /> <span>{t('exams.modal.addClass') || 'Add Class'}</span>
                   </button>
                 </div>
                 
@@ -359,37 +376,47 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
                     <div key={assignment.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto', gap: '1rem', alignItems: 'end', background: 'var(--glass-bg)', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
                       
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Class *</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                          {t('exams.modal.class') || 'Class'} *
+                        </label>
                         <select className="input" value={assignment.class_uid} onChange={(e) => updateAssignment(assignment.id, 'class_uid', e.target.value)} style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }}>
-                          <option value="">Select Class</option>
+                          <option value="">{t('exams.modal.selectClass') || 'Select Class'}</option>
                           {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Subject *</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                          {t('exams.modal.subject') || 'Subject'} *
+                        </label>
                         <select className="input" value={assignment.subject_uid} onChange={(e) => updateAssignment(assignment.id, 'subject_uid', e.target.value)} style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }} disabled={!assignment.class_uid}>
-                          <option value="">Select Subject</option>
+                          <option value="">{t('exams.modal.selectSubject') || 'Select Subject'}</option>
                           {subjects.filter(s => s.classId === assignment.class_uid).map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)}
                         </select>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Examiner *</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                          {t('exams.modal.examiner') || 'Examiner'} *
+                        </label>
                         <select className="input" value={assignment.examiner_uid} onChange={(e) => updateAssignment(assignment.id, 'examiner_uid', e.target.value)} style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }}>
-                          <option value="">Select Teacher</option>
+                          <option value="">{t('exams.modal.selectTeacher') || 'Select Teacher'}</option>
                           {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Exam Date *</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                          {t('exams.modal.examDate') || 'Exam Date'} *
+                        </label>
                         <input type="date" className="input" value={assignment.date} onChange={(e) => updateAssignment(assignment.id, 'date', e.target.value)} style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }} />
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Syllabus</label>
-                        <input type="text" className="input" value={assignment.syllabus} onChange={(e) => updateAssignment(assignment.id, 'syllabus', e.target.value)} placeholder="e.g. Chapter 1-5" style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }} />
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                          {t('exams.modal.syllabus') || 'Syllabus'}
+                        </label>
+                        <input type="text" className="input" value={assignment.syllabus} onChange={(e) => updateAssignment(assignment.id, 'syllabus', e.target.value)} placeholder={t('exams.modal.syllabusPlaceholder') || 'e.g. Chapter 1-5'} style={{ padding: '0.5rem', height: '38px', fontSize: '0.85rem' }} />
                       </div>
 
                       <div style={{ paddingBottom: '2px' }}>
@@ -398,7 +425,7 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
                           className="btn" 
                           disabled={assignments.length === 1}
                           style={{ width: '38px', height: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: assignments.length === 1 ? 'var(--muted)' : 'rgba(239, 68, 68, 0.1)', color: assignments.length === 1 ? 'var(--muted-foreground)' : 'var(--destructive)', border: 'none' }}
-                          title="Remove assignment"
+                          title={t('exams.modal.removeAssignment') || 'Remove assignment'}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -415,11 +442,11 @@ export default function CreateExamModal({ examToEdit, onClose, onSuccess }: Crea
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', background: 'var(--glass-bg)' }}>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
-              Cancel
+              {t('exams.modal.cancel') || 'Cancel'}
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || loadingData} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-              {submitting ? 'Saving...' : examToEdit ? 'Update Exam' : 'Create Exam'}
+              {submitting ? (t('exams.modal.saving') || 'Saving...') : examToEdit ? (t('exams.modal.saveUpdate') || 'Update Exam') : (t('exams.modal.saveCreate') || 'Create Exam')}
             </button>
           </div>
         </div>

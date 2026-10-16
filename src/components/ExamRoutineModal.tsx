@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, FileText, Users, Loader2, Download } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -120,6 +121,7 @@ function footer(doc: jsPDF, pageNum: number) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProps) {
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'routine' | 'results'>('routine');
 
   const [selectedClassId,   setSelectedClassId]   = useState('');
@@ -205,12 +207,12 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
   const handleSaveMarks = async (studentId: string) => {
     const form = marksForm[studentId];
     if (!form || form.marksObtained === '' || form.totalMarks === '') {
-      alert('Please enter both marks obtained and total marks'); return;
+      alert(t('exams.results.enterBothMarks') || 'Please enter both marks obtained and total marks'); return;
     }
     const assignment = exam.assignments.find(
       a => a.class?.uuid === selectedClassId && a.subject?.uuid === selectedSubjectId
     );
-    if (!assignment?.examiner?.uuid) { alert('Examiner not found for this subject'); return; }
+    if (!assignment?.examiner?.uuid) { alert(t('exams.results.examinerNotFound') || 'Examiner not found for this subject'); return; }
 
     setMarksForm(prev => ({ ...prev, [studentId]: { ...prev[studentId], loading: true } }));
     try {
@@ -230,9 +232,9 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         })
       });
       if (!res.ok) throw new Error();
-      alert('Marks saved!');
+      alert(t('exams.results.marksSaved') || 'Marks saved!');
       await refreshAllExamMarks();
-    } catch { alert('Failed to save marks'); }
+    } catch { alert(t('exams.results.saveFailed') || 'Failed to save marks'); }
     finally {
       setMarksForm(prev => ({ ...prev, [studentId]: { ...prev[studentId], loading: false } }));
     }
@@ -246,12 +248,12 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       return [{ studentId: st.id, subjectId: selectedSubjectId,
                 marksObtained: Number(f.marksObtained), totalMarks: Number(f.totalMarks) }];
     });
-    if (!payload.length) { alert('No marks entered to save'); return; }
+    if (!payload.length) { alert(t('exams.results.noMarksToSave') || 'No marks entered to save'); return; }
 
     const assignment = exam.assignments.find(
       a => a.class?.uuid === selectedClassId && a.subject?.uuid === selectedSubjectId
     );
-    if (!assignment?.examiner?.uuid) { alert('Examiner not found for this subject'); return; }
+    if (!assignment?.examiner?.uuid) { alert(t('exams.results.examinerNotFound') || 'Examiner not found for this subject'); return; }
 
     setIsSavingAll(true);
     try {
@@ -266,9 +268,9 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
         })
       });
       if (!res.ok) throw new Error();
-      alert('All marks saved!');
+      alert(t('exams.results.allMarksSaved') || 'All marks saved!');
       await refreshAllExamMarks();
-    } catch { alert('Failed to save all marks'); }
+    } catch { alert(t('exams.results.saveFailed') || 'Failed to save all marks'); }
     finally { setIsSavingAll(false); }
   };
 
@@ -337,7 +339,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
   }, [exam.id, selectedClassId, selectedSectionId, selectedSubjectId, students]); // eslint-disable-line
 
   const fmtDate = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBA';
+    d ? new Date(d).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (t('exams.status.datesTba') || 'TBA');
 
   // ════════════════════════════════════════════════════════════════════════════
   // PDF 1 — STUDENT RESULT CARD  (all classes in a single table, single page)
@@ -1002,7 +1004,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       doc.save(filename);
     } catch(err) {
       console.error(err);
-      alert('Failed to generate class result PDF. Please try again.');
+      alert(t('exams.results.pdfGenFailed') || 'Failed to generate class result PDF. Please try again.');
     } finally {
       setGeneratingClassPDF(false);
     }
@@ -1045,7 +1047,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
               display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s',
             }}>
               {tab === 'routine' ? <Calendar size={18} /> : <Users size={18} />}
-              {tab === 'routine' ? 'Exam Routine' : 'Manage Results'}
+              {tab === 'routine' ? (t('exams.routine.tabRoutine') || 'Exam Routine') : (t('exams.routine.tabResults') || 'Manage Results')}
             </button>
           ))}
         </div>
@@ -1059,15 +1061,21 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
               {(!exam.assignments || !exam.assignments.length) ? (
                 <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>
                   <Calendar size={48} style={{ opacity: 0.2, margin: '0 auto 1rem' }} />
-                  <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No routine found</p>
-                  <p>There are no subjects assigned to this exam yet.</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{t('exams.routine.noRoutine') || 'No routine found'}</p>
+                  <p>{t('exams.routine.noRoutineDesc') || 'There are no subjects assigned to this exam yet.'}</p>
                 </div>
               ) : (
                 <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1rem', overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border)' }}>
                       <tr>
-                        {['Date','Class','Subject','Examiner','Syllabus'].map(h => (
+                        {[
+                          t('exams.routine.thDate') || 'Date',
+                          t('exams.routine.thClass') || 'Class',
+                          t('exams.routine.thSubject') || 'Subject',
+                          t('exams.routine.thExaminer') || 'Examiner',
+                          t('exams.routine.thSyllabus') || 'Syllabus',
+                        ].map(h => (
                           <th key={h} style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{h}</th>
                         ))}
                       </tr>
@@ -1096,25 +1104,29 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
               {/* Filters */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: 'var(--card)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Select Class</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('exams.results.selectClass') || 'Select Class'}
+                  </label>
                   <select className="input" value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}>
-                    <option value="">— Choose Class —</option>
+                    <option value="">{t('exams.results.chooseClass') || '— Choose Class —'}</option>
                     {uniqueClasses.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                    Select Section {loadingSections && <Loader2 size={12} className="animate-spin inline" />}
+                    {t('exams.results.selectSection') || 'Select Section'} {loadingSections && <Loader2 size={12} className="animate-spin inline" />}
                   </label>
                   <select className="input" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} disabled={!selectedClassId || loadingSections}>
-                    <option value="">— Choose Section —</option>
+                    <option value="">{t('exams.results.chooseSection') || '— Choose Section —'}</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Select Subject</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('exams.results.selectSubject') || 'Select Subject'}
+                  </label>
                   <select className="input" value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)} disabled={!selectedClassId}>
-                    <option value="">— Choose Subject —</option>
+                    <option value="">{t('exams.results.chooseSubject') || '— Choose Subject —'}</option>
                     {classSubjects.map(s => <option key={s.uuid} value={s.uuid}>{s.name}</option>)}
                   </select>
                 </div>
@@ -1125,25 +1137,31 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
                 {!selectedClassId || !selectedSectionId || !selectedSubjectId ? (
                   <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <Users size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                    <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Select Class, Section and Subject</p>
-                    <p>Choose all three filters above to view students and manage their results.</p>
+                    <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{t('exams.results.selectPromptTitle') || 'Select Class, Section and Subject'}</p>
+                    <p>{t('exams.results.selectPromptDesc') || 'Choose all three filters above to view students and manage their results.'}</p>
                   </div>
                 ) : loadingStudents ? (
                   <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <Loader2 size={32} className="animate-spin text-primary" style={{ marginBottom: '1rem' }} />
-                    <p>Loading students…</p>
+                    <p>{t('exams.results.loadingStudents') || 'Loading students…'}</p>
                   </div>
                 ) : !students.length ? (
                   <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No students found</p>
-                    <p>There are no students enrolled in this section.</p>
+                    <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{t('exams.results.noStudents') || 'No students found'}</p>
+                    <p>{t('exams.results.noStudentsDesc') || 'There are no students enrolled in this section.'}</p>
                   </div>
                 ) : (
                   <div style={{ overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
                         <tr>
-                          {['Roll No.','Student Name','Marks Obtained','Total Marks','Actions'].map(h => (
+                          {[
+                            t('exams.results.thRoll') || 'Roll No.',
+                            t('exams.results.thName') || 'Student Name',
+                            t('exams.results.thMarksObtained') || 'Marks Obtained',
+                            t('exams.results.thTotalMarks') || 'Total Marks',
+                            t('exams.results.thActions') || 'Actions',
+                          ].map(h => (
                             <th key={h} style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{h}</th>
                           ))}
                         </tr>
@@ -1187,7 +1205,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
                                 {generatingStudentPDFId === st.id
                                   ? <Loader2 size={13} className="animate-spin" />
                                   : <Download size={13} />}
-                                View Result
+                                {t('exams.results.viewResult') || 'View Result'}
                               </button>
                             </td>
                           </tr>
@@ -1214,7 +1232,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
                         onMouseEnter={e => { if (!generatingClassPDF && students.length) { e.currentTarget.style.background='var(--primary)'; e.currentTarget.style.color='white'; }}}
                         onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--primary)'; }}>
                         {generatingClassPDF ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                        Class Result PDF
+                        {t('exams.results.classResultPDF') || 'Class Result PDF'}
                       </button>
 
                       {/* Submit All Marks */}
@@ -1224,7 +1242,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
                         disabled={isSavingAll}
                         style={{ padding: '0.6rem 1.5rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: isSavingAll ? 'not-allowed' : 'pointer', opacity: isSavingAll ? 0.7 : 1 }}>
                         {isSavingAll && <Loader2 size={16} className="animate-spin" />}
-                        Submit All Marks
+                        {t('exams.results.submitAllMarks') || 'Submit All Marks'}
                       </button>
                     </div>
                   </div>

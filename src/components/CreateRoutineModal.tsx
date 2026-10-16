@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Check, AlertCircle, Calendar } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -36,10 +37,17 @@ interface CreateRoutineModalProps {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutineModalProps) {
+  const { t } = useLanguage();
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [subjects, setSubjects] = useState<SubjectEntity[]>([]);
   const [teachers, setTeachers] = useState<TeacherEntity[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+
+  const getDayLabel = (day: string) => {
+    const key = `routine.day.${day.toLowerCase()}`;
+    const translated = t(key);
+    return translated !== key ? translated : day;
+  };
   
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
@@ -100,7 +108,7 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
         
       } catch (err) {
         console.error(err);
-        setErrorMsg('Failed to load form data.');
+        setErrorMsg(t('routine.loadingFormData') || 'Failed to load form data.');
       } finally {
         setLoadingData(false);
       }
@@ -119,7 +127,7 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
 
   const handleSubmit = async () => {
     if (!selectedClassId || !selectedSectionId || !selectedSubjectId || !selectedTeacherId || selectedDays.length === 0 || !startTime || !endTime) {
-      setErrorMsg('Please fill in all required fields and select at least one day.');
+      setErrorMsg(t('routine.fillRequiredAndDay') || 'Please fill in all required fields and select at least one day.');
       return;
     }
     
@@ -163,14 +171,14 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
       
       await Promise.all(promises);
       
-      setSuccessMsg('Routines created successfully!');
+      setSuccessMsg(t('routine.createdSuccess') || 'Routines created successfully!');
       setTimeout(() => {
         onSuccess();
       }, 1500);
       
     } catch (err: any) {
       console.error(err);
-      let errorText = err.message || 'An error occurred during submission.';
+      let errorText = err.message || (t('routine.createFailed') || 'An error occurred during submission.');
       if (Array.isArray(err.message)) {
           errorText = err.message.join(', ');
       }
@@ -194,8 +202,12 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
               <Calendar size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Create Routine</h2>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Assign a subject and teacher to specific timeslots</p>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                {t('routine.createRoutine') || 'Create Routine'}
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+                {t('routine.createSubtitle') || 'Assign a subject and teacher to specific timeslots'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='var(--muted)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
@@ -220,16 +232,18 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
           {loadingData ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 0', gap: '1rem' }}>
               <Loader2 size={32} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
-              <p style={{ color: 'var(--muted-foreground)' }}>Loading form data...</p>
+              <p style={{ color: 'var(--muted-foreground)' }}>{t('routine.loadingFormData') || 'Loading form data...'}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Class *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('common.class') || 'Class'} *
+                  </label>
                   <select className="input" value={selectedClassId} onChange={(e) => { setSelectedClassId(e.target.value); setSelectedSectionId(''); }} style={{ height: '44px' }}>
-                    <option value="">Select Class</option>
+                    <option value="">{t('common.selectClass') || 'Select Class'}</option>
                     {classes.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -237,9 +251,11 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Section *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('common.section') || 'Section'} *
+                  </label>
                   <select className="input" value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)} disabled={!selectedClassId || availableSections.length === 0} style={{ height: '44px', opacity: selectedClassId ? 1 : 0.6 }}>
-                    <option value="">Select Section</option>
+                    <option value="">{t('common.selectSection') || 'Select Section'}</option>
                     {availableSections.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -249,9 +265,11 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Subject *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('common.subject') || 'Subject'} *
+                  </label>
                   <select className="input" value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} style={{ height: '44px' }}>
-                    <option value="">Select Subject</option>
+                    <option value="">{t('common.selectSubject') || 'Select Subject'}</option>
                     {subjects.map(s => (
                       <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>
                     ))}
@@ -259,9 +277,11 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Teacher *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('common.teacher') || 'Teacher'} *
+                  </label>
                   <select className="input" value={selectedTeacherId} onChange={(e) => setSelectedTeacherId(e.target.value)} style={{ height: '44px' }}>
-                    <option value="">Select Teacher</option>
+                    <option value="">{t('common.selectTeacher') || 'Select Teacher'}</option>
                     {teachers.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
@@ -271,23 +291,31 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Start Time *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('routine.startTime') || 'Start Time'} *
+                  </label>
                   <input type="time" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ height: '44px' }} />
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>End Time *</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('routine.endTime') || 'End Time'} *
+                  </label>
                   <input type="time" className="input" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ height: '44px' }} />
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Room Number</label>
-                  <input type="text" className="input" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="e.g. 101" style={{ height: '44px' }} />
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('routine.roomNumber') || 'Room Number'}
+                  </label>
+                  <input type="text" className="input" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder={t('routine.roomPlaceholder') || 'e.g. 101'} style={{ height: '44px' }} />
                 </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>Assign Days *</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                  {t('routine.assignDays') || 'Assign Days'} *
+                </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
                   {DAYS_OF_WEEK.map(day => {
                     const isSelected = selectedDays.includes(day);
@@ -308,7 +336,7 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
                           boxShadow: isSelected ? '0 4px 10px -2px rgba(var(--primary-rgb), 0.3)' : 'none'
                         }}
                       >
-                        {day}
+                        {getDayLabel(day)}
                       </button>
                     );
                   })}
@@ -323,11 +351,11 @@ export default function CreateRoutineModal({ onClose, onSuccess }: CreateRoutine
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', background: 'var(--glass-bg)' }}>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
-              Cancel
+              {t('common.cancel') || 'Cancel'}
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || loadingData} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {submitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={18} />}
-              {submitting ? 'Creating...' : 'Create Routine'}
+              {submitting ? (t('routine.creating') || 'Creating...') : (t('routine.createRoutine') || 'Create Routine')}
             </button>
           </div>
         </div>

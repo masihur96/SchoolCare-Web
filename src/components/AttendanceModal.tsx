@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Check, AlertCircle, Info } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -32,8 +33,19 @@ interface AttendanceModalProps {
 }
 
 export default function AttendanceModal({ routine, onClose }: AttendanceModalProps) {
+  const { t, language } = useLanguage();
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'present': return t('common.present') || 'Present';
+      case 'absent': return t('common.absent') || 'Absent';
+      case 'late': return t('common.late') || 'Late';
+      case 'leave': return t('common.leave') || 'Leave';
+      default: return status;
+    }
+  };
   
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [isAttendanceTaken, setIsAttendanceTaken] = useState(false);
@@ -169,15 +181,15 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
       
       const json = await res.json();
       if (res.ok && (json.statusCode === 201 || json.statusCode === 200)) {
-        setSuccessMsg('Attendance submitted successfully!');
+        setSuccessMsg(t('routine.attendanceSubmitted') || 'Attendance submitted successfully!');
         setIsAttendanceTaken(true); // Since we just submitted it
         setTimeout(() => onClose(), 1500);
       } else {
-        setErrorMsg(json.message || 'Failed to submit attendance.');
+        setErrorMsg(json.message || (t('routine.attendanceFailed') || 'Failed to submit attendance.'));
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('An error occurred during submission.');
+      setErrorMsg(t('routine.attendanceFailed') || 'An error occurred during submission.');
     } finally {
       setSubmitting(false);
     }
@@ -191,10 +203,12 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Take Attendance</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                {t('routine.takeAttendance') || 'Take Attendance'}
+              </h2>
               {isAttendanceTaken && !loadingAttendance && (
                 <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.25rem 0.6rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                  <Check size={14} /> Already Taken
+                  <Check size={14} /> {t('routine.alreadyTaken') || 'Already Taken'}
                 </span>
               )}
             </div>
@@ -211,7 +225,9 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           
           <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--card)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-            <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Attendance Date:</label>
+            <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+              {t('routine.attendanceDate') || 'Attendance Date'}:
+            </label>
             <input 
               type="date" 
               className="input" 
@@ -236,26 +252,36 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
           {loadingStudents || loadingAttendance ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 0', gap: '1rem' }}>
               <Loader2 size={32} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
-              <p style={{ color: 'var(--muted-foreground)' }}>{loadingStudents ? 'Loading assigned students...' : 'Loading existing attendance...'}</p>
+              <p style={{ color: 'var(--muted-foreground)' }}>{loadingStudents ? (t('routine.loadingStudents') || 'Loading assigned students...') : (t('routine.loadingAttendance') || 'Loading existing attendance...')}</p>
             </div>
           ) : students.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--muted-foreground)' }}>
-              <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--foreground)' }}>No students found</p>
-              <p>There are no students assigned to this class and section.</p>
+              <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                {t('routine.noStudentsFound') || 'No students found'}
+              </p>
+              <p>{t('routine.noStudentsAssigned') || 'There are no students assigned to this class and section.'}</p>
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Roll No</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Student Name</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+                    {t('routine.rollNo') || 'Roll No'}
+                  </th>
+                  <th style={{ textAlign: 'left', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+                    {t('routine.studentName') || 'Student Name'}
+                  </th>
+                  <th style={{ textAlign: 'center', padding: '1rem', borderBottom: '2px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+                    {t('common.status') || 'Status'}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((student, idx) => (
                   <tr key={student.id} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{student.rollNumber || '-'}</td>
+                    <td style={{ padding: '1rem', fontWeight: 500 }}>
+                      {student.rollNumber ? (language === 'bn' ? String(student.rollNumber).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : student.rollNumber) : '-'}
+                    </td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{student.name}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -291,7 +317,7 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
                                 boxShadow: isSelected ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)' : 'none'
                               }}
                             >
-                              {status}
+                              {getStatusLabel(status)}
                             </button>
                           );
                         })}
@@ -309,17 +335,17 @@ export default function AttendanceModal({ routine, onClose }: AttendanceModalPro
           <div>
             {isAttendanceTaken && (
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Info size={14} /> You can update existing attendance by re-submitting.
+                <Info size={14} /> {t('routine.reSubmitHint') || 'You can update existing attendance by re-submitting.'}
               </p>
             )}
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
-              Cancel
+              {t('common.cancel') || 'Cancel'}
             </button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || students.length === 0 || loadingStudents || loadingAttendance} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: (submitting || students.length === 0 || loadingStudents || loadingAttendance) ? 0.7 : 1 }}>
               {submitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={18} />}
-              {submitting ? 'Submitting...' : isAttendanceTaken ? 'Update Attendance' : 'Submit Attendance'}
+              {submitting ? (t('routine.submitting') || 'Submitting...') : isAttendanceTaken ? (t('routine.updateAttendance') || 'Update Attendance') : (t('routine.submitAttendance') || 'Submit Attendance')}
             </button>
           </div>
         </div>

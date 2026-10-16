@@ -67,16 +67,21 @@ interface Routine {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Convert "HH:MM" to "h:MM AM/PM"
-function formatTimeTo12h(timeStr: string | null | undefined): string {
+function formatTimeTo12h(timeStr: string | null | undefined, language: string = 'en'): string {
   if (!timeStr) return '—';
   try {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime()) && timeStr.includes('T')) {
+      return d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
     const [hStr, mStr] = timeStr.split(':');
     if (hStr !== undefined && mStr !== undefined) {
       let h = parseInt(hStr, 10);
       const m = mStr.substring(0, 2);
-      const ampm = h >= 12 ? 'PM' : 'AM';
+      const ampm = h >= 12 ? (language === 'bn' ? 'পিএম' : 'PM') : (language === 'bn' ? 'এএম' : 'AM');
       h = h % 12 || 12;
-      return `${h}:${m} ${ampm}`;
+      const formattedNum = language === 'bn' ? `${h}:${m}`.replace(/\d/g, (dig) => '০১২৩৪৫৬৭৮৯'[parseInt(dig, 10)]) : `${h}:${m}`;
+      return `${formattedNum} ${ampm}`;
     }
   } catch (e) {}
   return timeStr;
@@ -93,7 +98,19 @@ const DAY_COLORS: Record<string, { bg: string; color: string; border: string }> 
 };
 
 export default function RoutinePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const getDayLabel = useCallback((day: string) => {
+    const key = day?.toLowerCase() || '';
+    if (key === 'monday') return t('routine.day.monday') || 'Monday';
+    if (key === 'tuesday') return t('routine.day.tuesday') || 'Tuesday';
+    if (key === 'wednesday') return t('routine.day.wednesday') || 'Wednesday';
+    if (key === 'thursday') return t('routine.day.thursday') || 'Thursday';
+    if (key === 'friday') return t('routine.day.friday') || 'Friday';
+    if (key === 'saturday') return t('routine.day.saturday') || 'Saturday';
+    if (key === 'sunday') return t('routine.day.sunday') || 'Sunday';
+    return day;
+  }, [t]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolEntity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,7 +333,7 @@ export default function RoutinePage() {
 
   // Delete Routine Handler
   const handleDeleteRoutine = async (routineId: string) => {
-    if (!confirm('Are you sure you want to remove this routine slot?')) return;
+    if (!confirm(t('routine.deleteConfirm') || 'Are you sure you want to remove this routine slot?')) return;
     try {
       const res = await fetch(`${API_BASE_URL}/general/routine/${routineId}`, {
         method: 'DELETE',
@@ -325,7 +342,7 @@ export default function RoutinePage() {
       if (res.ok) {
         fetchRoutines();
       } else {
-        alert('Failed to delete routine slot.');
+        alert(t('routine.createFailed') || 'Failed to delete routine slot.');
       }
     } catch (err) {
       console.error(err);
@@ -337,12 +354,23 @@ export default function RoutinePage() {
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
     if (filteredRoutines.length === 0) return;
-    const headers = ['#', 'Day', 'Start Time', 'End Time', 'Subject', 'Code', 'Class', 'Section', 'Teacher', 'Room'];
+    const headers = [
+      '#',
+      t('routine.day') || 'Day',
+      t('teacherAttendance.startTime') || 'Start Time',
+      t('teacherAttendance.endTime') || 'End Time',
+      t('common.subject') || 'Subject',
+      t('classes.subjectCode') || 'Code',
+      t('common.class') || 'Class',
+      t('common.section') || 'Section',
+      t('common.teacher') || 'Teacher',
+      t('routine.room') || 'Room',
+    ];
     const rows = filteredRoutines.map((r, i) => [
       (i + 1).toString(),
-      r.day || '',
-      formatTimeTo12h(r.startTime),
-      formatTimeTo12h(r.endTime),
+      `"${getDayLabel(r.day)}"`,
+      formatTimeTo12h(r.startTime, language),
+      formatTimeTo12h(r.endTime, language),
       `"${(r.subjectEntity?.name || '').replace(/"/g, '""')}"`,
       `"${r.subjectEntity?.code || ''}"`,
       `"${r.classEntity?.name || ''}"`,
@@ -390,7 +418,7 @@ export default function RoutinePage() {
 
     doc.setFontSize(15);
     doc.setTextColor(50, 50, 50);
-    doc.text('Class Routine & Timetable Schedule', 14, y);
+    doc.text(t('routine.reportTitle') || 'Class Routine & Timetable Schedule', 14, y);
     y += 7;
 
     doc.setFontSize(9);
@@ -398,33 +426,42 @@ export default function RoutinePage() {
     const filterParts: string[] = [];
     if (selectedClassId) {
       const cls = availableClasses.find((c) => c.id === selectedClassId)?.name;
-      if (cls) filterParts.push(`Class: ${cls}`);
+      if (cls) filterParts.push(`${t('common.class') || 'Class'}: ${cls}`);
     }
     if (selectedSectionId) {
       const sec = availableSections.find((s) => s.id === selectedSectionId)?.name;
-      if (sec) filterParts.push(`Section: ${sec}`);
+      if (sec) filterParts.push(`${t('common.section') || 'Section'}: ${sec}`);
     }
     if (selectedTeacherId) {
-      const t = availableTeachers.find((tc) => tc.id === selectedTeacherId)?.name;
-      if (t) filterParts.push(`Teacher: ${t}`);
+      const tName = availableTeachers.find((tc) => tc.id === selectedTeacherId)?.name;
+      if (tName) filterParts.push(`${t('common.teacher') || 'Teacher'}: ${tName}`);
     }
-    if (selectedDay) filterParts.push(`Day: ${selectedDay}`);
+    if (selectedDay) filterParts.push(`${t('routine.day') || 'Day'}: ${getDayLabel(selectedDay)}`);
     if (filterParts.length > 0) {
       doc.text(filterParts.join(' | '), 14, y);
       y += 7;
     }
 
     autoTable(doc, {
-      head: [['#', 'Day', 'Time', 'Subject', 'Class', 'Section', 'Teacher', 'Room']],
+      head: [[
+        '#',
+        t('routine.day') || 'Day',
+        t('attendance.time') || 'Time',
+        t('common.subject') || 'Subject',
+        t('common.class') || 'Class',
+        t('common.section') || 'Section',
+        t('common.teacher') || 'Teacher',
+        t('routine.room') || 'Room',
+      ]],
       body: filteredRoutines.map((r, i) => [
         (i + 1).toString(),
-        r.day,
-        `${formatTimeTo12h(r.startTime)} – ${formatTimeTo12h(r.endTime)}`,
-        r.subjectEntity?.code ? `${r.subjectEntity.name} (${r.subjectEntity.code})` : r.subjectEntity?.name || '—',
-        r.classEntity?.name || '—',
-        r.sectionEntity?.name || '—',
-        r.teacherEntity?.name || '—',
-        r.roomNumber || 'TBA',
+        getDayLabel(r.day),
+        `${formatTimeTo12h(r.startTime, language)} – ${formatTimeTo12h(r.endTime, language)}`,
+        r.subjectEntity?.code ? `${r.subjectEntity.name} (${r.subjectEntity.code})` : r.subjectEntity?.name || (t('common.na') || '—'),
+        r.classEntity?.name || (t('common.na') || '—'),
+        r.sectionEntity?.name || (t('common.na') || '—'),
+        r.teacherEntity?.name || (t('routine.unassigned') || '—'),
+        r.roomNumber || (t('routine.tba') || 'TBA'),
       ]),
       startY: y,
       styles: { fontSize: 8.5, cellPadding: 2.5 },
@@ -434,8 +471,8 @@ export default function RoutinePage() {
         const pages = (doc.internal as any).getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${data.pageNumber} of ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
+        doc.text(`${t('students.page') || 'Page'} ${data.pageNumber} ${t('students.of') || 'of'} ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+        doc.text(`${t('attendance.generated') || 'Generated'}: ${new Date().toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`, 14, doc.internal.pageSize.height - 10);
       },
     });
     doc.save('class_routine_schedule.pdf');
@@ -456,10 +493,10 @@ export default function RoutinePage() {
           }}
         >
           {[
-            { label: 'Weekly Periods', value: summaryMetrics.totalSlots, color: 'var(--primary)', icon: <Calendar size={16} /> },
-            { label: 'Active Classes', value: summaryMetrics.uniqueClasses, color: '#10b981', icon: <School size={16} /> },
-            { label: 'Assigned Teachers', value: summaryMetrics.uniqueTeachers, color: '#3b82f6', icon: <User size={16} /> },
-            { label: 'Subjects Taught', value: summaryMetrics.uniqueSubjects, color: '#8b5cf6', icon: <BookOpen size={16} /> },
+            { label: t('routine.weeklyPeriods') || 'Weekly Periods', value: language === 'bn' ? String(summaryMetrics.totalSlots).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : summaryMetrics.totalSlots, color: 'var(--primary)', icon: <Calendar size={16} /> },
+            { label: t('routine.activeClasses') || 'Active Classes', value: language === 'bn' ? String(summaryMetrics.uniqueClasses).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : summaryMetrics.uniqueClasses, color: '#10b981', icon: <School size={16} /> },
+            { label: t('routine.assignedTeachers') || 'Assigned Teachers', value: language === 'bn' ? String(summaryMetrics.uniqueTeachers).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : summaryMetrics.uniqueTeachers, color: '#3b82f6', icon: <User size={16} /> },
+            { label: t('routine.subjectsTaught') || 'Subjects Taught', value: language === 'bn' ? String(summaryMetrics.uniqueSubjects).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : summaryMetrics.uniqueSubjects, color: '#8b5cf6', icon: <BookOpen size={16} /> },
           ].map((s) => (
             <div
               key={s.label}
@@ -525,7 +562,7 @@ export default function RoutinePage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search subject, class, teacher, or room..."
+                  placeholder={t('routine.searchPlaceholder') || 'Search subject, class, teacher, or room...'}
                   style={{
                     border: 'none',
                     outline: 'none',
@@ -585,10 +622,10 @@ export default function RoutinePage() {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
-                  title="Table List View"
+                  title={t('routine.tableView') || 'Table List View'}
                 >
                   <TableIcon size={15} />
-                  <span>Table</span>
+                  <span>{t('routine.table') || 'Table'}</span>
                 </button>
                 <button
                   onClick={() => setViewMode('grid')}
@@ -607,10 +644,10 @@ export default function RoutinePage() {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
-                  title="Weekly Timetable Cards View"
+                  title={t('routine.timetableCards') || 'Weekly Timetable Cards View'}
                 >
                   <LayoutGrid size={15} />
-                  <span>Timetable</span>
+                  <span>{t('routine.timetable') || 'Timetable'}</span>
                 </button>
               </div>
 
@@ -633,7 +670,7 @@ export default function RoutinePage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('routine.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span
                     style={{
@@ -645,7 +682,7 @@ export default function RoutinePage() {
                       fontWeight: 700,
                     }}
                   >
-                    {activeFiltersCount}
+                    {language === 'bn' ? String(activeFiltersCount).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : activeFiltersCount}
                   </span>
                 )}
               </button>
@@ -673,7 +710,7 @@ export default function RoutinePage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('common.export') || 'Export'}</span>
                   <ChevronDown
                     size={14}
                     style={{
@@ -703,8 +740,8 @@ export default function RoutinePage() {
                     }}
                   >
                     {[
-                      { label: 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
-                      { label: 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
+                      { label: t('routine.exportCsv') || 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
+                      { label: t('routine.exportPdf') || 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
                     ].map((item) => (
                       <button
                         key={item.label}
@@ -753,14 +790,14 @@ export default function RoutinePage() {
                 }}
               >
                 <Plus size={18} />
-                <span>Create Routine</span>
+                <span>{t('routine.createRoutine') || 'Create Routine'}</span>
               </button>
 
               {/* Refresh Button */}
               <button
                 className="btn"
                 onClick={fetchRoutines}
-                title="Refresh"
+                title={t('routine.refresh') || 'Refresh'}
                 style={{
                   height: '42px',
                   width: '42px',
@@ -791,7 +828,7 @@ export default function RoutinePage() {
                     background: 'var(--background)',
                   }}
                 >
-                  <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                  <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('routine.show') || 'Show:'}</span>
                   <select
                     value={limit}
                     onChange={(e) => {
@@ -808,10 +845,10 @@ export default function RoutinePage() {
                       fontWeight: 600,
                     }}
                   >
-                    <option value={10}>10</option>
-                    <option value={15}>15</option>
-                    <option value={30}>30</option>
-                    <option value={50}>50</option>
+                    <option value={10}>{language === 'bn' ? '১০' : '10'}</option>
+                    <option value={15}>{language === 'bn' ? '১৫' : '15'}</option>
+                    <option value={30}>{language === 'bn' ? '৩০' : '30'}</option>
+                    <option value={50}>{language === 'bn' ? '৫০' : '50'}</option>
                   </select>
                 </div>
               )}
@@ -828,7 +865,7 @@ export default function RoutinePage() {
                     textDecoration: 'underline',
                   }}
                 >
-                  Clear all
+                  {t('routine.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -851,7 +888,7 @@ export default function RoutinePage() {
               {/* Day Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Day of Week
+                  {t('routine.dayOfWeek') || 'Day of Week'}
                 </label>
                 <select
                   className="input"
@@ -862,9 +899,9 @@ export default function RoutinePage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All Days</option>
+                  <option value="">{t('routine.allDays') || 'All Days'}</option>
                   {DAYS_OF_WEEK.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d} value={d}>{getDayLabel(d)}</option>
                   ))}
                 </select>
               </div>
@@ -872,7 +909,7 @@ export default function RoutinePage() {
               {/* Class Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Class
+                  {t('common.class') || 'Class'}
                 </label>
                 <select
                   className="input"
@@ -880,7 +917,7 @@ export default function RoutinePage() {
                   onChange={handleClassChange}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('common.allClasses') || 'All Classes'}</option>
                   {availableClasses.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -890,7 +927,7 @@ export default function RoutinePage() {
               {/* Section Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Section
+                  {t('common.section') || 'Section'}
                 </label>
                 <select
                   className="input"
@@ -902,7 +939,7 @@ export default function RoutinePage() {
                   disabled={!selectedClassId || availableSections.length === 0}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All Sections</option>
+                  <option value="">{t('common.allSections') || 'All Sections'}</option>
                   {availableSections.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -912,7 +949,7 @@ export default function RoutinePage() {
               {/* Teacher Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Teacher
+                  {t('common.teacher') || 'Teacher'}
                 </label>
                 <select
                   className="input"
@@ -923,7 +960,7 @@ export default function RoutinePage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All Teachers</option>
+                  <option value="">{t('common.allTeachers') || 'All Teachers'}</option>
                   {availableTeachers.map((tc) => (
                     <option key={tc.id} value={tc.id}>{tc.name}</option>
                   ))}
@@ -941,13 +978,13 @@ export default function RoutinePage() {
                 <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                   {[
                     { label: '#', w: '52px' },
-                    { label: 'Subject & Code' },
-                    { label: 'Day', w: '130px' },
-                    { label: 'Time', w: '190px' },
-                    { label: 'Class & Section' },
-                    { label: 'Teacher' },
-                    { label: 'Room', w: '110px' },
-                    { label: 'Actions', w: '170px', align: 'right' as const },
+                    { label: t('routine.subjectAndCode') || 'Subject & Code' },
+                    { label: t('routine.day') || 'Day', w: '130px' },
+                    { label: t('routine.time') || 'Time', w: '190px' },
+                    { label: t('routine.classAndSection') || 'Class & Section' },
+                    { label: t('common.teacher') || 'Teacher' },
+                    { label: t('routine.room') || 'Room', w: '110px' },
+                    { label: t('common.actions') || 'Actions', w: '170px', align: 'right' as const },
                   ].map((col) => (
                     <th
                       key={col.label}
@@ -1025,7 +1062,7 @@ export default function RoutinePage() {
                       >
                         {/* SL */}
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                          {sl}
+                          {language === 'bn' ? String(sl).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : sl}
                         </td>
 
                         {/* Subject */}
@@ -1049,7 +1086,7 @@ export default function RoutinePage() {
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontWeight: 600, fontSize: '0.925rem', color: 'var(--foreground)' }}>
-                                {routine.subjectEntity?.name || 'Subject Unknown'}
+                                {routine.subjectEntity?.name || t('routine.subjectUnknown') || 'Subject Unknown'}
                               </span>
                               {routine.subjectEntity?.code && (
                                 <span
@@ -1083,7 +1120,7 @@ export default function RoutinePage() {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {routine.day}
+                            {getDayLabel(routine.day)}
                           </span>
                         </td>
 
@@ -1106,7 +1143,7 @@ export default function RoutinePage() {
                               <Clock size={13} style={{ color: '#f59e0b' }} />
                             </div>
                             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
-                              {formatTimeTo12h(routine.startTime)} – {formatTimeTo12h(routine.endTime)}
+                              {formatTimeTo12h(routine.startTime, language)} – {formatTimeTo12h(routine.endTime, language)}
                             </span>
                           </div>
                         </td>
@@ -1116,11 +1153,11 @@ export default function RoutinePage() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
                               <School size={13} style={{ color: 'var(--primary)' }} />
-                              <span>{routine.classEntity?.name || 'N/A'}</span>
+                              <span>{routine.classEntity?.name || (t('common.na') || 'N/A')}</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                               <Layers size={12} />
-                              <span>Sec: {routine.sectionEntity?.name || 'N/A'}</span>
+                              <span>{t('routine.sec') || 'Sec'}: {routine.sectionEntity?.name || (t('common.na') || 'N/A')}</span>
                             </div>
                           </div>
                         </td>
@@ -1129,7 +1166,7 @@ export default function RoutinePage() {
                         <td style={{ padding: '1rem 1.25rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', color: 'var(--foreground)' }}>
                             <User size={13} style={{ color: 'var(--muted-foreground)' }} />
-                            <span style={{ fontWeight: 500 }}>{routine.teacherEntity?.name || 'Unassigned'}</span>
+                            <span style={{ fontWeight: 500 }}>{routine.teacherEntity?.name || t('routine.unassigned') || 'Unassigned'}</span>
                           </div>
                         </td>
 
@@ -1137,7 +1174,7 @@ export default function RoutinePage() {
                         <td style={{ padding: '1rem 1.25rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>
                             <MapPin size={13} />
-                            <span>{routine.roomNumber || 'TBA'}</span>
+                            <span>{routine.roomNumber ? (language === 'bn' ? String(routine.roomNumber).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : routine.roomNumber) : (t('routine.tba') || 'TBA')}</span>
                           </div>
                         </td>
 
@@ -1146,7 +1183,7 @@ export default function RoutinePage() {
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                             <button
                               className="action-btn"
-                              title="Take Attendance"
+                              title={t('routine.takeAttendance') || 'Take Attendance'}
                               onClick={() => setActiveAttendanceRoutine(routine)}
                               style={{
                                 padding: '0.35rem 0.6rem',
@@ -1163,11 +1200,11 @@ export default function RoutinePage() {
                               }}
                             >
                               <CheckSquare size={13} />
-                              <span>Att</span>
+                              <span>{t('routine.attShort') || 'Att'}</span>
                             </button>
                             <button
                               className="action-btn"
-                              title="Assign / View Homework"
+                              title={t('routine.assignHomework') || 'Assign / View Homework'}
                               onClick={() => setActiveHomeworkRoutine(routine)}
                               style={{
                                 padding: '0.35rem 0.6rem',
@@ -1184,11 +1221,11 @@ export default function RoutinePage() {
                               }}
                             >
                               <FileText size={13} />
-                              <span>HW</span>
+                              <span>{t('routine.hwShort') || 'HW'}</span>
                             </button>
                             <button
                               className="action-btn"
-                              title="Remove Routine Slot"
+                              title={t('routine.deleteSlot') || 'Remove Routine Slot'}
                               onClick={() => handleDeleteRoutine(routine.id)}
                               style={{
                                 width: '30px',
@@ -1233,8 +1270,8 @@ export default function RoutinePage() {
                         </p>
                         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                           {activeFiltersCount > 0
-                            ? 'Try adjusting your search query or reset your filters.'
-                            : 'No routines have been scheduled yet. Click "Create Routine" to begin.'}
+                            ? (t('routine.tryAdjusting') || 'Try adjusting your search query or reset your filters.')
+                            : (t('routine.noRoutinesYet') || 'No routines have been scheduled yet. Click "Create Routine" to begin.')}
                         </p>
                         {activeFiltersCount > 0 && (
                           <button
@@ -1247,7 +1284,7 @@ export default function RoutinePage() {
                               fontSize: '0.85rem',
                             }}
                           >
-                            Clear Filters
+                            {t('routine.clearFilters') || 'Clear Filters'}
                           </button>
                         )}
                       </div>
@@ -1289,7 +1326,9 @@ export default function RoutinePage() {
                     {t('routine.noRoutine') || 'No routine blocks found'}
                   </p>
                   <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-                    {activeFiltersCount > 0 ? 'Try clearing your filters.' : 'Click "Create Routine" to add timetable periods.'}
+                    {activeFiltersCount > 0
+                      ? (t('routine.tryClearingFilters') || 'Try clearing your filters.')
+                      : (t('routine.clickToCreate') || 'Click "Create Routine" to add timetable periods.')}
                   </p>
                 </div>
               </div>
@@ -1317,11 +1356,12 @@ export default function RoutinePage() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        {day}
+                        {getDayLabel(day)}
                       </span>
                       <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
                       <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                        {dayRoutines.length} {dayRoutines.length === 1 ? 'period' : 'periods'}
+                        {language === 'bn' ? String(dayRoutines.length).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : dayRoutines.length}{' '}
+                        {dayRoutines.length === 1 ? (t('routine.period') || 'period') : (t('routine.periods') || 'periods')}
                       </span>
                     </div>
 
@@ -1357,12 +1397,12 @@ export default function RoutinePage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                               <div>
                                 <h5 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                                  {routine.subjectEntity?.name || 'Subject Unknown'}
+                                  {routine.subjectEntity?.name || t('routine.subjectUnknown') || 'Subject Unknown'}
                                 </h5>
                                 <div style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                   <School size={12} />
-                                  <span>{routine.classEntity?.name}</span>
-                                  {routine.sectionEntity?.name && <span>• Sec {routine.sectionEntity.name}</span>}
+                                  <span>{routine.classEntity?.name || (t('common.na') || '—')}</span>
+                                  {routine.sectionEntity?.name && <span>• {t('routine.sec') || 'Sec'} {routine.sectionEntity.name}</span>}
                                 </div>
                               </div>
                               {routine.subjectEntity?.code && (
@@ -1398,16 +1438,20 @@ export default function RoutinePage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                                 <Clock size={13} style={{ color: '#f59e0b' }} />
                                 <span>
-                                  {formatTimeTo12h(routine.startTime)} – {formatTimeTo12h(routine.endTime)}
+                                  {formatTimeTo12h(routine.startTime, language)} – {formatTimeTo12h(routine.endTime, language)}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                                 <User size={13} />
-                                <span>{routine.teacherEntity?.name || 'Unassigned'}</span>
+                                <span>{routine.teacherEntity?.name || t('routine.unassigned') || 'Unassigned'}</span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                                 <MapPin size={13} />
-                                <span>{routine.roomNumber ? `Room ${routine.roomNumber}` : 'Room TBA'}</span>
+                                <span>
+                                  {routine.roomNumber
+                                    ? `${t('routine.room') || 'Room'} ${language === 'bn' ? String(routine.roomNumber).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : routine.roomNumber}`
+                                    : (t('routine.roomTba') || 'Room TBA')}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -1433,7 +1477,7 @@ export default function RoutinePage() {
                               }}
                             >
                               <CheckSquare size={14} />
-                              <span>Attendance</span>
+                              <span>{t('routine.attendance') || 'Attendance'}</span>
                             </button>
                             <button
                               onClick={() => setActiveHomeworkRoutine(routine)}
@@ -1454,11 +1498,11 @@ export default function RoutinePage() {
                               }}
                             >
                               <FileText size={14} />
-                              <span>Homework</span>
+                              <span>{t('routine.homework') || 'Homework'}</span>
                             </button>
                             <button
                               onClick={() => handleDeleteRoutine(routine.id)}
-                              title="Delete routine slot"
+                              title={t('routine.deleteSlot') || 'Delete routine slot'}
                               style={{
                                 padding: '0.65rem 0.75rem',
                                 display: 'flex',
@@ -1498,14 +1542,27 @@ export default function RoutinePage() {
             }}
           >
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> routine slots
+              {t('attendance.showing') || 'Showing'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? String(((page - 1) * limit) + 1).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : ((page - 1) * limit) + 1}
+              </strong>{' '}
+              {t('attendance.to') || 'to'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? String(Math.min(page * limit, total)).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : Math.min(page * limit, total)}
+              </strong>{' '}
+              {t('attendance.of') || 'of'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {language === 'bn' ? String(total).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : total}
+              </strong>{' '}
+              {t('routine.routineSlots') || 'routine slots'}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('attendance.page') || 'Page'}{' '}
+                {language === 'bn' ? String(page).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : page}{' '}
+                {t('attendance.of') || 'of'}{' '}
+                {language === 'bn' ? String(totalPages).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]) : totalPages}
               </span>
 
               <button
@@ -1520,7 +1577,7 @@ export default function RoutinePage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('attendance.prevPage') || 'Previous page'}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1537,7 +1594,7 @@ export default function RoutinePage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('attendance.nextPage') || 'Next page'}
               >
                 <ChevronRight size={16} />
               </button>

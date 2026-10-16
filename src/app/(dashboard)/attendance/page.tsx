@@ -38,6 +38,27 @@ interface AttendanceRecord {
   routine: { startTime: string; endTime: string } | null;
 }
 
+// Convert ISO string or "HH:MM" to "h:MM AM/PM"
+function formatTimeTo12h(timeStr: string | null | undefined, language: string = 'en'): string {
+  if (!timeStr) return '—';
+  try {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime()) && timeStr.includes('T')) {
+      return d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+    const [hStr, mStr] = timeStr.split(':');
+    if (hStr !== undefined && mStr !== undefined) {
+      let h = parseInt(hStr, 10);
+      const m = mStr.substring(0, 2);
+      const ampm = h >= 12 ? (language === 'bn' ? 'পিএম' : 'PM') : (language === 'bn' ? 'এএম' : 'AM');
+      h = h % 12 || 12;
+      const formattedNum = language === 'bn' ? `${h}:${m}`.replace(/\d/g, (dig) => '০১২৩৪৫৬৭৮৯'[parseInt(dig, 10)]) : `${h}:${m}`;
+      return `${formattedNum} ${ampm}`;
+    }
+  } catch (e) {}
+  return timeStr;
+}
+
 const STATUS_CONFIG: Record<string, { bg: string; color: string; border: string; dot: string }> = {
   present:  { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', border: 'rgba(16,185,129,0.25)',  dot: '#10b981' },
   absent:   { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', border: 'rgba(239,68,68,0.25)',   dot: '#ef4444' },
@@ -47,16 +68,28 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; border: string;
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   const key = status?.toLowerCase() || 'unknown';
   const cfg = STATUS_CONFIG[key] ?? { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', border: 'rgba(107,114,128,0.25)', dot: '#6b7280' };
-  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+  
+  let label = t('attendance.unknown') || 'Unknown';
+  if (key === 'present') label = t('common.present') || 'Present';
+  else if (key === 'absent') label = t('common.absent') || 'Absent';
+  else if (key === 'late') label = t('common.late') || 'Late';
+  else if (key === 'leave') label = t('common.leave') || 'Leave';
+  else if (key === 'excused') label = t('attendance.excused') || 'Excused';
+  else if (status) {
+    label = status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
       padding: '0.25rem 0.65rem', borderRadius: '999px',
       fontSize: '0.75rem', fontWeight: 600,
       background: cfg.bg, color: cfg.color,
-      border: `1px solid ${cfg.border}`
+      border: `1px solid ${cfg.border}`,
+      whiteSpace: 'nowrap'
     }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
       {label}
@@ -65,7 +98,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AttendancePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [classesData, setClassesData] = useState<ClassEntity[]>([]);
   const [sectionsData, setSectionsData] = useState<SectionEntity[]>([]);
@@ -216,23 +249,54 @@ export default function AttendancePage() {
     setPage(1);
   };
 
+  const getStatusLabel = useCallback((status: string) => {
+    const key = status?.toLowerCase() || '';
+    if (key === 'present') return t('common.present') || 'Present';
+    if (key === 'absent') return t('common.absent') || 'Absent';
+    if (key === 'late') return t('common.late') || 'Late';
+    if (key === 'leave') return t('common.leave') || 'Leave';
+    if (key === 'excused') return t('attendance.excused') || 'Excused';
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : (t('attendance.unknown') || 'Unknown');
+  }, [t]);
+
   // ── Export CSV ──────────────────────────────────────────────
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
     if (records.length === 0) return;
-    const headers = ['#', 'Date', 'Student', 'Roll No', 'Class', 'Section', 'Subject', 'Teacher', 'Time', 'Status'];
-    const rows = records.map((r, i) => [
-      ((page - 1) * limit + i + 1).toString(),
-      `"${new Date(r.date).toLocaleDateString()}"`,
-      `"${(r.studentName || '').replace(/"/g, '""')}"`,
-      `"${r.student?.rollNumber || ''}"`,
-      `"${r.class?.name || ''}"`,
-      `"${r.section?.name || ''}"`,
-      `"${r.subject?.name || ''}"`,
-      `"${r.teacher?.name || ''}"`,
-      `"${r.routine ? `${r.routine.startTime} - ${r.routine.endTime}` : ''}"`,
-      `"${r.status || ''}"`,
-    ]);
+    const headers = [
+      '#',
+      t('common.date') || 'Date',
+      t('common.student') || 'Student',
+      t('common.rollNo') || 'Roll No',
+      t('common.class') || 'Class',
+      t('common.section') || 'Section',
+      t('common.subject') || 'Subject',
+      t('common.teacher') || 'Teacher',
+      t('attendance.time') || 'Time',
+      t('common.status') || 'Status',
+    ];
+    const rows = records.map((r, i) => {
+      const dateObj = new Date(r.date);
+      const formattedDate = !isNaN(dateObj.getTime())
+        ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US')
+        : r.date || '';
+      const timeFormatted = r.routine
+        ? `${formatTimeTo12h(r.routine.startTime, language)} - ${formatTimeTo12h(r.routine.endTime, language)}`
+        : '';
+
+      return [
+        ((page - 1) * limit + i + 1).toString(),
+        `"${formattedDate}"`,
+        `"${(r.studentName || '').replace(/"/g, '""')}"`,
+        `"${r.student?.rollNumber || ''}"`,
+        `"${r.class?.name || ''}"`,
+        `"${r.section?.name || ''}"`,
+        `"${r.subject?.name || ''}"`,
+        `"${r.teacher?.name || ''}"`,
+        `"${timeFormatted}"`,
+        `"${getStatusLabel(r.status)}"`,
+      ];
+    });
     const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csv));
@@ -262,31 +326,53 @@ export default function AttendancePage() {
     }
 
     doc.setFontSize(15); doc.setTextColor(50, 50, 50);
-    doc.text('Student Attendance Report', 14, y); y += 7;
+    doc.text(t('attendance.reportTitle') || 'Student Attendance Report', 14, y); y += 7;
 
     doc.setFontSize(9); doc.setTextColor(110, 110, 110);
-    let filterText = `Date Range: ${startDate} to ${endDate}`;
-    if (debouncedSearch) filterText += ` | Search: ${debouncedSearch}`;
-    if (filterClass) { const n = classesData.find(c => c.id === filterClass)?.name; if (n) filterText += ` | Class: ${n}`; }
-    if (filterSection) { const n = sectionsData.find(s => s.id === filterSection)?.name; if (n) filterText += ` | Section: ${n}`; }
-    if (filterSubject) { const n = subjectsData.find(s => s.id === filterSubject)?.name; if (n) filterText += ` | Subject: ${n}`; }
-    if (filterStatus) filterText += ` | Status: ${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}`;
+    let filterText = `${t('attendance.dateRange') || 'Date Range'}: ${startDate} ${t('attendance.to') || 'to'} ${endDate}`;
+    if (debouncedSearch) filterText += ` | ${t('common.search') || 'Search'}: ${debouncedSearch}`;
+    if (filterClass) { const n = classesData.find(c => c.id === filterClass)?.name; if (n) filterText += ` | ${t('common.class') || 'Class'}: ${n}`; }
+    if (filterSection) { const n = sectionsData.find(s => s.id === filterSection)?.name; if (n) filterText += ` | ${t('common.section') || 'Section'}: ${n}`; }
+    if (filterSubject) { const n = subjectsData.find(s => s.id === filterSubject)?.name; if (n) filterText += ` | ${t('common.subject') || 'Subject'}: ${n}`; }
+    if (filterTeacher) { const n = teachersData.find(tc => tc.id === filterTeacher)?.name; if (n) filterText += ` | ${t('common.teacher') || 'Teacher'}: ${n}`; }
+    if (filterStatus) filterText += ` | ${t('common.status') || 'Status'}: ${getStatusLabel(filterStatus)}`;
     doc.text(filterText, 14, y); y += 7;
 
     autoTable(doc, {
-      head: [['#', 'Date', 'Student', 'Roll No', 'Class', 'Section', 'Subject', 'Teacher', 'Time', 'Status']],
-      body: records.map((r, i) => [
-        ((page - 1) * limit + i + 1).toString(),
-        new Date(r.date).toLocaleDateString(),
-        r.studentName || 'N/A',
-        r.student?.rollNumber || 'N/A',
-        r.class?.name || 'N/A',
-        r.section?.name || 'N/A',
-        r.subject?.name || 'N/A',
-        r.teacher?.name || 'N/A',
-        r.routine ? `${r.routine.startTime} - ${r.routine.endTime}` : 'N/A',
-        r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : 'Unknown',
-      ]),
+      head: [[
+        '#',
+        t('common.date') || 'Date',
+        t('attendance.studentDetails') || 'Student',
+        t('common.rollNo') || 'Roll No',
+        t('common.class') || 'Class',
+        t('common.section') || 'Section',
+        t('common.subject') || 'Subject',
+        t('common.teacher') || 'Teacher',
+        t('attendance.time') || 'Time',
+        t('common.status') || 'Status',
+      ]],
+      body: records.map((r, i) => {
+        const dateObj = new Date(r.date);
+        const formattedDate = !isNaN(dateObj.getTime())
+          ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+          : r.date || (t('common.na') || 'N/A');
+        const timeFormatted = r.routine
+          ? `${formatTimeTo12h(r.routine.startTime, language)} – ${formatTimeTo12h(r.routine.endTime, language)}`
+          : (t('common.na') || 'N/A');
+
+        return [
+          ((page - 1) * limit + i + 1).toString(),
+          formattedDate,
+          r.studentName || (t('attendance.unknown') || 'Unknown'),
+          r.student?.rollNumber || (t('common.na') || 'N/A'),
+          r.class?.name || (t('common.na') || 'N/A'),
+          r.section?.name || (t('common.na') || 'N/A'),
+          r.subject?.name || (t('common.na') || 'N/A'),
+          r.teacher?.name || (t('common.na') || 'N/A'),
+          timeFormatted,
+          getStatusLabel(r.status),
+        ];
+      }),
       startY: y,
       styles: { fontSize: 8, cellPadding: 2.5 },
       headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -294,8 +380,8 @@ export default function AttendancePage() {
       didDrawPage: (data) => {
         const pages = (doc.internal as any).getNumberOfPages();
         doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${data.pageNumber} of ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
+        doc.text(`${t('attendance.page') || 'Page'} ${data.pageNumber} ${t('attendance.of') || 'of'} ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+        doc.text(`${t('attendance.generated') || 'Generated'}: ${new Date().toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`, 14, doc.internal.pageSize.height - 10);
       },
     });
     doc.save(`attendance_${startDate}_to_${endDate}.pdf`);
@@ -320,10 +406,10 @@ export default function AttendancePage() {
           gap: '1rem', marginBottom: '1.5rem'
         }}>
           {[
-            { label: 'Total Records', value: total, color: 'var(--primary)', bg: 'rgba(79,70,229,0.08)' },
-            { label: 'Present',       value: stats.present, color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-            { label: 'Absent',        value: stats.absent,  color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
-            { label: 'Late / Other',  value: stats.late + stats.other, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+            { label: t('attendance.totalRecords') || 'Total Records', value: total, color: 'var(--primary)', bg: 'rgba(79,70,229,0.08)' },
+            { label: t('common.present') || 'Present',               value: stats.present, color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
+            { label: t('common.absent') || 'Absent',                value: stats.absent,  color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+            { label: t('attendance.lateOther') || 'Late / Other',   value: stats.late + stats.other, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
           ].map(s => (
             <div key={s.label} className="glass-card" style={{
               padding: '1rem 1.25rem', borderRadius: '1rem',
@@ -360,7 +446,7 @@ export default function AttendancePage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search by student name..."
+                  placeholder={t('attendance.searchPlaceholder') || "Search by student name..."}
                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: 'var(--foreground)', fontSize: '0.9rem' }}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
@@ -389,7 +475,7 @@ export default function AttendancePage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('attendance.filters') || t('common.filter') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{
                     background: showFilters ? '#ffffff' : 'var(--primary)',
@@ -417,7 +503,7 @@ export default function AttendancePage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('attendance.export') || t('common.export') || 'Export'}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
                 {exportDropdownOpen && (
@@ -429,8 +515,8 @@ export default function AttendancePage() {
                     display: 'flex', flexDirection: 'column', gap: '0.2rem'
                   }}>
                     {[
-                      { label: 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
-                      { label: 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
+                      { label: t('attendance.exportCsv') || t('students.exportCsv') || 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
+                      { label: t('attendance.exportPdf') || t('students.exportPdf') || 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
                     ].map(item => (
                       <button
                         key={item.label}
@@ -456,7 +542,7 @@ export default function AttendancePage() {
               <button
                 className="btn"
                 onClick={() => fetchAttendance()}
-                title="Refresh"
+                title={t('attendance.refresh') || 'Refresh'}
                 style={{
                   height: '42px', width: '42px', padding: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -469,7 +555,7 @@ export default function AttendancePage() {
 
               {/* Page sizer */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('attendance.show') || t('students.show') || 'Show:'}</span>
                 <select
                   value={limit}
                   onChange={e => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -487,7 +573,7 @@ export default function AttendancePage() {
                   onClick={resetAllFilters}
                   style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', fontSize: '0.825rem', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  Clear all
+                  {t('attendance.clearAll') || t('students.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -503,68 +589,84 @@ export default function AttendancePage() {
             }}>
               {/* Start Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Start Date</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('attendance.startDate') || 'Start Date'}
+                </label>
                 <input type="date" className="input" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }} />
               </div>
 
               {/* End Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>End Date</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('attendance.endDate') || 'End Date'}
+                </label>
                 <input type="date" className="input" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }} />
               </div>
 
               {/* Specific Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Specific Date</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('attendance.specificDate') || 'Specific Date'}
+                </label>
                 <input type="date" className="input" value={filterDate} onChange={e => { setFilterDate(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }} />
               </div>
 
               {/* Class */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Class</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('common.class') || 'Class'}
+                </label>
                 <select className="input" value={filterClass} onChange={e => { setFilterClass(e.target.value); setFilterSection(''); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }}>
-                  <option value="">{t('common.allClasses') || 'All Classes'}</option>
+                  <option value="">{t('attendance.allClasses') || t('common.allClasses') || 'All Classes'}</option>
                   {classesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
               {/* Section */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Section</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('common.section') || 'Section'}
+                </label>
                 <select className="input" value={filterSection} onChange={e => { setFilterSection(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }} disabled={!filterClass}>
-                  <option value="">{t('common.allSections') || 'All Sections'}</option>
+                  <option value="">{t('attendance.allSections') || t('common.allSections') || 'All Sections'}</option>
                   {availableSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
 
               {/* Subject */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Subject</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('common.subject') || 'Subject'}
+                </label>
                 <select className="input" value={filterSubject} onChange={e => { setFilterSubject(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }}>
-                  <option value="">{t('common.allSubjects') || 'All Subjects'}</option>
+                  <option value="">{t('attendance.allSubjects') || t('common.allSubjects') || 'All Subjects'}</option>
                   {subjectsData.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
 
               {/* Teacher */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Teacher</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('common.teacher') || 'Teacher'}
+                </label>
                 <select className="input" value={filterTeacher} onChange={e => { setFilterTeacher(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }}>
-                  <option value="">{t('common.allTeachers') || 'All Teachers'}</option>
+                  <option value="">{t('attendance.allTeachers') || t('common.allTeachers') || 'All Teachers'}</option>
                   {teachersData.map(tc => <option key={tc.id} value={tc.id}>{tc.name}</option>)}
                 </select>
               </div>
 
               {/* Status */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Status</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('common.status') || 'Status'}
+                </label>
                 <select className="input" value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} style={{ height: '38px', borderRadius: '0.5rem' }}>
-                  <option value="">{t('common.allStatus') || 'All Statuses'}</option>
-                  <option value="present">Present</option>
-                  <option value="absent">Absent</option>
-                  <option value="late">Late</option>
-                  <option value="excused">Excused</option>
-                  <option value="leave">Leave</option>
+                  <option value="">{t('attendance.allStatus') || t('dashboard.allStatus') || 'All Statuses'}</option>
+                  <option value="present">{t('common.present') || 'Present'}</option>
+                  <option value="absent">{t('common.absent') || 'Absent'}</option>
+                  <option value="late">{t('common.late') || 'Late'}</option>
+                  <option value="excused">{t('attendance.excused') || 'Excused'}</option>
+                  <option value="leave">{t('common.leave') || 'Leave'}</option>
                 </select>
               </div>
             </div>
@@ -578,12 +680,12 @@ export default function AttendancePage() {
               <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                 {[
                   { label: '#', w: '52px' },
-                  { label: 'Student Details' },
-                  { label: 'Date', w: '150px' },
-                  { label: 'Class & Section' },
-                  { label: 'Subject / Teacher' },
-                  { label: 'Time', w: '150px' },
-                  { label: 'Status', w: '120px' },
+                  { label: t('attendance.studentDetails') || 'Student Details' },
+                  { label: t('common.date') || 'Date', w: '160px' },
+                  { label: t('attendance.classAndSection') || t('common.classAndSection') || 'Class & Section' },
+                  { label: t('attendance.subjectTeacher') || 'Subject / Teacher' },
+                  { label: t('attendance.time') || 'Time', w: '150px' },
+                  { label: t('common.status') || 'Status', w: '120px' },
                 ].map(col => (
                   <th
                     key={col.label}
@@ -641,20 +743,11 @@ export default function AttendancePage() {
                 records.map((record, index) => {
                   const sl = (page - 1) * limit + index + 1;
 
-                  // Beautiful date: "Wed, Oct 15, 2026" — single line
+                  // Beautiful date formatted according to language
                   const dateObj = new Date(record.date);
-                  const formattedDate = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-
-                  // Convert "HH:MM" → "h:MM AM/PM"
-                  const to12h = (t: string) => {
-                    if (!t) return '';
-                    const [hStr, mStr] = t.split(':');
-                    let h = parseInt(hStr, 10);
-                    const m = mStr || '00';
-                    const ampm = h >= 12 ? 'PM' : 'AM';
-                    h = h % 12 || 12;
-                    return `${h}:${m} ${ampm}`;
-                  };
+                  const formattedDate = !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                    : record.date || (t('common.na') || 'N/A');
 
                   return (
                     <tr
@@ -683,11 +776,11 @@ export default function AttendancePage() {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem' }}>
-                              {record.studentName || 'Unknown'}
+                              {record.studentName || (t('attendance.unknown') || 'Unknown')}
                             </span>
                             {record.student?.rollNumber && (
                               <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                                Roll: <span style={{
+                                {t('attendance.roll') || t('common.rollNo') || 'Roll'}: <span style={{
                                   display: 'inline-block', padding: '0 0.4rem',
                                   background: 'rgba(79,70,229,0.08)', color: 'var(--primary)',
                                   borderRadius: '0.3rem', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace'
@@ -719,11 +812,11 @@ export default function AttendancePage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
                             <BookOpen size={13} style={{ color: 'var(--primary)' }} />
-                            <span>{record.class?.name || 'N/A'}</span>
+                            <span>{record.class?.name || (t('common.na') || 'N/A')}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                             <Layers size={13} />
-                            <span>Section: {record.section?.name || 'N/A'}</span>
+                            <span>{t('attendance.section') || t('common.section') || 'Section'}: {record.section?.name || (t('common.na') || 'N/A')}</span>
                           </div>
                         </div>
                       </td>
@@ -732,11 +825,11 @@ export default function AttendancePage() {
                       <td style={{ padding: '1rem 1.25rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                            {record.subject?.name || 'N/A'}
+                            {record.subject?.name || (t('common.na') || 'N/A')}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                             <User size={12} />
-                            <span>{record.teacher?.name || 'N/A'}</span>
+                            <span>{record.teacher?.name || (t('common.na') || 'N/A')}</span>
                           </div>
                         </div>
                       </td>
@@ -754,10 +847,10 @@ export default function AttendancePage() {
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
                               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                                {to12h(record.routine.startTime)}
+                                {formatTimeTo12h(record.routine.startTime, language)}
                               </span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>
-                                – {to12h(record.routine.endTime)}
+                                – {formatTimeTo12h(record.routine.endTime, language)}
                               </span>
                             </div>
                           </div>
@@ -785,8 +878,8 @@ export default function AttendancePage() {
                       </p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {activeFiltersCount > 0
-                          ? 'Try adjusting your search keywords or resetting filters.'
-                          : 'No attendance records exist for the selected date range.'}
+                          ? (t('attendance.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
+                          : (t('attendance.noRecordsDateRange') || 'No attendance records exist for the selected date range.')}
                       </p>
                       {activeFiltersCount > 0 && (
                         <button
@@ -794,7 +887,7 @@ export default function AttendancePage() {
                           className="btn"
                           style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
                         >
-                          Clear Filters
+                          {t('attendance.clearFilters') || t('students.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -813,25 +906,25 @@ export default function AttendancePage() {
             background: 'var(--background)', flexWrap: 'wrap', gap: '1rem'
           }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing{' '}
+              {t('attendance.showing') || 'Showing'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong>
-              {' '}to{' '}
+              {' '}{t('attendance.to') || 'to'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong>
-              {' '}of{' '}
+              {' '}{t('attendance.of') || 'of'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>{total}</strong>
-              {' '}records
+              {' '}{t('attendance.records') || 'records'}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('attendance.page') || 'Page'} {page} {t('attendance.of') || 'of'} {totalPages}
               </span>
               <button
                 className="btn"
                 style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }}
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('attendance.prevPage') || 'Previous page'}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -840,7 +933,7 @@ export default function AttendancePage() {
                 style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('attendance.nextPage') || 'Next page'}
               >
                 <ChevronRight size={16} />
               </button>
