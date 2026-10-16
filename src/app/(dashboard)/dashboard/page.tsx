@@ -283,6 +283,197 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
   );
 }
 
+// ─── Bar Chart (for Teacher Attendance) ─────────────────────────────────────────
+function BarChart({ data, height = 320 }: { data: { label: string, value: number, subLabel?: string, subColor?: string, stats?: { present: number, absent: number, leave: number, late: number, total: number }, dateStr?: string }[], height?: number }) {
+  const { t } = useLanguage();
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+      }, 0);
+    }
+  }, [data]);
+
+  const h = height;
+  const padX = 35;
+  const padY = 40;
+  const barWidth = data.length > 20 ? 18 : 28;
+  const gap = data.length > 20 ? 12 : 18;
+  const totalBarSpace = barWidth + gap;
+  const dynamicW = Math.max(600, padX * 2 + data.length * totalBarSpace);
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+        {t('common.noData')}
+      </div>
+    );
+  }
+
+  const maxVal = 100;
+  const getY = (v: number) => h - padY - (v / maxVal) * (h - padY * 2 - 20);
+  const chartHeight = h - padY * 2 - 20;
+
+  const getBarX = (i: number) => {
+    if (data.length <= 1) return dynamicW / 2 - barWidth / 2;
+    return padX + i * totalBarSpace;
+  };
+
+  return (
+    <div ref={scrollRef} style={{ width: '100%', overflowX: 'auto', overflowY: 'visible', position: 'relative' }}>
+      <svg width={dynamicW} height={h} viewBox={`0 0 ${dynamicW} ${h}`} preserveAspectRatio="none" style={{ minWidth: '100%', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="barGradPurple" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a855f7" />
+            <stop offset="100%" stopColor="#7c3aed" />
+          </linearGradient>
+          <linearGradient id="barGradHover" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#c084fc" />
+            <stop offset="100%" stopColor="#9333ea" />
+          </linearGradient>
+        </defs>
+
+        {/* Y-axis grid lines and labels */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+          const y = getY(pct * 100);
+          return (
+            <g key={pct}>
+              <text x={padX - 8} y={y + 4} fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">{pct * 100}%</text>
+              <line x1={padX} y1={y} x2={dynamicW - 15} y2={y} stroke="#f1f5f9" strokeDasharray="4 4" />
+            </g>
+          );
+        })}
+
+        {/* Vertical Bars */}
+        {data.map((d, i) => {
+          const x = getBarX(i);
+          const barH = (Math.max(0, Math.min(100, d.value)) / maxVal) * chartHeight;
+          const y = h - padY - barH;
+          const isHovered = hoverIndex === i;
+          const [dayName, dayNum] = d.label.split(' ');
+
+          return (
+            <g
+              key={i}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              {/* Invisible interactive hit area */}
+              <rect x={x - gap / 2} y={0} width={totalBarSpace} height={h} fill="transparent" />
+
+              {/* Background Track Column */}
+              <rect
+                x={x}
+                y={h - padY - chartHeight}
+                width={barWidth}
+                height={chartHeight}
+                rx={barWidth / 3.5}
+                ry={barWidth / 3.5}
+                fill="#f8fafc"
+                stroke="#e2e8f0"
+                strokeWidth="1"
+              />
+
+              {/* Active Bar Fill */}
+              {barH > 0 && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={barH}
+                  rx={barWidth / 3.5}
+                  ry={barWidth / 3.5}
+                  fill={isHovered ? "url(#barGradHover)" : "url(#barGradPurple)"}
+                  style={{
+                    transition: 'all 0.25s ease',
+                    filter: isHovered ? 'drop-shadow(0 6px 12px rgba(168, 85, 247, 0.35))' : 'none'
+                  }}
+                />
+              )}
+
+              {/* Top Percentage Label */}
+              {d.value > 0 && (
+                <text
+                  x={x + barWidth / 2}
+                  y={Math.max(16, y - 6)}
+                  fontSize="9.5"
+                  fontWeight="700"
+                  fill={isHovered ? "#7c3aed" : "#64748b"}
+                  textAnchor="middle"
+                >
+                  {d.value}%
+                </text>
+              )}
+
+              {/* Bottom Day / Month Labels */}
+              {dayNum ? (
+                <>
+                  <text x={x + barWidth / 2} y={h - 22} fontSize="10" fill={isHovered ? "#64748b" : "#94a3b8"} textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>
+                    {dayName}
+                  </text>
+                  <text x={x + barWidth / 2} y={h - 10} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                    {dayNum}
+                  </text>
+                </>
+              ) : (
+                <text x={x + barWidth / 2} y={h - 15} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                  {d.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Floating Detailed Tooltip */}
+      {hoverIndex !== null && data[hoverIndex]?.stats && (
+        <div style={{
+          position: 'absolute',
+          left: Math.min(getBarX(hoverIndex) + 20, dynamicW - 160),
+          top: Math.max(10, getY(data[hoverIndex].value) - 80),
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '0.75rem',
+          padding: '0.75rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          pointerEvents: 'none',
+          zIndex: 10,
+          minWidth: '140px'
+        }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+            {data[hoverIndex].label.replace(' ', ', ')} - {data[hoverIndex].value}%
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', fontSize: '0.75rem' }}>
+            <span style={{ color: '#10b981' }}>{t('common.present')}:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.present / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.present})</span>
+            
+            <span style={{ color: '#ef4444' }}>{t('common.absent')}:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.absent / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.absent})</span>
+            
+            {data[hoverIndex].stats.leave > 0 && (
+              <>
+                <span style={{ color: '#f59e0b' }}>{t('common.leave')}:</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{data[hoverIndex].stats.leave}</span>
+              </>
+            )}
+            
+            {data[hoverIndex].stats.late > 0 && (
+              <>
+                <span style={{ color: '#8b5cf6' }}>{t('common.late')}:</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{data[hoverIndex].stats.late}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Mini Bar Chart ───────────────────────────────────────────────────────────
 function MiniBarChart({ data }: { data: { label: string; avg: number; top: number }[] }) {
   return (
@@ -939,7 +1130,7 @@ export default function DashboardPage() {
                 {showTeacherMap ? (
                   <TeacherMap data={teacherAttendanceData} />
                 ) : (
-                  <AreaChart data={teacherChartData} height={320} />
+                  <BarChart data={teacherChartData} height={320} />
                 )}
               </div>
             </div>
