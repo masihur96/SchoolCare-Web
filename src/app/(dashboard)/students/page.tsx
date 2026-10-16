@@ -273,10 +273,10 @@ export default function StudentsPage() {
         setDeleteModal({ open: false, id: '', name: '', roll: '' });
         fetchStudents();
       } else {
-        alert('Failed to delete student.');
+        alert(t('students.failedToDelete') || 'Failed to delete student.');
       }
     } catch (e) {
-      alert('Error deleting student.');
+      alert(t('students.errorDeleting') || 'Error deleting student.');
     } finally {
       setDeleteLoading(false);
     }
@@ -303,10 +303,10 @@ export default function StudentsPage() {
       if (result.statusCode === 200 && result.data?.url) {
         setFormState(prev => ({ ...prev, avatar: result.data.url }));
       } else {
-        alert('Failed to upload image.');
+        alert(t('students.failedToUpload') || 'Failed to upload image.');
       }
     } catch (err) {
-      alert('Error uploading image.');
+      alert(t('students.errorUploading') || 'Error uploading image.');
     } finally {
       setUploadingAvatar(false);
     }
@@ -347,10 +347,10 @@ export default function StudentsPage() {
         fetchStudents();
       } else {
         const errorData = await response.json();
-        alert(`Failed to save: ${errorData.message || 'Unknown error'}`);
+        alert(`${t('students.failedToSave') || 'Failed to save'}: ${errorData.message || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("Error saving student information.");
+      alert(t('students.errorSaving') || "Error saving student information.");
     } finally {
       setActionLoading(false);
     }
@@ -585,7 +585,7 @@ export default function StudentsPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('students.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{ 
                     background: showFilters ? '#ffffff' : 'var(--primary)', 
@@ -606,7 +606,7 @@ export default function StudentsPage() {
                   className="btn"
                   onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                   disabled={students.length === 0}
-                  title="Export Options"
+                  title={t('students.exportOptions') || 'Export Options'}
                   style={{ 
                     background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
                     border: '1px solid var(--border)', 
@@ -624,7 +624,7 @@ export default function StudentsPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('common.export') || 'Export'}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
 
@@ -669,7 +669,7 @@ export default function StudentsPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                      <span>Export as CSV</span>
+                      <span>{t('students.exportCsv') || 'Export as CSV'}</span>
                     </button>
                     <button
                       onClick={handleExportPDF}
@@ -693,7 +693,7 @@ export default function StudentsPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileText size={15} style={{ color: '#ef4444' }} />
-                      <span>Export as PDF</span>
+                      <span>{t('students.exportPdf') || 'Export as PDF'}</span>
                     </button>
                   </div>
                 )}
@@ -720,7 +720,7 @@ export default function StudentsPage() {
 
               {/* Page Sizer */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('students.show') || 'Show:'}</span>
                 <select 
                   value={limit} 
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -744,7 +744,7 @@ export default function StudentsPage() {
                     textDecoration: 'underline'
                   }}
                 >
-                  Clear all
+                  {t('students.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -828,7 +828,7 @@ export default function StudentsPage() {
               {/* Sort by Roll No */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Sort by Roll No
+                  {t('students.sortByRoll') || 'Sort by Roll No'}
                 </label>
                 <select 
                   className="input" 
@@ -836,9 +836,9 @@ export default function StudentsPage() {
                   onChange={(e) => setRollSortOrder(e.target.value as 'asc' | 'desc' | 'none')}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="asc">Roll: Low to High (1 → 100)</option>
-                  <option value="desc">Roll: High to Low (100 → 1)</option>
-                  <option value="none">Original Order</option>
+                  <option value="asc">{t('students.rollAsc') || 'Roll: Low to High (1 → 100)'}</option>
+                  <option value="desc">{t('students.rollDesc') || 'Roll: High to Low (100 → 1)'}</option>
+                  <option value="none">{t('students.originalOrder') || 'Original Order'}</option>
                 </select>
               </div>
             </div>
@@ -855,7 +855,7 @@ export default function StudentsPage() {
                 </th>
                 <th 
                   onClick={toggleRollSort}
-                  title="Click to sort by Roll Number"
+                  title={t('students.clickToSortRoll') || 'Click to sort by Roll Number'}
                   style={{ 
                     padding: '0.875rem 1.25rem', 
                     color: rollSortOrder !== 'none' ? 'var(--primary)' : 'var(--muted-foreground)', 
@@ -880,19 +880,19 @@ export default function StudentsPage() {
                   </div>
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Student Details
+                  {t('students.studentDetails') || 'Student Details'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Class & Section
+                  {t('students.classAndSection') || 'Class & Section'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Contact Info
+                  {t('students.contactInfo') || 'Contact Info'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '110px' }}>
-                  Status
+                  {t('common.status') || 'Status'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
-                  Actions
+                  {t('common.actions') || 'Actions'}
                 </th>
               </tr>
             </thead>
@@ -940,10 +940,10 @@ export default function StudentsPage() {
                   const sl = (page - 1) * limit + index + 1;
                   const classesList = student.classes && student.classes.length > 0
                     ? student.classes.map(c => c.name).join(', ')
-                    : 'Unassigned';
+                    : (t('students.unassigned') || 'Unassigned');
                   const sectionsList = student.sections && student.sections.length > 0
                     ? student.sections.map(s => s.name).join(', ')
-                    : 'None';
+                    : (t('students.none') || 'None');
 
                   return (
                     <tr 
@@ -1003,7 +1003,7 @@ export default function StudentsPage() {
                             <span 
                               style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }}
                               onClick={() => openViewModal(student)}
-                              title="Click to view full profile"
+                              title={t('students.clickToViewProfile') || 'Click to view full profile'}
                             >
                               {student.name}
                             </span>
@@ -1023,7 +1023,7 @@ export default function StudentsPage() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                             <Layers size={13} />
-                            <span>Section: {sectionsList}</span>
+                            <span>{t('students.filterBySection') || 'Section'}: {sectionsList}</span>
                           </div>
                         </div>
                       </td>
@@ -1033,7 +1033,7 @@ export default function StudentsPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: student.phone ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
                             <Phone size={13} style={{ color: 'var(--muted-foreground)' }} />
-                            <span>{student.phone || 'No phone'}</span>
+                            <span>{student.phone || (t('students.noPhone') || 'No phone')}</span>
                           </div>
                           {student.designation && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
@@ -1072,7 +1072,7 @@ export default function StudentsPage() {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           <button 
                             className="action-btn" 
-                            title="View student profile" 
+                            title={t('students.viewProfile') || 'View student profile'} 
                             onClick={() => openViewModal(student)}
                             style={{ 
                               width: '32px', 
@@ -1092,7 +1092,7 @@ export default function StudentsPage() {
                           
                           <button 
                             className="action-btn" 
-                            title="Edit student" 
+                            title={t('students.editStudent') || 'Edit student'} 
                             onClick={() => openEditModal(student)}
                             style={{ 
                               width: '32px', 
@@ -1112,7 +1112,7 @@ export default function StudentsPage() {
                           
                           <button 
                             className="action-btn" 
-                            title="Delete student" 
+                            title={t('students.deleteStudentBtn') || 'Delete student'} 
                             onClick={() => handleDelete(student)}
                             style={{ 
                               width: '32px', 
@@ -1147,7 +1147,7 @@ export default function StudentsPage() {
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {searchTerm || filterClass || filterSection || filterIsActive
                           ? (t('students.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
-                          : 'No student records have been created in this school yet. Click "Add Student" to begin.'}
+                          : (t('students.noStudentsYet') || 'No student records have been created in this school yet. Click "Add Student" to begin.')}
                       </p>
                       {(searchTerm || filterClass || filterSection || filterIsActive) && (
                         <button 
@@ -1155,7 +1155,7 @@ export default function StudentsPage() {
                           className="btn" 
                           style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
                         >
-                          Clear Filters
+                          {t('students.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -1179,12 +1179,12 @@ export default function StudentsPage() {
             gap: '1rem'
           }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> students
+              {t('students.showing') || 'Showing'} <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> {t('students.to') || 'to'} <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> {t('students.of') || 'of'} <strong style={{ color: 'var(--foreground)' }}>{total}</strong> {t('students.students') || 'students'}
             </span>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('students.page') || 'Page'} {page} {t('students.of') || 'of'} {totalPages}
               </span>
 
               <button 
@@ -1199,7 +1199,7 @@ export default function StudentsPage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('students.prevPage') || 'Previous page'}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1216,7 +1216,7 @@ export default function StudentsPage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('students.nextPage') || 'Next page'}
               >
                 <ChevronRight size={16} />
               </button>
@@ -1274,10 +1274,10 @@ export default function StudentsPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                    {modalMode === 'add' ? 'Enroll New Student' : modalMode === 'edit' ? 'Edit Student Profile' : 'Student Profile Details'}
+                    {modalMode === 'add' ? (t('students.enrollStudent') || 'Enroll New Student') : modalMode === 'edit' ? (t('students.editStudentTitle') || 'Edit Student Profile') : (t('students.profileDetails') || 'Student Profile Details')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
-                    {modalMode === 'view' ? 'Read-only student information' : 'Fill in the information below to continue'}
+                    {modalMode === 'view' ? (t('students.readOnlyInfo') || 'Read-only student information') : (t('students.fillInfo') || 'Fill in the information below to continue')}
                   </p>
                 </div>
               </div>
@@ -1340,7 +1340,7 @@ export default function StudentsPage() {
                           background: selectedStudent.isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                           color: selectedStudent.isActive ? '#10b981' : '#ef4444',
                         }}>
-                          {selectedStudent.isActive ? 'Active Account' : 'Inactive'}
+                          {selectedStudent.isActive ? (t('students.activeAccount') || 'Active Account') : (t('common.inactive') || 'Inactive')}
                         </span>
                         {selectedStudent.rollNumber && (
                           <span style={{
@@ -1352,7 +1352,7 @@ export default function StudentsPage() {
                             color: 'var(--primary)',
                             fontFamily: 'monospace'
                           }}>
-                            Roll #{selectedStudent.rollNumber}
+                            {t('students.rollNo') || 'Roll'} #{selectedStudent.rollNumber}
                           </span>
                         )}
                       </div>
@@ -1361,23 +1361,23 @@ export default function StudentsPage() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Phone Number</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.phone || 'Not provided'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('students.phoneNumber') || 'Phone Number'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.phone || (t('students.notProvided') || 'Not provided')}</div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Designation / Tag</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.designation || 'Student'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('students.designationTag') || 'Designation / Tag'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedStudent.designation || (t('common.student') || 'Student')}</div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Enrolled Classes</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('students.enrolledClasses') || 'Enrolled Classes'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
-                        {selectedStudent.classes?.map(c => c.name).join(', ') || 'None assigned'}
+                        {selectedStudent.classes?.map(c => c.name).join(', ') || (t('students.noneAssigned') || 'None assigned')}
                       </div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sections</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('students.filterBySection') || 'Sections'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
-                        {selectedStudent.sections?.map(s => s.name).join(', ') || 'None assigned'}
+                        {selectedStudent.sections?.map(s => s.name).join(', ') || (t('students.noneAssigned') || 'None assigned')}
                       </div>
                     </div>
                   </div>
@@ -1389,7 +1389,7 @@ export default function StudentsPage() {
                       style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} 
                       onClick={() => setIsModalOpen(false)}
                     >
-                      Close
+                      {t('common.close') || 'Close'}
                     </button>
                     <button 
                       type="button" 
@@ -1397,7 +1397,7 @@ export default function StudentsPage() {
                       style={{ borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }} 
                       onClick={() => openEditModal(selectedStudent)}
                     >
-                      <Edit3 size={16} /> Edit Profile
+                      <Edit3 size={16} /> {t('students.editProfile') || 'Edit Profile'}
                     </button>
                   </div>
                 </div>
@@ -1427,7 +1427,7 @@ export default function StudentsPage() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>
-                        Student Profile Photo
+                        {t('students.profilePhoto') || 'Student Profile Photo'}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <label className="btn" style={{ 
@@ -1442,7 +1442,7 @@ export default function StudentsPage() {
                           gap: '0.4rem'
                         }}>
                           {uploadingAvatar ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                          <span>{uploadingAvatar ? 'Uploading...' : 'Upload Image'}</span>
+                          <span>{uploadingAvatar ? (t('common.uploading') || 'Uploading...') : (t('common.uploadImage') || 'Upload Image')}</span>
                           <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar} />
                         </label>
                         {formState.avatar && (
@@ -1451,7 +1451,7 @@ export default function StudentsPage() {
                             onClick={() => setFormState(p => ({ ...p, avatar: '' }))}
                             style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}
                           >
-                            Remove
+                            {t('common.remove') || 'Remove'}
                           </button>
                         )}
                       </div>
@@ -1461,7 +1461,7 @@ export default function StudentsPage() {
                   {/* Name and Email */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Full Name *</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('students.fullName') || 'Full Name'} *</label>
                       <input 
                         type="text" 
                         className="input" 
@@ -1469,11 +1469,11 @@ export default function StudentsPage() {
                         onChange={(e) => setFormState({...formState, name: e.target.value})} 
                         required 
                         disabled={actionLoading} 
-                        placeholder="e.g. John Doe"
+                        placeholder={t('students.namePlaceholder') || "e.g. John Doe"}
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Email Address *</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('students.emailAddress') || 'Email Address'} *</label>
                       <input 
                         type="email" 
                         className="input" 
@@ -1481,7 +1481,7 @@ export default function StudentsPage() {
                         onChange={(e) => setFormState({...formState, email: e.target.value})} 
                         required 
                         disabled={actionLoading} 
-                        placeholder="student@school.edu"
+                        placeholder={t('students.emailPlaceholder') || "student@school.edu"}
                       />
                     </div>
                   </div>
@@ -1490,7 +1490,7 @@ export default function StudentsPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                       <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        Password {modalMode === 'add' ? '*' : '(Leave empty to keep current)'}
+                        {t('students.password') || 'Password'} {modalMode === 'add' ? '*' : (t('students.passwordKeepHint') || '(Leave empty to keep current)')}
                       </label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <input 
@@ -1501,7 +1501,7 @@ export default function StudentsPage() {
                           onChange={(e) => setFormState({...formState, password: e.target.value})} 
                           required={modalMode === 'add'} 
                           disabled={actionLoading} 
-                          placeholder={modalMode === 'edit' ? "••••••••" : "Minimum 6 characters"} 
+                          placeholder={modalMode === 'edit' ? "••••••••" : (t('students.passwordMinHint') || "Minimum 6 characters")} 
                         />
                         <button 
                           type="button" 
@@ -1513,7 +1513,7 @@ export default function StudentsPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Phone Number</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('students.phoneNumber') || 'Phone Number'}</label>
                       <input 
                         type="text" 
                         className="input" 
@@ -1528,25 +1528,25 @@ export default function StudentsPage() {
                   {/* Roll Number & Designation */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Roll Number / ID</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('students.rollNumberId') || 'Roll Number / ID'}</label>
                       <input 
                         type="text" 
                         className="input" 
                         value={formState.rollNumber} 
                         onChange={(e) => setFormState({...formState, rollNumber: e.target.value})} 
                         disabled={actionLoading} 
-                        placeholder="e.g. 101"
+                        placeholder={t('students.rollPlaceholder') || "e.g. 101"}
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Designation / Tag</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('students.designationTag') || 'Designation / Tag'}</label>
                       <input 
                         type="text" 
                         className="input" 
                         value={formState.designation} 
                         onChange={(e) => setFormState({...formState, designation: e.target.value})} 
                         disabled={actionLoading} 
-                        placeholder="e.g. Class Representative, Student"
+                        placeholder={t('students.designationPlaceholder') || "e.g. Class Representative, Student"}
                       />
                     </div>
                   </div>
@@ -1555,10 +1555,10 @@ export default function StudentsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        {t('common.classes') || 'Assign Classes'}
+                        {t('students.assignClasses') || t('common.classes') || 'Assign Classes'}
                       </label>
                       <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                        {formState.classIds.length} selected
+                        {formState.classIds.length} {t('students.selected') || 'selected'}
                       </span>
                     </div>
                     <div style={{ 
@@ -1608,7 +1608,7 @@ export default function StudentsPage() {
                           );
                         })
                       ) : (
-                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>No classes available</span>
+                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>{t('students.noClassesAvailable') || 'No classes available'}</span>
                       )}
                     </div>
                   </div>
@@ -1617,10 +1617,10 @@ export default function StudentsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        {t('common.sections') || 'Assign Sections'}
+                        {t('students.assignSections') || t('common.sections') || 'Assign Sections'}
                       </label>
                       <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                        {formState.sectionIds.length} selected
+                        {formState.sectionIds.length} {t('students.selected') || 'selected'}
                       </span>
                     </div>
                     <div style={{ 
@@ -1671,7 +1671,7 @@ export default function StudentsPage() {
                         })
                       ) : (
                         <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>
-                          {formState.classIds.length === 0 ? "Select classes above to view sections" : "No sections found for chosen classes"}
+                          {formState.classIds.length === 0 ? (t('students.selectClassFirst') || "Select classes above to view sections") : (t('students.noSectionsFound') || "No sections found for chosen classes")}
                         </span>
                       )}
                     </div>
@@ -1695,7 +1695,7 @@ export default function StudentsPage() {
                       style={{ borderRadius: '0.75rem', padding: '0.625rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
                       {actionLoading ? <Loader2 size={16} className="animate-spin" /> : null} 
-                      {modalMode === 'add' ? (t('students.addStudent') || 'Create Student') : (t('common.saveChanges') || 'Save Changes')}
+                      {modalMode === 'add' ? (t('students.createStudent') || 'Create Student') : (t('common.saveChanges') || 'Save Changes')}
                     </button>
                   </div>
                 </form>
@@ -1724,7 +1724,7 @@ export default function StudentsPage() {
             maxWidth: '440px', 
             borderRadius: '1.25rem', 
             overflow: 'hidden', 
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', 
             border: '1px solid var(--border)'
           }}>
             <div style={{ padding: '2rem 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', textAlign: 'center' }}>
@@ -1743,10 +1743,10 @@ export default function StudentsPage() {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>
-                  {t('students.deleteStudent') || 'Delete Student Record'}
+                  {t('students.deleteStudentHeading') || t('students.deleteStudent') || 'Delete Student Record'}
                 </h2>
                 <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-                  Are you sure you want to permanently delete student <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong> (Roll: {deleteModal.roll})? All class enrollments and records will be revoked.
+                  {t('students.deleteConfirmText') || 'Are you sure you want to permanently delete student'} <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong> ({t('students.rollNo') || 'Roll'}: {deleteModal.roll})? {t('students.deleteConfirmSuffix') || 'All class enrollments and records will be revoked.'}
                 </p>
               </div>
             </div>
@@ -1758,7 +1758,7 @@ export default function StudentsPage() {
                 onClick={() => setDeleteModal({ open: false, id: '', name: '', roll: '' })}
                 disabled={deleteLoading}
               >
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
               <button
                 className="btn"
@@ -1767,7 +1767,7 @@ export default function StudentsPage() {
                   background: 'linear-gradient(135deg, #ef4444, #dc2626)', 
                   color: '#ffffff', 
                   fontSize: '0.9rem', 
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.75rem', 
                   border: 'none', 
                   boxShadow: '0 4px 15px rgba(239,68,68,0.35)', 
                   display: 'flex', 

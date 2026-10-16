@@ -61,6 +61,7 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; border: string;
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   const key = status?.toLowerCase() || 'unknown';
   const cfg = STATUS_CONFIG[key] ?? {
     bg: 'rgba(107,114,128,0.1)',
@@ -68,12 +69,21 @@ function StatusBadge({ status }: { status: string }) {
     border: 'rgba(107,114,128,0.25)',
     dot: '#6b7280',
   };
-  const label = status
-    ? status
-        .split('-')
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ')
-    : 'Unknown';
+
+  let label = t('teacherAttendance.unknown') || 'Unknown';
+  if (key === 'clock-in' || key === 'clocked-in') label = t('teacherAttendance.clockIn') || 'Clock In';
+  else if (key === 'clock-out' || key === 'clocked-out') label = t('teacherAttendance.clockOut') || 'Clock Out';
+  else if (key === 'present') label = t('common.present') || 'Present';
+  else if (key === 'absent') label = t('common.absent') || 'Absent';
+  else if (key === 'late') label = t('common.late') || 'Late';
+  else if (key === 'leave') label = t('common.leave') || 'Leave';
+  else if (key === 'excused') label = t('teacherAttendance.excused') || 'Excused';
+  else if (status) {
+    label = status
+      .split('-')
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ');
+  }
 
   return (
     <span
@@ -98,27 +108,28 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // Convert ISO string or "HH:MM" to "h:MM AM/PM"
-function formatTimeTo12h(timeStr: string | null | undefined): string {
+function formatTimeTo12h(timeStr: string | null | undefined, language: string = 'en'): string {
   if (!timeStr) return '—';
   try {
     const d = new Date(timeStr);
     if (!isNaN(d.getTime()) && timeStr.includes('T')) {
-      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     }
     const [hStr, mStr] = timeStr.split(':');
     if (hStr !== undefined && mStr !== undefined) {
       let h = parseInt(hStr, 10);
       const m = mStr.substring(0, 2);
-      const ampm = h >= 12 ? 'PM' : 'AM';
+      const ampm = h >= 12 ? (language === 'bn' ? 'পিএম' : 'PM') : (language === 'bn' ? 'এএম' : 'AM');
       h = h % 12 || 12;
-      return `${h}:${m} ${ampm}`;
+      const formattedNum = language === 'bn' ? `${h}:${m}`.replace(/\d/g, (dig) => '০১২৩৪৫৬৭৮৯'[parseInt(dig, 10)]) : `${h}:${m}`;
+      return `${formattedNum} ${ampm}`;
     }
   } catch (e) {}
   return timeStr;
 }
 
 export default function TeacherAttendancePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [records, setRecords] = useState<TeacherAttendanceRecord[]>([]);
   const [teachersData, setTeachersData] = useState<TeacherEntity[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolEntity | null>(null);
@@ -291,26 +302,48 @@ export default function TeacherAttendancePage() {
     return { clockIn, clockOut, absent, other };
   }, [records]);
 
+  // ── Helper for localized status label ──────────────────────
+  const getStatusLabel = (st: string) => {
+    const k = st?.toLowerCase() || '';
+    if (k === 'clock-in' || k === 'clocked-in') return t('teacherAttendance.clockIn') || 'Clock In';
+    if (k === 'clock-out' || k === 'clocked-out') return t('teacherAttendance.clockOut') || 'Clock Out';
+    if (k === 'present') return t('common.present') || 'Present';
+    if (k === 'absent') return t('common.absent') || 'Absent';
+    if (k === 'late') return t('common.late') || 'Late';
+    if (k === 'leave') return t('common.leave') || 'Leave';
+    if (k === 'excused') return t('teacherAttendance.excused') || 'Excused';
+    return st ? st.charAt(0).toUpperCase() + st.slice(1).replace('-', ' ') : (t('teacherAttendance.unknown') || 'Unknown');
+  };
+
   // ── Export CSV ──────────────────────────────────────────────
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
     if (filteredRecords.length === 0) return;
-    const headers = ['#', 'Teacher Name', 'Designation', 'Date', 'Clock In', 'Clock Out', 'Distance (m)', 'Status'];
+    const headers = [
+      '#',
+      t('teacherAttendance.teacherDetails') || 'Teacher Name',
+      t('teachers.designationTag') || 'Designation',
+      t('common.date') || 'Date',
+      t('teacherAttendance.clockIn') || 'Clock In',
+      t('teacherAttendance.clockOut') || 'Clock Out',
+      `${t('teacherAttendance.distance') || 'Distance'} (${t('teachers.meter') || 'm'})`,
+      t('common.status') || 'Status'
+    ];
     const rows = filteredRecords.map((r, i) => {
       const dateObj = new Date(r.date);
       const formattedDate = !isNaN(dateObj.getTime())
-        ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-        : r.date || 'N/A';
+        ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+        : r.date || (t('common.na') || 'N/A');
 
       return [
         ((page - 1) * limit + i + 1).toString(),
-        `"${(r.teacher?.name || 'Unknown').replace(/"/g, '""')}"`,
-        `"${(r.teacher?.designation || 'N/A').replace(/"/g, '""')}"`,
+        `"${(r.teacher?.name || (t('teacherAttendance.unknown') || 'Unknown')).replace(/"/g, '""')}"`,
+        `"${(r.teacher?.designation || (t('common.na') || 'N/A')).replace(/"/g, '""')}"`,
         `"${formattedDate}"`,
-        `"${formatTimeTo12h(r.startTime)}"`,
-        `"${formatTimeTo12h(r.endTime)}"`,
-        `"${r.distanceFromCenter != null ? r.distanceFromCenter.toFixed(2) : 'N/A'}"`,
-        `"${r.status || ''}"`,
+        `"${formatTimeTo12h(r.startTime, language)}"`,
+        `"${formatTimeTo12h(r.endTime, language)}"`,
+        `"${r.distanceFromCenter != null ? r.distanceFromCenter.toFixed(2) : (t('common.na') || 'N/A')}"`,
+        `"${getStatusLabel(r.status)}"`,
       ];
     });
 
@@ -353,38 +386,47 @@ export default function TeacherAttendancePage() {
 
     doc.setFontSize(15);
     doc.setTextColor(50, 50, 50);
-    doc.text('Teacher Attendance Report', 14, y);
+    doc.text(t('teacherAttendance.reportTitle') || 'Teacher Attendance Report', 14, y);
     y += 7;
 
     doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
-    let filterText = `Date Range: ${startDate} to ${endDate}`;
-    if (debouncedSearch) filterText += ` | Search: ${debouncedSearch}`;
+    let filterText = `${t('teacherAttendance.dateRange') || 'Date Range'}: ${startDate} ${t('teachers.to') || 'to'} ${endDate}`;
+    if (debouncedSearch) filterText += ` | ${t('teachers.searchPlaceholder') || 'Search'}: ${debouncedSearch}`;
     if (filterTeacher) {
-      const n = teachersData.find((t) => t.id === filterTeacher)?.name;
-      if (n) filterText += ` | Teacher: ${n}`;
+      const n = teachersData.find((tItem) => tItem.id === filterTeacher)?.name;
+      if (n) filterText += ` | ${t('common.teacher') || 'Teacher'}: ${n}`;
     }
-    if (filterStatus) filterText += ` | Status: ${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}`;
+    if (filterStatus) filterText += ` | ${t('common.status') || 'Status'}: ${getStatusLabel(filterStatus)}`;
     doc.text(filterText, 14, y);
     y += 7;
 
     autoTable(doc, {
-      head: [['#', 'Teacher Name', 'Designation', 'Date', 'Clock In', 'Clock Out', 'Distance (m)', 'Status']],
+      head: [[
+        '#',
+        t('teacherAttendance.teacherDetails') || 'Teacher Name',
+        t('teachers.designationTag') || 'Designation',
+        t('common.date') || 'Date',
+        t('teacherAttendance.clockIn') || 'Clock In',
+        t('teacherAttendance.clockOut') || 'Clock Out',
+        `${t('teacherAttendance.distance') || 'Distance'} (${t('teachers.meter') || 'm'})`,
+        t('common.status') || 'Status'
+      ]],
       body: filteredRecords.map((r, i) => {
         const dateObj = new Date(r.date);
         const formattedDate = !isNaN(dateObj.getTime())
-          ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-          : r.date || 'N/A';
+          ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+          : r.date || (t('common.na') || 'N/A');
 
         return [
           ((page - 1) * limit + i + 1).toString(),
-          r.teacher?.name || 'Unknown',
-          r.teacher?.designation || 'N/A',
+          r.teacher?.name || (t('teacherAttendance.unknown') || 'Unknown'),
+          r.teacher?.designation || (t('common.na') || 'N/A'),
           formattedDate,
-          formatTimeTo12h(r.startTime),
-          formatTimeTo12h(r.endTime),
-          r.distanceFromCenter != null ? r.distanceFromCenter.toFixed(2) : 'N/A',
-          r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ') : 'Unknown',
+          formatTimeTo12h(r.startTime, language),
+          formatTimeTo12h(r.endTime, language),
+          r.distanceFromCenter != null ? r.distanceFromCenter.toFixed(2) : (t('common.na') || 'N/A'),
+          getStatusLabel(r.status),
         ];
       }),
       startY: y,
@@ -395,8 +437,8 @@ export default function TeacherAttendancePage() {
         const pages = (doc.internal as any).getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${data.pageNumber} of ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
+        doc.text(`${t('teachers.page') || 'Page'} ${data.pageNumber} ${t('teachers.of') || 'of'} ${pages}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+        doc.text(`${t('teacherAttendance.generated') || 'Generated'}: ${new Date().toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`, 14, doc.internal.pageSize.height - 10);
       },
     });
     doc.save(`teacher_attendance_${startDate}_to_${endDate}.pdf`);
@@ -417,10 +459,10 @@ export default function TeacherAttendancePage() {
           }}
         >
           {[
-            { label: 'Total Records', value: total, color: 'var(--primary)', bg: 'rgba(79,70,229,0.08)' },
-            { label: 'Clocked In', value: stats.clockIn, color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-            { label: 'Clocked Out', value: stats.clockOut, color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
-            { label: 'Absent / Other', value: stats.absent + stats.other, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+            { label: t('teacherAttendance.totalRecords') || 'Total Records', value: total, color: 'var(--primary)', bg: 'rgba(79,70,229,0.08)' },
+            { label: t('teacherAttendance.clockedIn') || 'Clocked In', value: stats.clockIn, color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
+            { label: t('teacherAttendance.clockedOut') || 'Clocked Out', value: stats.clockOut, color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
+            { label: t('teacherAttendance.absentOther') || 'Absent / Other', value: stats.absent + stats.other, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
           ].map((s) => (
             <div
               key={s.label}
@@ -491,7 +533,7 @@ export default function TeacherAttendancePage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search by teacher name or designation..."
+                  placeholder={t('teacherAttendance.searchPlaceholder') || "Search by teacher name or designation..."}
                   style={{
                     border: 'none',
                     outline: 'none',
@@ -541,7 +583,7 @@ export default function TeacherAttendancePage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('teacherAttendance.filters') || t('common.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span
                     style={{
@@ -581,7 +623,7 @@ export default function TeacherAttendancePage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('common.export') || 'Export'}</span>
                   <ChevronDown
                     size={14}
                     style={{
@@ -611,8 +653,8 @@ export default function TeacherAttendancePage() {
                     }}
                   >
                     {[
-                      { label: 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
-                      { label: 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
+                      { label: t('teachers.exportCsv') || 'Export as CSV', icon: <FileSpreadsheet size={15} style={{ color: '#10b981' }} />, fn: handleExportCSV },
+                      { label: t('teachers.exportPdf') || 'Export as PDF', icon: <FileText size={15} style={{ color: '#ef4444' }} />, fn: handleExportPDF },
                     ].map((item) => (
                       <button
                         key={item.label}
@@ -661,14 +703,14 @@ export default function TeacherAttendancePage() {
                 }}
               >
                 <Plus size={18} />
-                <span>Create Attendance</span>
+                <span>{t('teacherAttendance.createAttendance') || 'Create Attendance'}</span>
               </button>
 
               {/* Refresh button */}
               <button
                 className="btn"
                 onClick={() => fetchAttendance()}
-                title="Refresh"
+                title={t('teacherAttendance.refresh') || 'Refresh'}
                 style={{
                   height: '42px',
                   width: '42px',
@@ -698,7 +740,7 @@ export default function TeacherAttendancePage() {
                   background: 'var(--background)',
                 }}
               >
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('teachers.show') || 'Show:'}</span>
                 <select
                   value={limit}
                   onChange={(e) => {
@@ -734,7 +776,7 @@ export default function TeacherAttendancePage() {
                     textDecoration: 'underline',
                   }}
                 >
-                  Clear all
+                  {t('teachers.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -757,7 +799,7 @@ export default function TeacherAttendancePage() {
               {/* Start Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Start Date
+                  {t('teacherAttendance.startDate') || 'Start Date'}
                 </label>
                 <input
                   type="date"
@@ -774,7 +816,7 @@ export default function TeacherAttendancePage() {
               {/* End Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  End Date
+                  {t('teacherAttendance.endDate') || 'End Date'}
                 </label>
                 <input
                   type="date"
@@ -791,7 +833,7 @@ export default function TeacherAttendancePage() {
               {/* Specific Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Specific Date
+                  {t('teacherAttendance.specificDate') || 'Specific Date'}
                 </label>
                 <input
                   type="date"
@@ -808,7 +850,7 @@ export default function TeacherAttendancePage() {
               {/* Teacher */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Teacher
+                  {t('common.teacher') || 'Teacher'}
                 </label>
                 <select
                   className="input"
@@ -831,7 +873,7 @@ export default function TeacherAttendancePage() {
               {/* Status */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Status
+                  {t('common.status') || 'Status'}
                 </label>
                 <select
                   className="input"
@@ -843,12 +885,12 @@ export default function TeacherAttendancePage() {
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
                   <option value="">{t('common.allStatus') || 'All Statuses'}</option>
-                  <option value="clock-in">Clock In</option>
-                  <option value="clock-out">Clock Out</option>
-                  <option value="present">Present</option>
-                  <option value="absent">Absent</option>
-                  <option value="late">Late</option>
-                  <option value="leave">Leave</option>
+                  <option value="clock-in">{t('teacherAttendance.clockIn') || 'Clock In'}</option>
+                  <option value="clock-out">{t('teacherAttendance.clockOut') || 'Clock Out'}</option>
+                  <option value="present">{t('common.present') || 'Present'}</option>
+                  <option value="absent">{t('common.absent') || 'Absent'}</option>
+                  <option value="late">{t('common.late') || 'Late'}</option>
+                  <option value="leave">{t('common.leave') || 'Leave'}</option>
                 </select>
               </div>
             </div>
@@ -862,12 +904,12 @@ export default function TeacherAttendancePage() {
               <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                 {[
                   { label: '#', w: '52px' },
-                  { label: 'Teacher Details' },
-                  { label: 'Date', w: '160px' },
-                  { label: 'Clock In', w: '130px' },
-                  { label: 'Clock Out', w: '130px' },
-                  { label: 'Distance', w: '130px' },
-                  { label: 'Status', w: '130px' },
+                  { label: t('teacherAttendance.teacherDetails') || 'Teacher Details' },
+                  { label: t('common.date') || 'Date', w: '160px' },
+                  { label: t('teacherAttendance.clockIn') || 'Clock In', w: '130px' },
+                  { label: t('teacherAttendance.clockOut') || 'Clock Out', w: '130px' },
+                  { label: t('teacherAttendance.distance') || 'Distance', w: '130px' },
+                  { label: t('common.status') || 'Status', w: '130px' },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -933,11 +975,11 @@ export default function TeacherAttendancePage() {
                   // Beautiful date: "Wed, Oct 15, 2026" — single line
                   const dateObj = new Date(record.date);
                   const formattedDate = !isNaN(dateObj.getTime())
-                    ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                    : record.date || 'N/A';
+                    ? dateObj.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                    : record.date || (t('common.na') || 'N/A');
 
-                  const clockIn = formatTimeTo12h(record.startTime);
-                  const clockOut = formatTimeTo12h(record.endTime);
+                  const clockIn = formatTimeTo12h(record.startTime, language);
+                  const clockOut = formatTimeTo12h(record.endTime, language);
 
                   return (
                     <tr
@@ -973,7 +1015,7 @@ export default function TeacherAttendancePage() {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem' }}>
-                              {record.teacher?.name || 'Unknown'}
+                              {record.teacher?.name || (t('teacherAttendance.unknown') || 'Unknown')}
                             </span>
                             {record.teacher?.designation && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
@@ -1070,7 +1112,7 @@ export default function TeacherAttendancePage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <MapPin size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                             <span style={{ fontSize: '0.825rem', color: 'var(--foreground)', fontWeight: 500 }}>
-                              {record.distanceFromCenter.toFixed(1)} m
+                              {record.distanceFromCenter.toFixed(1)} {t('teachers.meter') || 'm'}
                             </span>
                           </div>
                         ) : (
@@ -1108,8 +1150,8 @@ export default function TeacherAttendancePage() {
                       </p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {activeFiltersCount > 0
-                          ? 'Try adjusting your search keywords or resetting filters.'
-                          : 'No teacher attendance records exist for the selected date range.'}
+                          ? (t('teacherAttendance.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
+                          : (t('teacherAttendance.noRecordsDateRange') || 'No teacher attendance records exist for the selected date range.')}
                       </p>
                       {activeFiltersCount > 0 && (
                         <button
@@ -1122,7 +1164,7 @@ export default function TeacherAttendancePage() {
                             fontSize: '0.85rem',
                           }}
                         >
-                          Clear Filters
+                          {t('teachers.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -1148,14 +1190,14 @@ export default function TeacherAttendancePage() {
             }}
           >
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of{' '}
-              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> records
+              {t('teachers.showing') || 'Showing'} <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> {t('teachers.to') || 'to'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> {t('teachers.of') || 'of'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>{total}</strong> {t('teacherAttendance.records') || 'records'}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('teachers.page') || 'Page'} {page} {t('teachers.of') || 'of'} {totalPages}
               </span>
               <button
                 className="btn"
@@ -1169,7 +1211,7 @@ export default function TeacherAttendancePage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('teachers.prevPage') || 'Previous page'}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1185,7 +1227,7 @@ export default function TeacherAttendancePage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('teachers.nextPage') || 'Next page'}
               >
                 <ChevronRight size={16} />
               </button>

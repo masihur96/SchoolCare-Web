@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Check, AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/components/language-provider';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -22,6 +23,7 @@ interface CreateTeacherAttendanceModalProps {
 }
 
 export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: CreateTeacherAttendanceModalProps) {
+  const { t } = useLanguage();
   const [teachers, setTeachers] = useState<TeacherEntity[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -45,17 +47,17 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
         setTeachers(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
-        setErrorMsg('Failed to load teachers.');
+        setErrorMsg(t('teacherAttendance.loadTeachersError') || 'Failed to load teachers.');
       } finally {
         setLoadingTeachers(false);
       }
     };
     fetchTeachers();
-  }, []);
+  }, [t]);
 
   const handleSubmit = async () => {
     if (!teacherId) {
-      setErrorMsg('Please select a teacher.');
+      setErrorMsg(t('teacherAttendance.selectTeacherError') || 'Please select a teacher.');
       return;
     }
 
@@ -97,17 +99,17 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
       } catch (e) {}
       
       if (res.ok) {
-        setSuccessMsg('Attendance created successfully!');
+        setSuccessMsg(t('teacherAttendance.createdSuccess') || 'Attendance created successfully!');
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 1500);
       } else {
-        setErrorMsg(json.message || json.error || 'Failed to create attendance.');
+        setErrorMsg(json.message || json.error || (t('teacherAttendance.createFailed') || 'Failed to create attendance.'));
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('An error occurred during submission.');
+      setErrorMsg(t('teacherAttendance.submissionError') || 'An error occurred during submission.');
     } finally {
       setSubmitting(false);
     }
@@ -119,7 +121,9 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
         
         {/* Header */}
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Create Attendance</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+            {t('teacherAttendance.createAttendanceTitle') || 'Create Attendance'}
+          </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: '0.5rem' }}>
             <X size={24} />
           </button>
@@ -141,22 +145,26 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>Teacher</label>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+              {t('common.teacher') || 'Teacher'}
+            </label>
             <select 
               className="input" 
               value={teacherId} 
               onChange={(e) => setTeacherId(e.target.value)}
               disabled={loadingTeachers}
             >
-              <option value="">Select a teacher</option>
-              {teachers.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              <option value="">{t('teacherAttendance.selectTeacher') || 'Select a teacher'}</option>
+              {teachers.map(tItem => (
+                <option key={tItem.id} value={tItem.id}>{tItem.name}</option>
               ))}
             </select>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>Date</label>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+              {t('common.date') || 'Date'}
+            </label>
             <input 
               type="date" 
               className="input" 
@@ -166,22 +174,26 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>Status</label>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+              {t('common.status') || 'Status'}
+            </label>
             <select 
               className="input" 
               value={status} 
               onChange={(e) => setStatus(e.target.value)}
             >
-              <option value="clock-in">Clock In</option>
-              <option value="clock-out">Clock Out</option>
-              <option value="absent">Absent</option>
-              <option value="leave">Leave</option>
+              <option value="clock-in">{t('teacherAttendance.clockIn') || 'Clock In'}</option>
+              <option value="clock-out">{t('teacherAttendance.clockOut') || 'Clock Out'}</option>
+              <option value="absent">{t('common.absent') || 'Absent'}</option>
+              <option value="leave">{t('common.leave') || 'Leave'}</option>
             </select>
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>Start Time</label>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                {t('teacherAttendance.startTime') || 'Start Time'}
+              </label>
               <input 
                 type="time" 
                 className="input" 
@@ -191,7 +203,9 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>End Time</label>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                {t('teacherAttendance.endTime') || 'End Time'}
+              </label>
               <input 
                 type="time" 
                 className="input" 
@@ -206,11 +220,11 @@ export default function CreateTeacherAttendanceModal({ onClose, onSuccess }: Cre
         {/* Footer */}
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem', background: 'var(--card)' }}>
           <button className="btn" onClick={onClose} disabled={submitting} style={{ border: '1px solid var(--border)', background: 'transparent' }}>
-            Cancel
+            {t('common.cancel') || 'Cancel'}
           </button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {submitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={18} />}
-            {submitting ? 'Creating...' : 'Create Attendance'}
+            {submitting ? (t('teacherAttendance.creatingAttendance') || 'Creating...') : (t('teacherAttendance.createAttendance') || 'Create Attendance')}
           </button>
         </div>
       </div>

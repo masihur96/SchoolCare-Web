@@ -50,6 +50,7 @@ interface TeacherEntity {
 
 // Reverse geocode with sessionStorage caching
 const LocationCell = ({ lat, lon, radius, hideRadius }: { lat?: number | string | null; lon?: number | string | null; radius?: number | string | null; hideRadius?: boolean }) => {
+  const { t } = useLanguage();
   const [placeName, setPlaceName] = useState<string | null>(null);
 
   const numLat = lat !== undefined && lat !== null && lat !== '' ? Number(lat) : NaN;
@@ -80,7 +81,7 @@ const LocationCell = ({ lat, lon, radius, hideRadius }: { lat?: number | string 
   }, [isValidCoord, numLat, numLon]);
 
   if (!isValidCoord) {
-    return <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>N/A</span>;
+    return <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('common.na') || 'N/A'}</span>;
   }
 
   return (
@@ -91,7 +92,7 @@ const LocationCell = ({ lat, lon, radius, hideRadius }: { lat?: number | string 
       </div>
       {!hideRadius && (
         <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', paddingLeft: '1.1rem' }}>
-          Radius: {radius ?? 'N/A'} m
+          {t('teachers.radius') || 'Radius'}: {radius ?? (t('common.na') || 'N/A')} {t('teachers.meter') || 'm'}
         </span>
       )}
     </div>
@@ -283,9 +284,9 @@ export default function TeachersPage() {
         setDeleteModal({ open: false, id: '', name: '' });
         fetchTeachers();
       } else {
-        alert('Failed to delete teacher.');
+        alert(t('teachers.failedToDelete') || 'Failed to delete teacher.');
       }
-    } catch { alert('Error deleting teacher.'); }
+    } catch { alert(t('teachers.errorDeleting') || 'Error deleting teacher.'); }
     finally { setDeleteLoading(false); }
   };
 
@@ -306,9 +307,9 @@ export default function TeachersPage() {
       if (result.statusCode === 200 && result.data?.url) {
         setFormState(prev => ({ ...prev, avatar: result.data.url }));
       } else {
-        alert('Failed to upload image.');
+        alert(t('teachers.failedToUpload') || 'Failed to upload image.');
       }
-    } catch { alert('Error uploading image.'); }
+    } catch { alert(t('teachers.errorUploading') || 'Error uploading image.'); }
     finally { setUploadingAvatar(false); }
   };
 
@@ -340,9 +341,9 @@ export default function TeachersPage() {
         fetchTeachers();
       } else {
         const errorData = await response.json();
-        alert(`Failed to save: ${errorData.message || 'Unknown error'}`);
+        alert(`${t('teachers.failedToSave') || 'Failed to save'}: ${errorData.message || 'Unknown error'}`);
       }
-    } catch { alert('Error saving teacher information.'); }
+    } catch { alert(t('teachers.errorSaving') || 'Error saving teacher information.'); }
     finally { setActionLoading(false); }
   };
 
@@ -494,7 +495,7 @@ export default function TeachersPage() {
                 <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search teacher name or email..."
+                  placeholder={t('teachers.searchPlaceholder') || "Search teacher name, email or phone..."}
                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: 'var(--foreground)', fontSize: '0.9rem' }}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -522,7 +523,7 @@ export default function TeachersPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('teachers.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{
                     background: showFilters ? '#ffffff' : 'var(--primary)',
@@ -540,7 +541,7 @@ export default function TeachersPage() {
                   className="btn"
                   onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                   disabled={teachers.length === 0}
-                  title="Export Options"
+                  title={t('teachers.exportOptions') || 'Export Options'}
                   style={{
                     background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)',
                     border: '1px solid var(--border)',
@@ -558,7 +559,7 @@ export default function TeachersPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('common.export') || 'Export'}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
 
@@ -603,7 +604,7 @@ export default function TeachersPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                      <span>Export as CSV</span>
+                      <span>{t('teachers.exportCsv') || 'Export as CSV'}</span>
                     </button>
                     <button
                       onClick={handleExportPDF}
@@ -627,7 +628,7 @@ export default function TeachersPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileText size={15} style={{ color: '#ef4444' }} />
-                      <span>Export as PDF</span>
+                      <span>{t('teachers.exportPdf') || 'Export as PDF'}</span>
                     </button>
                   </div>
                 )}
@@ -648,7 +649,7 @@ export default function TeachersPage() {
 
               {/* Page Sizer */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('teachers.show') || 'Show:'}</span>
                 <select
                   value={limit}
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -665,7 +666,7 @@ export default function TeachersPage() {
                   onClick={resetAllFilters}
                   style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', fontSize: '0.825rem', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  Clear all
+                  {t('teachers.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -681,7 +682,7 @@ export default function TeachersPage() {
               {/* Class Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  {t('common.classes') || 'Class'}
+                  {t('teachers.filterByClass') || t('common.classes') || 'Class'}
                 </label>
                 <select
                   className="input"
@@ -697,7 +698,7 @@ export default function TeachersPage() {
               {/* Section Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  {t('common.sections') || 'Section'}
+                  {t('teachers.filterBySection') || t('common.sections') || 'Section'}
                 </label>
                 <select
                   className="input"
@@ -714,7 +715,7 @@ export default function TeachersPage() {
               {/* Status Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Status
+                  {t('teachers.filterByStatus') || t('common.status') || 'Status'}
                 </label>
                 <select
                   className="input"
@@ -740,22 +741,22 @@ export default function TeachersPage() {
                   #
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Teacher Details
+                  {t('teachers.teacherDetails') || 'Teacher Details'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Class &amp; Section
+                  {t('teachers.classAndSection') || 'Class & Section'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Contact &amp; Designation
+                  {t('teachers.contactAndDesignation') || 'Contact & Designation'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Location
+                  {t('teachers.location') || 'Location'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '110px' }}>
-                  Status
+                  {t('common.status') || 'Status'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
-                  Actions
+                  {t('common.actions') || 'Actions'}
                 </th>
               </tr>
             </thead>
@@ -796,10 +797,10 @@ export default function TeachersPage() {
                   const sl = (page - 1) * limit + index + 1;
                   const classesList = teacher.classes && teacher.classes.length > 0
                     ? teacher.classes.map(c => c.name).join(', ')
-                    : 'Unassigned';
+                    : (t('teachers.unassigned') || 'Unassigned');
                   const sectionsList = teacher.sections && teacher.sections.length > 0
                     ? teacher.sections.map(s => s.name).join(', ')
-                    : 'None';
+                    : (t('teachers.none') || 'None');
 
                   return (
                     <tr
@@ -819,7 +820,7 @@ export default function TeachersPage() {
                             )}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }} onClick={() => openViewModal(teacher)} title="Click to view full profile">{teacher.name}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }} onClick={() => openViewModal(teacher)} title={t('teachers.clickToViewProfile') || 'Click to view full profile'}>{teacher.name}</span>
                             <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{teacher.email}</span>
                           </div>
                         </div>
@@ -832,7 +833,7 @@ export default function TeachersPage() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                             <Layers size={13} />
-                            <span>Section: {sectionsList}</span>
+                            <span>{t('common.section') || 'Section'}: {sectionsList}</span>
                           </div>
                         </div>
                       </td>
@@ -840,7 +841,7 @@ export default function TeachersPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: teacher.phone ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
                             <Phone size={13} style={{ color: 'var(--muted-foreground)' }} />
-                            <span>{teacher.phone || 'No phone'}</span>
+                            <span>{teacher.phone || (t('teachers.noPhone') || 'No phone')}</span>
                           </div>
                           {teacher.designation && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{teacher.designation}</span>
@@ -858,9 +859,9 @@ export default function TeachersPage() {
                       </td>
                       <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <button className="action-btn" title="View teacher profile" onClick={() => openViewModal(teacher)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--foreground)' }}><Eye size={15} /></button>
-                          <button className="action-btn" title="Edit teacher" onClick={() => openEditModal(teacher)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--foreground)' }}><Edit3 size={15} /></button>
-                          <button className="action-btn" title="Delete teacher" onClick={() => handleDelete(teacher.id, teacher.name)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.05)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={15} /></button>
+                          <button className="action-btn" title={t('teachers.viewProfile') || 'View teacher profile'} onClick={() => openViewModal(teacher)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--foreground)' }}><Eye size={15} /></button>
+                          <button className="action-btn" title={t('teachers.editTeacher') || 'Edit teacher'} onClick={() => openEditModal(teacher)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--foreground)' }}><Edit3 size={15} /></button>
+                          <button className="action-btn" title={t('teachers.deleteTeacherBtn') || 'Delete teacher'} onClick={() => handleDelete(teacher.id, teacher.name)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.05)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>
@@ -879,11 +880,11 @@ export default function TeachersPage() {
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {searchTerm || filterClass || filterSection || filterIsActive
                           ? (t('teachers.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
-                          : 'No teacher records have been created yet. Click "Add Teacher" to begin.'}
+                          : (t('teachers.noTeachersYet') || 'No teacher records have been created yet. Click "Add Teacher" to begin.')}
                       </p>
                       {(searchTerm || filterClass || filterSection || filterIsActive) && (
                         <button onClick={resetAllFilters} className="btn" style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}>
-                          Clear Filters
+                          {t('teachers.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -898,14 +899,14 @@ export default function TeachersPage() {
         {!loading && total > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)', flexWrap: 'wrap', gap: '1rem' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> teachers
+              {t('teachers.showing') || 'Showing'} <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> {t('teachers.to') || 'to'} <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> {t('teachers.of') || 'of'} <strong style={{ color: 'var(--foreground)' }}>{total}</strong> {t('teachers.teachers') || 'teachers'}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>Page {page} of {totalPages}</span>
-              <button className="btn" style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }} disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} title="Previous page">
+              <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>{t('teachers.page') || 'Page'} {page} {t('teachers.of') || 'of'} {totalPages}</span>
+              <button className="btn" style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }} disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} title={t('teachers.prevPage') || 'Previous page'}>
                 <ChevronLeft size={16} />
               </button>
-              <button className="btn" style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }} disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} title="Next page">
+              <button className="btn" style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.4 : 1, background: 'var(--card)', borderRadius: '0.5rem' }} disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} title={t('teachers.nextPage') || 'Next page'}>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -925,10 +926,10 @@ export default function TeachersPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                    {modalMode === 'add' ? 'Add New Teacher' : modalMode === 'edit' ? 'Edit Teacher Profile' : 'Teacher Profile Details'}
+                    {modalMode === 'add' ? (t('teachers.addNewTeacher') || 'Add New Teacher') : modalMode === 'edit' ? (t('teachers.editTeacherTitle') || 'Edit Teacher Profile') : (t('teachers.profileDetails') || 'Teacher Profile Details')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
-                    {modalMode === 'view' ? 'Read-only teacher information' : 'Fill in the information below to continue'}
+                    {modalMode === 'view' ? (t('teachers.readOnlyInfo') || 'Read-only teacher information') : (t('teachers.fillInfo') || 'Fill in the information below to continue')}
                   </p>
                 </div>
               </div>
@@ -951,11 +952,11 @@ export default function TeachersPage() {
                       <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{selectedTeacher.email}</span>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                         <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.725rem', fontWeight: 600, background: selectedTeacher.isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', color: selectedTeacher.isActive ? '#10b981' : '#ef4444' }}>
-                          {selectedTeacher.isActive ? 'Active Account' : 'Inactive'}
+                          {selectedTeacher.isActive ? (t('teachers.activeAccount') || 'Active Account') : (t('common.inactive') || 'Inactive')}
                         </span>
                         {selectedTeacher.rollNumber && (
                           <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.725rem', fontWeight: 600, background: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)', fontFamily: 'monospace' }}>
-                            Roll #{selectedTeacher.rollNumber}
+                            {t('teachers.rollNo') || 'Roll'} #{selectedTeacher.rollNumber}
                           </span>
                         )}
                         {selectedTeacher.designation && (
@@ -970,33 +971,33 @@ export default function TeachersPage() {
                   {/* Info Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Phone Number</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.phone || 'Not provided'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('teachers.phoneNumber') || 'Phone Number'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.phone || (t('teachers.notProvided') || 'Not provided')}</div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Designation</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.designation || 'Teacher'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('teachers.designationTag') || 'Designation'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.designation || (t('common.teacher') || 'Teacher')}</div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Classes</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.classes?.map(c => c.name).join(', ') || 'None assigned'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('teachers.enrolledClasses') || t('common.classes') || 'Classes'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.classes?.map(c => c.name).join(', ') || (t('teachers.noneAssigned') || 'None assigned')}</div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sections</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.sections?.map(s => s.name).join(', ') || 'None assigned'}</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('common.sections') || 'Sections'}</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>{selectedTeacher.sections?.map(s => s.name).join(', ') || (t('teachers.noneAssigned') || 'None assigned')}</div>
                     </div>
                     {(selectedTeacher.lat !== undefined || selectedTeacher.lon !== undefined) && (
                       <div style={{ gridColumn: '1 / -1', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600, marginBottom: '0.4rem' }}>Attendance Location</div>
+                        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600, marginBottom: '0.4rem' }}>{t('teachers.attendanceLocation') || 'Attendance Location'}</div>
                         <LocationCell lat={selectedTeacher.lat} lon={selectedTeacher.lon} radius={selectedTeacher.radius} />
                       </div>
                     )}
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-                    <button type="button" className="btn" style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} onClick={() => setIsModalOpen(false)}>Close</button>
+                    <button type="button" className="btn" style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} onClick={() => setIsModalOpen(false)}>{t('common.close') || 'Close'}</button>
                     <button type="button" className="btn btn-primary" style={{ borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => openEditModal(selectedTeacher)}>
-                      <Edit3 size={16} /> Edit Profile
+                      <Edit3 size={16} /> {t('teachers.editProfile') || 'Edit Profile'}
                     </button>
                   </div>
                 </div>
@@ -1009,15 +1010,15 @@ export default function TeachersPage() {
                       {formState.avatar ? (<img src={formState.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />) : (<Users size={24} style={{ color: 'var(--muted-foreground)' }} />)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>Teacher Profile Photo</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>{t('teachers.profilePhoto') || 'Teacher Profile Photo'}</div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <label className="btn" style={{ border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', padding: '0.4rem 0.85rem', fontSize: '0.825rem', borderRadius: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           {uploadingAvatar ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                          <span>{uploadingAvatar ? 'Uploading...' : 'Upload Image'}</span>
+                          <span>{uploadingAvatar ? (t('common.uploading') || 'Uploading...') : (t('common.uploadImage') || 'Upload Image')}</span>
                           <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingAvatar} />
                         </label>
                         {formState.avatar && (
-                          <button type="button" onClick={() => setFormState(p => ({ ...p, avatar: '' }))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}>Remove</button>
+                          <button type="button" onClick={() => setFormState(p => ({ ...p, avatar: '' }))} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}>{t('common.remove') || 'Remove'}</button>
                         )}
                       </div>
                     </div>
@@ -1026,28 +1027,28 @@ export default function TeachersPage() {
                   {/* Name & Email */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Full Name *</label>
-                      <input type="text" className="input" value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} required disabled={actionLoading} placeholder="e.g. Mr. John Smith" />
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.fullName') || 'Full Name'} *</label>
+                      <input type="text" className="input" value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} required disabled={actionLoading} placeholder={t('teachers.namePlaceholder') || "e.g. Mr. John Smith"} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Email Address *</label>
-                      <input type="email" className="input" value={formState.email} onChange={(e) => setFormState({ ...formState, email: e.target.value })} required disabled={actionLoading} placeholder="teacher@school.edu" />
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.emailAddress') || 'Email Address'} *</label>
+                      <input type="email" className="input" value={formState.email} onChange={(e) => setFormState({ ...formState, email: e.target.value })} required disabled={actionLoading} placeholder={t('teachers.emailPlaceholder') || "teacher@school.edu"} />
                     </div>
                   </div>
 
                   {/* Password & Phone */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Password {modalMode === 'add' ? '*' : '(Leave empty to keep current)'}</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.password') || 'Password'} {modalMode === 'add' ? '*' : (t('teachers.passwordKeepHint') || '(Leave empty to keep current)')}</label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <input type={showPassword ? 'text' : 'password'} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={formState.password} onChange={(e) => setFormState({ ...formState, password: e.target.value })} required={modalMode === 'add'} disabled={actionLoading} placeholder={modalMode === 'edit' ? '••••••••' : 'Minimum 6 characters'} />
+                        <input type={showPassword ? 'text' : 'password'} className="input" style={{ width: '100%', paddingRight: '2.5rem' }} value={formState.password} onChange={(e) => setFormState({ ...formState, password: e.target.value })} required={modalMode === 'add'} disabled={actionLoading} placeholder={modalMode === 'edit' ? '••••••••' : (t('teachers.passwordMinHint') || 'Minimum 6 characters')} />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.75rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Phone Number</label>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.phoneNumber') || 'Phone Number'}</label>
                       <input type="text" className="input" value={formState.phone} onChange={(e) => setFormState({ ...formState, phone: e.target.value })} disabled={actionLoading} placeholder="+880 1700 000000" />
                     </div>
                   </div>
@@ -1055,29 +1056,29 @@ export default function TeachersPage() {
                   {/* Roll Number & Designation */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Roll Number / ID</label>
-                      <input type="text" className="input" value={formState.rollNumber} onChange={(e) => setFormState({ ...formState, rollNumber: e.target.value })} disabled={actionLoading} placeholder="e.g. T-001" />
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.rollNumberId') || 'Roll Number / ID'}</label>
+                      <input type="text" className="input" value={formState.rollNumber} onChange={(e) => setFormState({ ...formState, rollNumber: e.target.value })} disabled={actionLoading} placeholder={t('teachers.rollPlaceholder') || "e.g. T-001"} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Designation</label>
-                      <input type="text" className="input" value={formState.designation} onChange={(e) => setFormState({ ...formState, designation: e.target.value })} disabled={actionLoading} placeholder="e.g. Senior Teacher, HOD" />
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.designationTag') || 'Designation'}</label>
+                      <input type="text" className="input" value={formState.designation} onChange={(e) => setFormState({ ...formState, designation: e.target.value })} disabled={actionLoading} placeholder={t('teachers.designationPlaceholder') || "e.g. Senior Teacher, HOD"} />
                     </div>
                   </div>
 
                   {/* Attendance Location */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Attendance Location (Optional)</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.attendanceLocationOptional') || 'Attendance Location (Optional)'}</label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Latitude</label>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('teachers.latitude') || 'Latitude'}</label>
                         <input type="number" step="any" className="input" value={formState.lat} onChange={(e) => setFormState({ ...formState, lat: e.target.value })} disabled={actionLoading} placeholder="23.8103" />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Longitude</label>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('teachers.longitude') || 'Longitude'}</label>
                         <input type="number" step="any" className="input" value={formState.lon} onChange={(e) => setFormState({ ...formState, lon: e.target.value })} disabled={actionLoading} placeholder="90.4125" />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Radius (m)</label>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('teachers.radiusMeters') || 'Radius (m)'}</label>
                         <input type="number" className="input" value={formState.radius} onChange={(e) => setFormState({ ...formState, radius: e.target.value })} disabled={actionLoading} placeholder="100" />
                       </div>
                     </div>
@@ -1086,8 +1087,8 @@ export default function TeachersPage() {
                   {/* Class Assignment */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('common.classes') || 'Assign Classes'}</label>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{formState.classIds.length} selected</span>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.assignClasses') || t('common.classes') || 'Assign Classes'}</label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{formState.classIds.length} {t('teachers.selected') || 'selected'}</span>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '0.75rem', minHeight: '52px', background: 'var(--background)' }}>
                       {classesData.length > 0 ? (
@@ -1102,7 +1103,7 @@ export default function TeachersPage() {
                           );
                         })
                       ) : (
-                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>No classes available</span>
+                        <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>{t('teachers.noClassesAvailable') || 'No classes available'}</span>
                       )}
                     </div>
                   </div>
@@ -1110,8 +1111,8 @@ export default function TeachersPage() {
                   {/* Section Assignment */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('common.sections') || 'Assign Sections'}</label>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{formState.sectionIds.length} selected</span>
+                      <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>{t('teachers.assignSections') || t('common.sections') || 'Assign Sections'}</label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{formState.sectionIds.length} {t('teachers.selected') || 'selected'}</span>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '0.75rem', minHeight: '52px', background: 'var(--background)' }}>
                       {availableModalSections.length > 0 ? (
@@ -1127,7 +1128,7 @@ export default function TeachersPage() {
                         })
                       ) : (
                         <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>
-                          {formState.classIds.length === 0 ? 'Select classes above to view sections' : 'No sections found for chosen classes'}
+                          {formState.classIds.length === 0 ? (t('teachers.selectClassFirst') || 'Select classes above to view sections') : (t('teachers.noSectionsFound') || 'No sections found for chosen classes')}
                         </span>
                       )}
                     </div>
@@ -1140,7 +1141,7 @@ export default function TeachersPage() {
                     </button>
                     <button type="submit" className="btn btn-primary" disabled={actionLoading} style={{ borderRadius: '0.75rem', padding: '0.625rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {actionLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-                      {modalMode === 'add' ? (t('teachers.addTeacher') || 'Add Teacher') : (t('common.saveChanges') || 'Save Changes')}
+                      {modalMode === 'add' ? (t('teachers.createTeacher') || 'Add Teacher') : (t('common.saveChanges') || 'Save Changes')}
                     </button>
                   </div>
                 </form>
@@ -1159,15 +1160,15 @@ export default function TeachersPage() {
                 <AlertTriangle size={32} />
               </div>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>Delete Teacher Account</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>{t('teachers.deleteTeacher') || 'Delete Teacher Account'}</h2>
                 <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-                  Are you sure you want to permanently delete <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong>? All class assignments and records will be removed. This action cannot be undone.
+                  {t('teachers.deleteConfirmText') || 'Are you sure you want to permanently delete'} <strong style={{ color: 'var(--foreground)' }}>{deleteModal.name}</strong>? {t('teachers.deleteConfirmSuffix') || 'All class assignments and records will be removed. This action cannot be undone.'}
                 </p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
               <button className="btn" style={{ flex: 1, border: '1px solid var(--border)', borderRadius: '0.75rem', fontSize: '0.9rem' }} onClick={() => setDeleteModal({ open: false, id: '', name: '' })} disabled={deleteLoading}>
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
               <button className="btn" style={{ flex: 1, background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#ffffff', fontSize: '0.9rem', borderRadius: '0.75rem', border: 'none', boxShadow: '0 4px 15px rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 600 }} onClick={confirmDelete} disabled={deleteLoading}>
                 {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
