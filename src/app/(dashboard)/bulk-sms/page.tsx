@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLanguage } from '@/components/language-provider';
 import {
-  Send, Users, MessageSquare, CheckCircle, Clock, AlertTriangle,
+  Send, Users, MessageSquare, Clock, AlertTriangle,
   Smartphone, Filter, Search, Plus, RefreshCw, Copy, Check,
-  Sparkles, ShieldCheck, ChevronRight, FileText, Calendar,
-  CreditCard, Info, ArrowUpRight, Radio, Bell, GraduationCap, UserCheck
+  ShieldCheck, FileText, Calendar, CreditCard,
+  Bell, GraduationCap, UserCheck,
+  Layers, LayoutGrid, FileSpreadsheet, ChevronDown, ChevronLeft,
+  ChevronRight, X, Download, CheckCircle2, Eye, RotateCcw
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface SMSCampaign {
   id: string;
@@ -20,6 +24,7 @@ interface SMSCampaign {
   status: 'delivered' | 'processing' | 'scheduled' | 'failed';
   deliveryRate: number;
   senderId: string;
+  messageText?: string;
 }
 
 interface SMSTemplate {
@@ -30,7 +35,7 @@ interface SMSTemplate {
   charCount: number;
 }
 
-const STATIC_CAMPAIGNS: SMSCampaign[] = [
+const INITIAL_CAMPAIGNS: SMSCampaign[] = [
   {
     id: 'CMP-2026-089',
     title: 'Monthly Tuition Fee Reminder - May',
@@ -38,10 +43,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 342,
     smsCount: 1,
     totalCredits: 342,
-    sentAt: '2026-05-10 10:30 AM',
+    sentAt: '2026-05-10T10:30:00',
     status: 'delivered',
     deliveryRate: 99.4,
     senderId: 'SCHOOLCARE',
+    messageText: 'Dear Parent, tuition fees for {student_name} of BDT {due_amount} for this month is pending. Kindly clear dues before {date} to avoid late fines. - SchoolCare Academy',
   },
   {
     id: 'CMP-2026-088',
@@ -50,10 +56,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 180,
     smsCount: 2,
     totalCredits: 360,
-    sentAt: '2026-05-08 04:15 PM',
+    sentAt: '2026-05-08T16:15:00',
     status: 'delivered',
     deliveryRate: 100,
     senderId: 'SCHOOLCARE',
+    messageText: 'Notice: Term Final Exam begins on {date}. Admit cards for {student_name} have been published. Check routine on the student portal. - SchoolCare Academy',
   },
   {
     id: 'CMP-2026-087',
@@ -62,10 +69,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 28,
     smsCount: 1,
     totalCredits: 28,
-    sentAt: '2026-05-08 11:00 AM',
+    sentAt: '2026-05-08T11:00:00',
     status: 'delivered',
     deliveryRate: 96.4,
     senderId: 'SCHOOLCARE',
+    messageText: 'Dear Parent, your child {student_name} (Class: {class}, Roll: {roll_no}) is marked ABSENT today ({date}). Please inform the school if unexpected. - SchoolCare Academy',
   },
   {
     id: 'CMP-2026-086',
@@ -74,10 +82,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 520,
     smsCount: 1,
     totalCredits: 520,
-    sentAt: '2026-05-05 02:00 PM',
+    sentAt: '2026-05-05T14:00:00',
     status: 'delivered',
     deliveryRate: 98.8,
     senderId: 'SCHOOLCARE',
+    messageText: 'Dear Guardian, you are cordially invited to the Parent-Teacher Meeting for {student_name} on {date} at 10:00 AM. Your presence is vital. - SchoolCare Academy',
   },
   {
     id: 'CMP-2026-085',
@@ -86,10 +95,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 1420,
     smsCount: 1,
     totalCredits: 1420,
-    sentAt: '2026-05-02 09:10 AM',
+    sentAt: '2026-05-02T09:10:00',
     status: 'delivered',
     deliveryRate: 99.8,
     senderId: 'SCHOOLCARE',
+    messageText: 'Urgent: Due to unavoidable weather conditions, SchoolCare Academy will remain closed on {date}. Regular classes resume the following day.',
   },
   {
     id: 'CMP-2026-084',
@@ -98,10 +108,11 @@ const STATIC_CAMPAIGNS: SMSCampaign[] = [
     recipientsCount: 1350,
     smsCount: 1,
     totalCredits: 1350,
-    sentAt: '2026-05-15 09:00 AM',
+    sentAt: '2026-05-15T09:00:00',
     status: 'scheduled',
     deliveryRate: 0,
     senderId: 'SCHOOLCARE',
+    messageText: 'Dear Parents, please be advised that the annual Summer Vacation starts next week. Review holiday assignments on the student portal. - SchoolCare Academy',
   },
 ];
 
@@ -155,29 +166,56 @@ const DYNAMIC_TAGS = [
 
 export default function BulkSMSPage() {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'compose' | 'history' | 'templates' | 'settings'>('compose');
+  const [campaigns, setCampaigns] = useState<SMSCampaign[]>(INITIAL_CAMPAIGNS);
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'templates' | 'gateway'>('campaigns');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [loading, setLoading] = useState(false);
+
+  // Balance & KPIs
+  const [creditsBalance, setCreditsBalance] = useState(8450);
+  const [sentThisMonth, setSentThisMonth] = useState(24180);
+
+  // Search & Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [audienceFilter, setAudienceFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Export dropdown
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  // Modals
+  const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
+  const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<SMSCampaign | null>(null);
 
   // Compose State
   const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'teachers' | 'custom'>('all');
   const [selectedClass, setSelectedClass] = useState('Class 9');
   const [selectedSection, setSelectedSection] = useState('All Sections');
   const [senderId, setSenderId] = useState('SCHOOLCARE');
+  const [campaignTitle, setCampaignTitle] = useState('');
   const [message, setMessage] = useState(
     'Dear Parent, your child {student_name} (Class: {class}, Roll: {roll_no}) is marked ABSENT today ({date}). Please inform the school if unexpected. - {school_name}'
   );
   const [scheduleType, setScheduleType] = useState<'instant' | 'scheduled'>('instant');
   const [scheduledDateTime, setScheduledDateTime] = useState('2026-05-15T09:00');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [broadcastSuccess, setBroadcastSuccess] = useState(false);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
-  // Search in History
-  const [historySearch, setHistorySearch] = useState('');
-  const [historyFilter, setHistoryFilter] = useState('all');
+  // Notification Banner
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
-  // Copy Template State
+  // Copy template indicator
   const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null);
 
-  // Calculation helpers
+  // Calculations for Compose
   const charLength = message.length;
   const isUnicode = /[^\u0000-\u007f]/.test(message);
   const charsPerSMS = isUnicode ? 70 : 160;
@@ -204,13 +242,51 @@ export default function BulkSMSPage() {
     return preview;
   };
 
+  // Close export dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Clear banner timeout
+  useEffect(() => {
+    if (!bannerMessage) return;
+    const timer = setTimeout(() => setBannerMessage(null), 4500);
+    return () => clearTimeout(timer);
+  }, [bannerMessage]);
+
+  const formatSingleLineDate = (dateString?: string) => {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    const datePart = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timePart = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${datePart} • ${timePart}`;
+  };
+
+  // Insert tag into message
   const handleInsertTag = (tag: string) => {
     setMessage(prev => prev + ' ' + tag);
   };
 
+  // Apply template in compose modal
   const handleApplyTemplate = (tpl: SMSTemplate) => {
     setMessage(tpl.content);
-    setActiveTab('compose');
+    setCampaignTitle(tpl.title);
+    setIsComposeModalOpen(true);
   };
 
   const handleCopyTemplate = (tpl: SMSTemplate) => {
@@ -219,871 +295,2052 @@ export default function BulkSMSPage() {
     setTimeout(() => setCopiedTemplateId(null), 2000);
   };
 
-  const handleSendBroadcast = () => {
-    if (!message.trim()) return;
+  // Handle Send Broadcast
+  const handleSendBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBroadcastError(null);
+
+    if (!message.trim()) {
+      setBroadcastError('Please enter message content to broadcast.');
+      return;
+    }
+
+    if (totalCreditsRequired > creditsBalance) {
+      setBroadcastError(`Insufficient SMS credits. Required: ${totalCreditsRequired}, Available: ${creditsBalance}. Please recharge.`);
+      return;
+    }
+
     setIsBroadcasting(true);
     setTimeout(() => {
       setIsBroadcasting(false);
-      setBroadcastSuccess(true);
-      setTimeout(() => setBroadcastSuccess(false), 4000);
+
+      const newId = `CMP-2026-${String(campaigns.length + 90).padStart(3, '0')}`;
+      const title = campaignTitle.trim() || `Broadcast to ${targetAudience === 'all' ? 'All Parents' : targetAudience === 'class' ? selectedClass : 'Custom Audience'}`;
+      const newCampaign: SMSCampaign = {
+        id: newId,
+        title,
+        targetGroup: targetAudience === 'all' ? 'All Parents & Guardians' : targetAudience === 'class' ? `${selectedClass} (${selectedSection})` : 'Teachers & Staff',
+        recipientsCount: totalRecipients,
+        smsCount: smsParts,
+        totalCredits: totalCreditsRequired,
+        sentAt: scheduleType === 'scheduled' ? scheduledDateTime : new Date().toISOString(),
+        status: scheduleType === 'scheduled' ? 'scheduled' : 'delivered',
+        deliveryRate: scheduleType === 'scheduled' ? 0 : 99.6,
+        senderId,
+        messageText: message,
+      };
+
+      setCampaigns(prev => [newCampaign, ...prev]);
+      setCreditsBalance(prev => Math.max(0, prev - totalCreditsRequired));
+      if (scheduleType === 'instant') {
+        setSentThisMonth(prev => prev + totalRecipients);
+      }
+
+      setIsComposeModalOpen(false);
+      setBannerMessage(`Campaign "${title}" successfully queued to ${totalRecipients} recipients (${totalCreditsRequired} credits deducted).`);
     }, 1200);
   };
 
-  const filteredCampaigns = STATIC_CAMPAIGNS.filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(historySearch.toLowerCase()) ||
-      c.targetGroup.toLowerCase().includes(historySearch.toLowerCase());
-    const matchesFilter = historyFilter === 'all' || c.status === historyFilter;
-    return matchesSearch && matchesFilter;
-  });
+  // Recharge credits simulation
+  const handleRechargeCredits = (amount: number) => {
+    setCreditsBalance(prev => prev + amount);
+    setIsRechargeModalOpen(false);
+    setBannerMessage(`Successfully recharged ${amount.toLocaleString()} SMS credits to account.`);
+  };
+
+  // Filtered campaigns
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(c => {
+      const matchesSearch =
+        c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.targetGroup.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.senderId.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+      const matchesAudience = audienceFilter === 'all' || c.targetGroup.toLowerCase().includes(audienceFilter.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesAudience;
+    });
+  }, [campaigns, searchTerm, statusFilter, audienceFilter]);
+
+  const activeFiltersCount = (statusFilter !== 'all' ? 1 : 0) + (audienceFilter !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
+
+  const resetAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setAudienceFilter('all');
+    setPage(1);
+  };
+
+  // Paginated campaigns
+  const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / limit));
+  const paginatedCampaigns = useMemo(() => {
+    const start = (page - 1) * limit;
+    return filteredCampaigns.slice(start, start + limit);
+  }, [filteredCampaigns, page, limit]);
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    setExportDropdownOpen(false);
+    if (filteredCampaigns.length === 0) return;
+
+    const headers = ['SL', 'Campaign ID', 'Title', 'Audience', 'Recipients', 'SMS Parts', 'Credits', 'Sent Date', 'Status', 'Delivery Rate'];
+    const rows = filteredCampaigns.map((c, idx) => [
+      (idx + 1).toString(),
+      `"${c.id}"`,
+      `"${c.title.replace(/"/g, '""')}"`,
+      `"${c.targetGroup.replace(/"/g, '""')}"`,
+      c.recipientsCount.toString(),
+      c.smsCount.toString(),
+      c.totalCredits.toString(),
+      `"${formatSingleLineDate(c.sentAt)}"`,
+      `"${c.status}"`,
+      `"${c.deliveryRate}%"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `sms_campaigns_page_${page}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export to PDF
+  const handleExportPDF = () => {
+    setExportDropdownOpen(false);
+    if (filteredCampaigns.length === 0) return;
+
+    const doc = new jsPDF('landscape');
+
+    doc.setFontSize(16);
+    doc.setTextColor(79, 70, 229);
+    doc.text('Bulk SMS Broadcasts & Campaigns Report', 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(110, 110, 110);
+    const subtitle = `Total Campaigns: ${filteredCampaigns.length} | Available Credits: ${creditsBalance.toLocaleString()} | Date: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    doc.text(subtitle, 14, 25);
+
+    const tableColumn = ['#', 'Campaign ID', 'Title', 'Audience', 'Recipients', 'Credits', 'Date & Time', 'Status', 'Rate'];
+    const tableRows = filteredCampaigns.map((c, idx) => [
+      (idx + 1).toString(),
+      c.id,
+      c.title,
+      c.targetGroup,
+      c.recipientsCount.toLocaleString(),
+      c.totalCredits.toLocaleString(),
+      formatSingleLineDate(c.sentAt),
+      c.status.toUpperCase(),
+      `${c.deliveryRate}%`
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 249, 252] },
+      didDrawPage: data => {
+        const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+      }
+    });
+
+    doc.save(`sms_campaigns_report.pdf`);
+  };
+
+  // Download single campaign voucher / delivery report
+  const handleDownloadCampaignPDF = (c: SMSCampaign) => {
+    const doc = new jsPDF('portrait');
+
+    doc.setFillColor(79, 70, 229);
+    doc.rect(0, 0, 210, 26, 'F');
+
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BULK SMS DISPATCH REPORT', 14, 16);
+
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`CAMPAIGN AUDIT VOUCHER • SENDER: ${c.senderId}`, 14, 22);
+
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10.5);
+
+    const startY = 38;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Campaign Title:', 14, startY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(c.title, 60, startY);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Campaign ID:', 14, startY + 10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(c.id, 60, startY + 10);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Target Audience:', 14, startY + 20);
+    doc.setFont('helvetica', 'normal');
+    doc.text(c.targetGroup, 60, startY + 20);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Dispatched At:', 14, startY + 30);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatSingleLineDate(c.sentAt), 60, startY + 30);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Recipients Count:', 14, startY + 40);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${c.recipientsCount.toLocaleString()} Contacts (${c.smsCount} SMS/recp)`, 60, startY + 40);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Credits Used:', 14, startY + 50);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${c.totalCredits.toLocaleString()} Credits`, 60, startY + 50);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Delivery Success Rate:', 14, startY + 60);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${c.deliveryRate}% (${Math.round((c.recipientsCount * c.deliveryRate) / 100).toLocaleString()} Delivered)`, 60, startY + 60);
+
+    // Message box
+    doc.setFont('helvetica', 'bold');
+    doc.text('Dispatched Message:', 14, startY + 74);
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, startY + 80, 182, 36, 3, 3, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(70, 70, 70);
+    doc.text(c.messageText || 'Standard broadcast message transmitted via telecomm gateway.', 18, startY + 90, { maxWidth: 174 });
+
+    doc.save(`sms_campaign_${c.id}.pdf`);
+  };
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
-      
-      {/* ── Page Header ────────────────────────────────────────── */}
-      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.25rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.35rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.2rem 0.65rem', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', borderRadius: '99px', fontSize: '0.78rem', fontWeight: 700 }}>
-              <Radio size={13} className="animate-pulse" /> Telecomm Gateway
-            </span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Approved Masking: <strong>SCHOOLCARE</strong></span>
-          </div>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
-            Bulk SMS Broadcast
-          </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.35rem', fontSize: '0.98rem' }}>
-            Send instant notices, emergency broadcasts, attendance alerts, and fee reminders to thousands of parents in one click.
-          </p>
-        </div>
+    <div className="page-container animate-fade-in" style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}>
 
-        {/* Top Header Actions / Balance */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '0.85rem', padding: '0.65rem 1.1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CreditCard size={18} />
+      {/* ── Top Metric Summary Cards (Directly at top without page title header) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+        
+        {/* Available Credits Card */}
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', minWidth: 0 }}>
+            <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CreditCard size={26} />
             </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance')}</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.1 }}>8,450 <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#10b981' }}>Credits</span></div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance') || 'SMS Balance'}</div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
+                {creditsBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>Credits</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Masking: <strong>SCHOOLCARE</strong>
+              </div>
             </div>
           </div>
-
           <button
-            onClick={() => alert('Opening Secure Telecom Payment Gateway... (Simulation)')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.75rem 1.35rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '0.85rem', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 14px -3px rgba(79,70,229,0.35)' }}
+            type="button"
+            onClick={() => setIsRechargeModalOpen(true)}
+            style={{ padding: '0.35rem 0.65rem', borderRadius: '0.55rem', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
-            <Plus size={16} /> Recharge Credits
+            + Top Up
           </button>
         </div>
-      </div>
 
-      {/* ── KPI Stats Cards ────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.1rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Send size={24} />
+        {/* Sent This Month Card */}
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Send size={26} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentThisMonth')}</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>24,180</div>
-            <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>↑ +14.2% vs last month</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentThisMonth') || 'Sent This Month'}</div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
+              {sentThisMonth.toLocaleString()}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
+              ↑ +14.2% vs last month
+            </div>
           </div>
         </div>
 
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.1rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle size={24} />
+        {/* Delivery Rate Card */}
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckCircle2 size={26} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.deliveryRate')}</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>99.4%</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>24,035 Successful</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.deliveryRate') || 'Delivery Rate'}</div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
+              99.4%
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
+              24,035 Successful deliveries
+            </div>
           </div>
         </div>
 
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.1rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={24} />
+        {/* Scheduled Campaigns Card */}
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Clock size={26} />
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Scheduled Campaigns</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>3</div>
-            <div style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 600 }}>Next: May 15 at 9:00 AM</div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
+              {campaigns.filter(c => c.status === 'scheduled').length}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
+              Next: May 15 • 9:00 AM
+            </div>
           </div>
         </div>
 
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.1rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AlertTriangle size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Failed / Invalid Numbers</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--foreground)' }}>42</div>
-            <div style={{ fontSize: '0.75rem', color: '#dc2626' }}>0.6% bounce rate</div>
-          </div>
-        </div>
       </div>
 
-      {/* ── Tabs Navigation ────────────────────────────────────── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '2rem', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {[
-          { key: 'compose', label: 'Compose Broadcast', icon: Send },
-          { key: 'history', label: 'Sent Campaigns & Logs', icon: Clock },
-          { key: 'templates', label: 'Message Templates', icon: FileText },
-          { key: 'settings', label: 'Gateway Configuration', icon: ShieldCheck },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
-              style={{
-                display: 'flex',
+      {/* Success / Info Banner */}
+      {bannerMessage && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '0.9rem 1.25rem',
+          borderRadius: '0.85rem',
+          background: 'rgba(16, 185, 129, 0.1)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          color: '#10b981',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.9rem',
+          fontWeight: 600
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <CheckCircle2 size={18} />
+            <span>{bannerMessage}</span>
+          </div>
+          <button
+            onClick={() => setBannerMessage(null)}
+            style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Main Data Wrapper ──────────────────────────────────── */}
+      <div className="data-table-wrapper glass-card" style={{ background: 'var(--card)', borderRadius: '1.25rem', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+        
+        {/* Table Toolbar Header */}
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+            
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '260px', maxWidth: '380px' }}>
+              <div style={{ 
+                display: 'flex', 
                 alignItems: 'center',
-                gap: '0.55rem',
-                padding: '0.85rem 1.4rem',
-                border: 'none',
-                background: 'none',
-                color: isActive ? '#4f46e5' : 'var(--muted-foreground)',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.92rem',
-                cursor: 'pointer',
-                borderBottom: isActive ? '3px solid #4f46e5' : '3px solid transparent',
-                marginBottom: '-1px',
+                border: '1px solid var(--border)', 
+                borderRadius: '0.75rem', 
+                padding: '0 0.875rem', 
+                height: '42px', 
+                background: 'var(--background)',
                 transition: 'all 0.2s',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+              }}>
+                <Search size={17} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
+                <input 
+                  type="text" 
+                  placeholder="Search campaigns, ID, or audience..." 
+                  style={{ 
+                    border: 'none', 
+                    outline: 'none', 
+                    background: 'transparent', 
+                    width: '100%', 
+                    color: 'var(--foreground)',
+                    fontSize: '0.9rem'
+                  }}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => setSearchTerm('')}
+                    style={{ background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', color: 'var(--muted-foreground)' }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Toolbar Action Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              
+              {/* Module Sub-Tabs (Campaigns, Templates, Gateway) */}
+              <div style={{ display: 'flex', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '3px', gap: '2px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('campaigns')}
+                  style={{
+                    padding: '0 0.8rem',
+                    height: '34px',
+                    borderRadius: '0.55rem',
+                    border: 'none',
+                    background: activeTab === 'campaigns' ? '#4f46e5' : 'transparent',
+                    color: activeTab === 'campaigns' ? '#ffffff' : 'var(--muted-foreground)',
+                    fontSize: '0.82rem',
+                    fontWeight: activeTab === 'campaigns' ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <Clock size={14} /> Campaigns
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('templates')}
+                  style={{
+                    padding: '0 0.8rem',
+                    height: '34px',
+                    borderRadius: '0.55rem',
+                    border: 'none',
+                    background: activeTab === 'templates' ? '#4f46e5' : 'transparent',
+                    color: activeTab === 'templates' ? '#ffffff' : 'var(--muted-foreground)',
+                    fontSize: '0.82rem',
+                    fontWeight: activeTab === 'templates' ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <FileText size={14} /> Templates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('gateway')}
+                  style={{
+                    padding: '0 0.8rem',
+                    height: '34px',
+                    borderRadius: '0.55rem',
+                    border: 'none',
+                    background: activeTab === 'gateway' ? '#4f46e5' : 'transparent',
+                    color: activeTab === 'gateway' ? '#ffffff' : 'var(--muted-foreground)',
+                    fontSize: '0.82rem',
+                    fontWeight: activeTab === 'gateway' ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <ShieldCheck size={14} /> Gateway
+                </button>
+              </div>
+
+              {/* Filters Toggle Button (for Campaigns tab) */}
+              {activeTab === 'campaigns' && (
+                <button 
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)} 
+                  style={{ 
+                    border: showFilters || activeFiltersCount > 0 ? '1px solid #4f46e5' : '1px solid var(--border)', 
+                    gap: '0.45rem', 
+                    borderRadius: '0.75rem',
+                    height: '42px',
+                    padding: '0 0.95rem',
+                    background: showFilters ? '#4f46e5' : 'var(--background)', 
+                    color: showFilters ? '#ffffff' : 'var(--foreground)',
+                    fontWeight: 600,
+                    fontSize: '0.86rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <Filter size={15} />
+                  <span>Filters</span>
+                  {activeFiltersCount > 0 && (
+                    <span style={{ 
+                      background: showFilters ? '#ffffff' : '#4f46e5', 
+                      color: showFilters ? '#4f46e5' : '#ffffff', 
+                      fontSize: '0.72rem', 
+                      borderRadius: '999px', 
+                      padding: '0.1rem 0.45rem',
+                      fontWeight: 700
+                    }}>
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* View Mode Toggle (Table / Cards) */}
+              {activeTab === 'campaigns' && (
+                <div style={{ display: 'flex', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '3px' }}>
+                  <button
+                    type="button"
+                    title="Table View"
+                    onClick={() => setViewMode('table')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '36px',
+                      height: '34px',
+                      borderRadius: '0.55rem',
+                      border: 'none',
+                      background: viewMode === 'table' ? 'var(--card)' : 'transparent',
+                      color: viewMode === 'table' ? '#4f46e5' : 'var(--muted-foreground)',
+                      boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Layers size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Cards View"
+                    onClick={() => setViewMode('cards')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '36px',
+                      height: '34px',
+                      borderRadius: '0.55rem',
+                      border: 'none',
+                      background: viewMode === 'cards' ? 'var(--card)' : 'transparent',
+                      color: viewMode === 'cards' ? '#4f46e5' : 'var(--muted-foreground)',
+                      boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <LayoutGrid size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* Export Dropdown */}
+              {activeTab === 'campaigns' && (
+                <div ref={exportRef} style={{ position: 'relative' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                    disabled={filteredCampaigns.length === 0}
+                    title="Export Options"
+                    style={{ 
+                      background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
+                      border: '1px solid var(--border)', 
+                      color: 'var(--foreground)',
+                      height: '42px',
+                      padding: '0 0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      borderRadius: '0.75rem',
+                      fontWeight: 500,
+                      fontSize: '0.86rem',
+                      opacity: filteredCampaigns.length === 0 ? 0.6 : 1,
+                      cursor: filteredCampaigns.length === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <Download size={15} />
+                    <span>Export</span>
+                    <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </button>
+
+                  {exportDropdownOpen && (
+                    <div 
+                      className="glass-card animate-fade-in"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        left: 0,
+                        zIndex: 50,
+                        minWidth: '165px',
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                        padding: '0.35rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem'
+                      }}
+                    >
+                      <button
+                        onClick={handleExportCSV}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.6rem',
+                          width: '100%',
+                          padding: '0.55rem 0.75rem',
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--foreground)',
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          borderRadius: '0.5rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--muted)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                        <span>Export as CSV</span>
+                      </button>
+                      <button
+                        onClick={handleExportPDF}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.6rem',
+                          width: '100%',
+                          padding: '0.55rem 0.75rem',
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--foreground)',
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          borderRadius: '0.5rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--muted)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <FileText size={15} style={{ color: '#ef4444' }} />
+                        <span>Export as PDF</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rows Per Page Selector */}
+              {activeTab === 'campaigns' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                  <select 
+                    value={limit} 
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Primary Action Button: Compose Broadcast */}
+              <button 
+                type="button"
+                onClick={() => {
+                  setBroadcastError(null);
+                  setIsComposeModalOpen(true);
+                }}
+                style={{ 
+                  height: '42px',
+                  padding: '0 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: '0 4px 15px rgba(79, 70, 229, 0.35)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={17} />
+                <span>{t('bulkSms.newCampaign') || 'New SMS Campaign'}</span>
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  setTimeout(() => setLoading(false), 500);
+                }}
+                title="Refresh Campaigns"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
+              >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* ── Advanced Filter Drawer (Campaigns) ────────────────── */}
+          {activeTab === 'campaigns' && showFilters && (
+            <div
+              style={{
+                marginTop: '0.5rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid var(--border)',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem',
+                alignItems: 'flex-end'
               }}
             >
-              <Icon size={17} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── TAB 1: Compose Broadcast ───────────────────────────── */}
-      {activeTab === 'compose' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(360px, 1fr)', gap: '2rem', alignItems: 'start' }}>
-          
-          {/* Left Form: Configuration */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.25rem', padding: '2rem', boxShadow: '0 4px 20px -8px rgba(0,0,0,0.04)' }}>
-            
-            {broadcastSuccess && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.75rem', animation: 'fadeIn 0.3s ease-out' }}>
-                <CheckCircle size={22} color="#16a34a" />
-                <div>
-                  <div style={{ fontWeight: 700, color: '#16a34a', fontSize: '0.95rem' }}>Broadcast Successfully Queued!</div>
-                  <div style={{ fontSize: '0.82rem', color: '#15803d' }}>
-                    Sent to {totalRecipients} recipients ({totalCreditsRequired} credits deducted). Delivery reports are updating live.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              
-              {/* 1. Target Audience */}
               <div>
-                <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', display: 'block', marginBottom: '0.5rem' }}>
-                  1. Select Target Audience
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                  Delivery Status
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
-                  {[
-                    { id: 'all', label: 'All Parents', count: '1,350', icon: Users },
-                    { id: 'class', label: 'Specific Class', count: '120', icon: GraduationCap },
-                    { id: 'teachers', label: 'Staff & Teachers', count: '68', icon: UserCheck },
-                    { id: 'custom', label: 'Custom List', count: 'Manual', icon: Smartphone },
-                  ].map(aud => {
-                    const isSelected = targetAudience === aud.id;
-                    return (
+                <select
+                  value={statusFilter}
+                  onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="processing">Processing</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                  Audience Group
+                </label>
+                <select
+                  value={audienceFilter}
+                  onChange={e => { setAudienceFilter(e.target.value); setPage(1); }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
+                >
+                  <option value="all">All Audiences</option>
+                  <option value="Parents">Parents & Guardians</option>
+                  <option value="Class">Specific Classes</option>
+                  <option value="Staff">Staff & Teachers</option>
+                  <option value="Absent">Absent Students</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex' }}>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 1rem',
+                    borderRadius: '0.55rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--muted)',
+                    color: 'var(--foreground)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Filter Badges */}
+          {activeTab === 'campaigns' && activeFiltersCount > 0 && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', paddingTop: '0.25rem' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Active Filters:</span>
+              
+              {searchTerm && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#eff6ff', color: '#2563eb', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
+                  Search: &ldquo;{searchTerm}&rdquo;
+                  <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#2563eb', display: 'flex' }}><X size={12} /></button>
+                </span>
+              )}
+
+              {statusFilter !== 'all' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
+                  Status: {statusFilter}
+                  <button onClick={() => setStatusFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#16a34a', display: 'flex' }}><X size={12} /></button>
+                </span>
+              )}
+
+              {audienceFilter !== 'all' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#fff7ed', color: '#ea580c', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
+                  Audience: {audienceFilter}
+                  <button onClick={() => setAudienceFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#ea580c', display: 'flex' }}><X size={12} /></button>
+                </span>
+              )}
+
+              <button
+                onClick={resetAllFilters}
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: '0 0.25rem' }}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
+        </div>
+
+        {/* ── Tab Content 1: Campaigns & Logs ──────────────────── */}
+        {activeTab === 'campaigns' && (
+          filteredCampaigns.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.7 }}>
+                <MessageSquare size={36} />
+              </div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>No SMS Campaigns Found</h3>
+              <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '420px' }}>
+                No broadcast records match your search query or filter parameters.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}
+                >
+                  Reset Filters
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsComposeModalOpen(true)}
+                  style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Plus size={16} /> New Broadcast
+                </button>
+              </div>
+            </div>
+          ) : viewMode === 'table' ? (
+            /* Table View */
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '0.9rem 1.25rem', width: '45px' }}>#</th>
+                    <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Date & Time</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Campaign & ID</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Target Audience</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Recipients</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Credits</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Delivery Rate</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Status</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedCampaigns.map((cmp, idx) => (
+                    <tr
+                      key={cmp.id}
+                      style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.015)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {/* Index */}
+                      <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
+                        {(page - 1) * limit + idx + 1}
+                      </td>
+
+                      {/* Date & Time - Strictly Single Line */}
+                      <td style={{ padding: '1rem 1.25rem', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
+                          <Calendar size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                          <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(cmp.sentAt)}</span>
+                        </div>
+                      </td>
+
+                      {/* Campaign Title & Masking */}
+                      <td style={{ padding: '1rem 1rem', minWidth: '200px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
+                          {cmp.title}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
+                            {cmp.id}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.45rem', borderRadius: '4px', background: 'var(--muted)', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                            {cmp.senderId}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Target Audience */}
+                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '99px',
+                          background: 'rgba(79, 70, 229, 0.08)',
+                          color: '#4f46e5',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {cmp.targetGroup}
+                        </span>
+                      </td>
+
+                      {/* Recipients & SMS Parts */}
+                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
+                          {cmp.recipientsCount.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
+                          {cmp.smsCount} SMS / recipient
+                        </div>
+                      </td>
+
+                      {/* Credits */}
+                      <td style={{ padding: '1rem 1rem', fontWeight: 800, color: '#4f46e5', whiteSpace: 'nowrap' }}>
+                        {cmp.totalCredits.toLocaleString()}
+                      </td>
+
+                      {/* Delivery Rate */}
+                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                        {cmp.status === 'scheduled' ? (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Pending</span>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <div style={{ width: '56px', height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
+                            </div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>{cmp.deliveryRate}%</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                        {cmp.status === 'delivered' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            <CheckCircle2 size={12} /> Delivered
+                          </span>
+                        )}
+                        {cmp.status === 'scheduled' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            <Clock size={12} /> Scheduled
+                          </span>
+                        )}
+                        {cmp.status === 'processing' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            <RefreshCw size={12} className="animate-spin" /> Processing
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            title="View Report & Log"
+                            onClick={() => {
+                              setSelectedCampaign(cmp);
+                              setDetailsModalOpen(true);
+                            }}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--background)',
+                              color: 'var(--foreground)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
+                          >
+                            <Eye size={14} />
+                          </button>
+
+                          <button
+                            type="button"
+                            title="Clone & Resend"
+                            onClick={() => {
+                              setMessage(cmp.messageText || cmp.title);
+                              setCampaignTitle(`Copy of ${cmp.title}`);
+                              setIsComposeModalOpen(true);
+                            }}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--background)',
+                              color: '#4f46e5',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#eef2ff')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        </div>
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* Cards View */
+            <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+              {paginatedCampaigns.map(cmp => (
+                <div
+                  key={cmp.id}
+                  style={{
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '1rem',
+                    padding: '1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.85rem',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                    transition: 'transform 0.15s, box-shadow 0.15s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.02)';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '99px',
+                      background: 'rgba(79, 70, 229, 0.08)',
+                      color: '#4f46e5',
+                      fontSize: '0.74rem',
+                      fontWeight: 700
+                    }}>
+                      {cmp.targetGroup}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
+                      {cmp.id}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.35rem', color: 'var(--foreground)' }}>
+                      {cmp.title}
+                    </h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                      <Calendar size={13} style={{ flexShrink: 0 }} />
+                      <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(cmp.sentAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Delivery Progress Bar */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                      <span style={{ color: 'var(--muted-foreground)' }}>Delivery Rate:</span>
+                      <strong style={{ color: 'var(--foreground)' }}>{cmp.deliveryRate}%</strong>
+                    </div>
+                    <div style={{ height: '6px', width: '100%', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
+                    </div>
+                  </div>
+
+                  {/* Footer Stats & Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Recipients / Credits</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                        {cmp.recipientsCount.toLocaleString()} <span style={{ color: '#4f46e5' }}>({cmp.totalCredits.toLocaleString()} cr)</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <button
-                        key={aud.id}
                         type="button"
-                        onClick={() => setTargetAudience(aud.id as any)}
+                        title="View Details"
+                        onClick={() => {
+                          setSelectedCampaign(cmp);
+                          setDetailsModalOpen(true);
+                        }}
                         style={{
-                          padding: '0.85rem 0.65rem',
-                          borderRadius: '0.75rem',
-                          border: isSelected ? '2px solid #4f46e5' : '1px solid var(--border)',
-                          background: isSelected ? 'rgba(79, 70, 229, 0.05)' : 'var(--background)',
-                          color: isSelected ? '#4f46e5' : 'var(--foreground)',
-                          cursor: 'pointer',
-                          textAlign: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
                           display: 'flex',
-                          flexDirection: 'column',
                           alignItems: 'center',
-                          gap: '0.35rem',
-                          transition: 'all 0.18s',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
                         }}
                       >
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{aud.label}</span>
-                        <span style={{ fontSize: '0.72rem', color: isSelected ? '#4f46e5' : 'var(--muted-foreground)', background: isSelected ? 'rgba(79, 70, 229, 0.12)' : 'rgba(0,0,0,0.04)', padding: '0.1rem 0.5rem', borderRadius: '99px' }}>
-                          {aud.count}
-                        </span>
+                        <Eye size={14} />
                       </button>
-                    );
-                  })}
+                      <button
+                        type="button"
+                        title="Clone & Resend"
+                        onClick={() => {
+                          setMessage(cmp.messageText || cmp.title);
+                          setCampaignTitle(`Copy of ${cmp.title}`);
+                          setIsComposeModalOpen(true);
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--background)',
+                          color: '#4f46e5',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* ── Tab Content 2: Pre-approved Templates ────────────── */}
+        {activeTab === 'templates' && (
+          <div style={{ padding: '1.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.25rem' }}>
+              {STATIC_TEMPLATES.map(tpl => {
+                const categoryColors: Record<string, { bg: string; text: string }> = {
+                  Attendance: { bg: '#eef2ff', text: '#4f46e5' },
+                  Fees: { bg: '#f0fdf4', text: '#16a34a' },
+                  Examination: { bg: '#fff7ed', text: '#ea580c' },
+                  Emergency: { bg: '#fef2f2', text: '#dc2626' },
+                  General: { bg: '#f1f5f9', text: '#475569' },
+                };
+                const col = categoryColors[tpl.category] || categoryColors.General;
+
+                return (
+                  <div
+                    key={tpl.id}
+                    style={{
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '1rem',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', background: col.bg, color: col.text, fontSize: '0.74rem', fontWeight: 700 }}>
+                          {tpl.category}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
+                          {tpl.id}
+                        </span>
+                      </div>
+
+                      <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.5rem', color: 'var(--foreground)' }}>
+                        {tpl.title}
+                      </h4>
+
+                      <div style={{ background: 'var(--background)', padding: '0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', fontSize: '0.84rem', color: 'var(--foreground)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+                        {tpl.content}
+                      </div>
+
+                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>
+                        Length: <strong>{tpl.charCount}</strong> chars (1 SMS Part)
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.65rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyTemplate(tpl)}
+                        style={{
+                          flex: 1,
+                          padding: '0.55rem 0',
+                          borderRadius: '0.6rem',
+                          background: '#4f46e5',
+                          color: 'white',
+                          border: 'none',
+                          fontWeight: 700,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                        }}
+                      >
+                        <Send size={14} /> Use Template
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyTemplate(tpl)}
+                        style={{
+                          padding: '0.55rem 0.85rem',
+                          borderRadius: '0.6rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontWeight: 600,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                        }}
+                        title="Copy Template"
+                      >
+                        {copiedTemplateId === tpl.id ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab Content 3: Gateway Configuration ─────────────── */}
+        {activeTab === 'gateway' && (
+          <div style={{ padding: '1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>Telecom Gateway Status</h3>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Primary carrier connection</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Gateway Provider</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>SSL Wireless Telecom Hub</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Connection Health</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} /> Operational (Ping 38ms)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Masking Approval</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a' }}>SCHOOLCARE (BTRC Active)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Throughput Rate</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>500 SMS / second</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBannerMessage('Gateway Ping Successful! Server latency is 38ms.')}
+                style={{ marginTop: '1.25rem', width: '100%', padding: '0.65rem 0', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
+              >
+                Test Gateway Ping
+              </button>
+            </div>
+
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bell size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>Automatic Event Triggers</h3>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Auto-send SMS on school actions</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {[
+                  { title: 'Auto Absentee Alert', desc: 'Trigger SMS automatically when student marked absent by teacher', active: true },
+                  { title: 'Fee Payment Confirmation', desc: 'Send receipt SMS instantly when accountant collects tuition', active: true },
+                  { title: 'Exam Routine Publication', desc: 'Broadcast to parents when exam schedule is published', active: false },
+                ].map((ev, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>{ev.title}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', maxWidth: '280px' }}>{ev.desc}</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      defaultChecked={ev.active}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Table Footer & Pagination ─────────────────────────── */}
+        {activeTab === 'campaigns' && filteredCampaigns.length > 0 && (
+          <div
+            style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              fontSize: '0.85rem',
+              color: 'var(--muted-foreground)',
+            }}
+          >
+            <div>
+              Showing <strong>{paginatedCampaigns.length}</strong> of <strong>{filteredCampaigns.length}</strong> campaign{filteredCampaigns.length !== 1 ? 's' : ''}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.82rem', marginRight: '0.5rem' }}>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '0.55rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: page <= 1 ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '0.55rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                  opacity: page >= totalPages ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Modal: Compose Broadcast (with Live Smartphone Mockup) ── */}
+      {isComposeModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.55)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: '1.25rem',
+        }}>
+          <div
+            className="glass-card animate-fade-in"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: '1.25rem',
+              width: '100%',
+              maxWidth: '960px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#eef2ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Send size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                    Compose SMS Broadcast
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                    Transmit notices, fee reminders, or emergency alerts via telecom gateway
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsComposeModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body: Two Column (Form + Smartphone Preview) */}
+            <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(300px, 0.85fr)', gap: '1.75rem', alignItems: 'start' }}>
+              
+              {/* Left Column: Form */}
+              <form onSubmit={handleSendBroadcast} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+                
+                {broadcastError && (
+                  <div style={{ padding: '0.75rem 1rem', borderRadius: '0.65rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                    <span>{broadcastError}</span>
+                  </div>
+                )}
+
+                {/* Campaign Title */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                    Campaign Title <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Monthly Tuition Fee Reminder, PTM Meeting"
+                    value={campaignTitle}
+                    onChange={e => setCampaignTitle(e.target.value)}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
+                    required
+                  />
                 </div>
 
-                {/* Sub-selectors for Class & Section */}
-                {targetAudience === 'class' && (
-                  <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', padding: '1rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
-                    <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.3rem' }}>Select Class</label>
+                {/* Target Audience Tabs */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                    Target Audience <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                    {[
+                      { id: 'all', label: 'All Parents', count: '1,350', icon: Users },
+                      { id: 'class', label: 'Class', count: '120', icon: GraduationCap },
+                      { id: 'teachers', label: 'Staff', count: '68', icon: UserCheck },
+                      { id: 'custom', label: 'Custom', count: '45', icon: Smartphone },
+                    ].map(aud => {
+                      const isSelected = targetAudience === aud.id;
+                      return (
+                        <button
+                          key={aud.id}
+                          type="button"
+                          onClick={() => setTargetAudience(aud.id as 'all' | 'class' | 'teachers' | 'custom')}
+                          style={{
+                            padding: '0.65rem 0.4rem',
+                            borderRadius: '0.65rem',
+                            border: isSelected ? '2px solid #4f46e5' : '1px solid var(--border)',
+                            background: isSelected ? 'rgba(79, 70, 229, 0.08)' : 'var(--background)',
+                            color: isSelected ? '#4f46e5' : 'var(--foreground)',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '0.2rem'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{aud.label}</span>
+                          <span style={{ fontSize: '0.7rem', color: isSelected ? '#4f46e5' : 'var(--muted-foreground)' }}>{aud.count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sub-selector for Class */}
+                  {targetAudience === 'class' && (
+                    <div style={{ marginTop: '0.65rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                       <select
                         value={selectedClass}
                         onChange={e => setSelectedClass(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
                       >
                         {['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'HSC 1st Year', 'HSC 2nd Year'].map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.3rem' }}>Select Section</label>
                       <select
                         value={selectedSection}
                         onChange={e => setSelectedSection(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
                       >
                         {['All Sections', 'Section A (Padma)', 'Section B (Meghna)', 'Section C (Jamuna)'].map(s => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. Sender ID & Template */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', display: 'block', marginBottom: '0.5rem' }}>
-                    2. Sender ID (Masking)
-                  </label>
-                  <select
-                    value={senderId}
-                    onChange={e => setSenderId(e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="SCHOOLCARE">SCHOOLCARE (Masked - Approved)</option>
-                    <option value="EDUALERT">EDUALERT (Emergency Masking)</option>
-                    <option value="Non-Masking">01888-XXXXXX (Non-masking)</option>
-                  </select>
+                  )}
                 </div>
 
-                <div>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', display: 'block', marginBottom: '0.5rem' }}>
-                    Load Template
-                  </label>
-                  <select
-                    onChange={e => {
-                      const tpl = STATIC_TEMPLATES.find(t => t.id === e.target.value);
-                      if (tpl) setMessage(tpl.content);
-                    }}
-                    defaultValue=""
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="" disabled>Choose quick template...</option>
-                    {STATIC_TEMPLATES.map(tpl => (
-                      <option key={tpl.id} value={tpl.id}>{tpl.title} ({tpl.category})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 3. Dynamic Variables Pills */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    3. Dynamic Personalization Tags
-                  </label>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Click to append at cursor</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-                  {DYNAMIC_TAGS.map(item => (
-                    <button
-                      key={item.tag}
-                      type="button"
-                      onClick={() => handleInsertTag(item.tag)}
-                      style={{
-                        padding: '0.3rem 0.65rem',
-                        borderRadius: '99px',
-                        background: 'rgba(79, 70, 229, 0.08)',
-                        color: '#4f46e5',
-                        border: '1px solid rgba(79, 70, 229, 0.2)',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s',
-                      }}
-                      title={`Replaces with e.g. "${item.sample}"`}
+                {/* Sender ID & Load Template */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                      Sender Masking
+                    </label>
+                    <select
+                      value={senderId}
+                      onChange={e => setSenderId(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                     >
-                      + {item.tag}
-                    </button>
-                  ))}
+                      <option value="SCHOOLCARE">SCHOOLCARE (Masked)</option>
+                      <option value="EDUALERT">EDUALERT (Emergency)</option>
+                      <option value="01888-XXXXXX">01888-XXXXXX (Non-mask)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                      Insert Template
+                    </label>
+                    <select
+                      onChange={e => {
+                        const tpl = STATIC_TEMPLATES.find(t => t.id === e.target.value);
+                        if (tpl) {
+                          setMessage(tpl.content);
+                          if (!campaignTitle) setCampaignTitle(tpl.title);
+                        }
+                      }}
+                      defaultValue=""
+                      style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
+                    >
+                      <option value="" disabled>Choose template...</option>
+                      {STATIC_TEMPLATES.map(tpl => (
+                        <option key={tpl.id} value={tpl.id}>{tpl.title}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              {/* 4. Message Content Box */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    4. Message Content
-                  </label>
-                  <span style={{ fontSize: '0.75rem', color: isUnicode ? '#ea580c' : '#16a34a', fontWeight: 600 }}>
-                    {isUnicode ? '● Unicode (Bangla/Special characters detected)' : '● Standard GSM (English/ASCII)'}
-                  </span>
-                </div>
-
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  rows={5}
-                  placeholder="Type your SMS broadcast text here..."
-                  style={{
-                    width: '100%',
-                    padding: '0.85rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--background)',
-                    color: 'var(--foreground)',
-                    fontSize: '0.92rem',
-                    fontFamily: 'inherit',
-                    lineHeight: 1.5,
-                    resize: 'vertical',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-
-                {/* Character & Parts Count Footbar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', padding: '0.4rem 0.5rem', background: 'var(--background)', borderRadius: '0.55rem', border: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  <span>
-                    Characters: <strong style={{ color: 'var(--foreground)' }}>{charLength}</strong> / {charsPerSMS} max per SMS
-                  </span>
-                  <span>
-                    Parts: <strong style={{ color: '#4f46e5' }}>{smsParts} SMS</strong> ({smsParts > 1 ? 'Multi-part message' : 'Single message'})
-                  </span>
-                </div>
-              </div>
-
-              {/* 5. Dispatch Scheduling */}
-              <div>
-                <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', display: 'block', marginBottom: '0.5rem' }}>
-                  5. Dispatch Schedule
-                </label>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', color: 'var(--foreground)' }}>
-                    <input
-                      type="radio"
-                      name="scheduleType"
-                      checked={scheduleType === 'instant'}
-                      onChange={() => setScheduleType('instant')}
-                    />
-                    Send Instantly
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', color: 'var(--foreground)' }}>
-                    <input
-                      type="radio"
-                      name="scheduleType"
-                      checked={scheduleType === 'scheduled'}
-                      onChange={() => setScheduleType('scheduled')}
-                    />
-                    Schedule for Later
-                  </label>
-
-                  {scheduleType === 'scheduled' && (
-                    <input
-                      type="datetime-local"
-                      value={scheduledDateTime}
-                      onChange={e => setScheduledDateTime(e.target.value)}
-                      style={{ padding: '0.5rem 0.8rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Summary & Submit Button */}
-              <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                {/* Dynamic Variables */}
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Estimated Cost:</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                    {totalCreditsRequired} Credits <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>({totalRecipients} recipients × {smsParts} SMS)</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                      Personalization Tags
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Click to append</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    {DYNAMIC_TAGS.map(item => (
+                      <button
+                        key={item.tag}
+                        type="button"
+                        onClick={() => handleInsertTag(item.tag)}
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '99px',
+                          background: 'rgba(79, 70, 229, 0.08)',
+                          color: '#4f46e5',
+                          border: '1px solid rgba(79, 70, 229, 0.2)',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + {item.tag}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSendBroadcast}
-                  disabled={isBroadcasting || !message.trim()}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.55rem',
-                    padding: '0.85rem 1.85rem',
-                    borderRadius: '0.85rem',
-                    background: '#4f46e5',
-                    color: 'white',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: isBroadcasting || !message.trim() ? 'not-allowed' : 'pointer',
-                    opacity: isBroadcasting || !message.trim() ? 0.6 : 1,
-                    boxShadow: '0 4px 16px -2px rgba(79,70,229,0.4)',
-                    transition: 'all 0.18s',
-                  }}
-                >
-                  {isBroadcasting ? (
-                    <>
-                      <RefreshCw size={18} className="animate-spin" /> Transmitting Broadcast...
-                    </>
-                  ) : (
-                    <>
-                      <Send size={18} /> Broadcast to {totalRecipients} Recipients
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Right Column: Live Mobile Mockup */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'sticky', top: '1.5rem' }}>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: 'var(--muted-foreground)', fontSize: '0.85rem', fontWeight: 600 }}>
-              <Smartphone size={16} /> Live Recipient Phone Preview
-            </div>
-
-            {/* Smartphone Case Mockup */}
-            <div
-              style={{
-                width: '320px',
-                height: '620px',
-                background: '#0f172a',
-                borderRadius: '44px',
-                padding: '12px',
-                boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(255,255,255,0.1) inset',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              {/* Smartphone Inner Screen */}
-              <div
-                style={{
-                  background: '#f8fafc',
-                  borderRadius: '34px',
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
-              >
-                {/* Phone Speaker Notch */}
-                <div style={{ height: '24px', background: 'transparent', display: 'flex', justifyContent: 'center', alignItems: 'center', paddingTop: '4px' }}>
-                  <div style={{ width: '80px', height: '14px', background: '#0f172a', borderRadius: '12px' }} />
-                </div>
-
-                {/* SMS App Header */}
-                <div style={{ padding: '0.5rem 0.85rem 0.75rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '0.95rem', marginBottom: '0.25rem', boxShadow: '0 2px 8px rgba(79,70,229,0.3)' }}>
-                    SC
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', lineHeight: 1.2 }}>
-                    {senderId}
-                  </div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                    Verified SMS Sender
-                  </div>
-                </div>
-
-                {/* Messages Chat Area */}
-                <div style={{ flex: 1, padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  
-                  {/* Timestamp Badge */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, background: '#e2e8f0', padding: '0.15rem 0.5rem', borderRadius: '99px' }}>
-                      Today 3:45 PM
+                {/* Message Content */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      SMS Content <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: isUnicode ? '#ea580c' : '#16a34a', fontWeight: 600 }}>
+                      {isUnicode ? '● Unicode (Bangla/Special)' : '● Standard GSM'}
                     </span>
                   </div>
+                  <textarea
+                    rows={4}
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    placeholder="Type broadcast text here..."
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none', resize: 'vertical', lineHeight: 1.45 }}
+                    required
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem', fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
+                    <span>Characters: <strong>{charLength}</strong> / {charsPerSMS} per SMS</span>
+                    <span>Parts: <strong style={{ color: '#4f46e5' }}>{smsParts} SMS</strong></span>
+                  </div>
+                </div>
 
-                  {/* SMS Bubble */}
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      color: '#1e293b',
-                      borderRadius: '16px 16px 16px 4px',
-                      padding: '0.85rem 1rem',
-                      maxWidth: '88%',
-                      alignSelf: 'flex-start',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '0.82rem',
-                      lineHeight: 1.45,
-                      wordBreak: 'break-word',
-                      animation: 'fadeIn 0.2s ease-out',
-                    }}
-                  >
-                    {message.trim() ? (
-                      getRenderedPreview()
-                    ) : (
-                      <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                        Start typing message on the left to preview live...
-                      </span>
+                {/* Dispatch Schedule */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                    Dispatch Time
+                  </label>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="scheduleType"
+                        checked={scheduleType === 'instant'}
+                        onChange={() => setScheduleType('instant')}
+                      />
+                      Send Immediately
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="scheduleType"
+                        checked={scheduleType === 'scheduled'}
+                        onChange={() => setScheduleType('scheduled')}
+                      />
+                      Schedule for Later
+                    </label>
+                    {scheduleType === 'scheduled' && (
+                      <input
+                        type="datetime-local"
+                        value={scheduledDateTime}
+                        onChange={e => setScheduledDateTime(e.target.value)}
+                        style={{ padding: '0.35rem 0.65rem', borderRadius: '0.45rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.8rem' }}
+                      />
                     )}
-                    <div style={{ textAlign: 'right', marginTop: '0.35rem', fontSize: '0.62rem', color: '#94a3b8' }}>
-                      Delivered • Just now
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Bottom Input Mock */}
-                <div style={{ padding: '0.65rem 0.85rem', background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ flex: 1, background: '#f1f5f9', borderRadius: '18px', padding: '0.4rem 0.85rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Text Message...
-                  </div>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                    <ArrowUpRight size={14} />
                   </div>
                 </div>
 
-                {/* Home Indicator */}
-                <div style={{ height: '14px', background: '#ffffff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <div style={{ width: '100px', height: '4px', background: '#cbd5e1', borderRadius: '99px' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Telco Route Status */}
-            <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.5rem', fontSize: '0.72rem', color: 'var(--muted-foreground)', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> GP Direct
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Robi/Airtel
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Banglalink
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Teletalk
-              </span>
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* ── TAB 2: Sent Campaigns & Logs ───────────────────────── */}
-      {activeTab === 'history' && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 4px 20px -8px rgba(0,0,0,0.04)' }}>
-          
-          {/* Table Header Filter Controls */}
-          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ position: 'relative', width: '320px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
-              <input
-                type="text"
-                placeholder="Search campaigns..."
-                value={historySearch}
-                onChange={e => setHistorySearch(e.target.value)}
-                style={{ width: '100%', paddingLeft: '2.5rem', paddingRight: '0.9rem', paddingTop: '0.55rem', paddingBottom: '0.55rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <Filter size={15} style={{ color: 'var(--muted-foreground)' }} />
-              <select
-                value={historyFilter}
-                onChange={e => setHistoryFilter(e.target.value)}
-                style={{ padding: '0.55rem 0.9rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
-              >
-                <option value="all">All Statuses</option>
-                <option value="delivered">Delivered</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="processing">Processing</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-              <thead>
-                <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '1rem 1.5rem' }}>Campaign & ID</th>
-                  <th style={{ padding: '1rem 1rem' }}>Target Audience</th>
-                  <th style={{ padding: '1rem 1rem' }}>Recipients</th>
-                  <th style={{ padding: '1rem 1rem' }}>Credits</th>
-                  <th style={{ padding: '1rem 1rem' }}>Date & Time</th>
-                  <th style={{ padding: '1rem 1rem' }}>{t('bulkSms.deliveryRate')}</th>
-                  <th style={{ padding: '1rem 1rem' }}>Status</th>
-                  <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCampaigns.map(cmp => (
-                  <tr key={cmp.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '1.1rem 1.5rem' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{cmp.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>{cmp.id} • {cmp.senderId}</div>
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem', color: 'var(--foreground)', fontWeight: 500 }}>
-                      {cmp.targetGroup}
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--foreground)' }}>{cmp.recipientsCount.toLocaleString()}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}> ({cmp.smsCount} SMS/recp)</span>
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem', fontWeight: 700, color: '#4f46e5' }}>
-                      {cmp.totalCredits.toLocaleString()}
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
-                      {cmp.sentAt}
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem' }}>
-                      {cmp.status === 'scheduled' ? (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Pending</span>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <div style={{ width: '60px', height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
-                            <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
-                          </div>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>{cmp.deliveryRate}%</span>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '1.1rem 1rem' }}>
-                      {cmp.status === 'delivered' && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.75rem', fontWeight: 700 }}>
-                          <CheckCircle size={12} /> Delivered
-                        </span>
-                      )}
-                      {cmp.status === 'scheduled' && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700 }}>
-                          <Clock size={12} /> Scheduled
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '1.1rem 1.5rem', textAlign: 'right' }}>
-                      <button
-                        onClick={() => alert(`Showing delivery logs for campaign: ${cmp.title}`)}
-                        style={{ padding: '0.4rem 0.8rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Delivery Log
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 3: Message Templates ───────────────────────────── */}
-      {activeTab === 'templates' && (
-        <div>
-          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Pre-approved Templates</h2>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Choose a telecom regulator approved template to broadcast in seconds.</p>
-            </div>
-            <button
-              onClick={() => alert('Template creation request sent to telecom authority for review.')}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.15rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '0.65rem', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
-            >
-              <Plus size={15} /> Request New Template
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
-            {STATIC_TEMPLATES.map(tpl => {
-              const categoryColors: Record<string, { bg: string; text: string }> = {
-                Attendance: { bg: '#eef2ff', text: '#4f46e5' },
-                Fees: { bg: '#f0fdf4', text: '#16a34a' },
-                Examination: { bg: '#fff7ed', text: '#ea580c' },
-                Emergency: { bg: '#fef2f2', text: '#dc2626' },
-                General: { bg: '#f1f5f9', text: '#475569' },
-              };
-              const col = categoryColors[tpl.category] || categoryColors.General;
-
-              return (
-                <div
-                  key={tpl.id}
-                  style={{
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '1.1rem',
-                    padding: '1.35rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                  }}
-                >
+                {/* Submit Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', background: col.bg, color: col.text, fontSize: '0.75rem', fontWeight: 700 }}>
-                        {tpl.category}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
-                        {tpl.id}
-                      </span>
-                    </div>
-
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 0.5rem', color: 'var(--foreground)' }}>
-                      {tpl.title}
-                    </h3>
-
-                    <div style={{ background: 'var(--background)', padding: '0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', fontSize: '0.84rem', color: 'var(--foreground)', lineHeight: 1.5, marginBottom: '0.85rem' }}>
-                      {tpl.content}
-                    </div>
-
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>
-                      Length: <strong>{tpl.charCount}</strong> chars (1 SMS Part)
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Required Cost:</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                      {totalCreditsRequired} Credits <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>({totalRecipients} × {smsParts})</span>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.65rem' }}>
                     <button
-                      onClick={() => handleApplyTemplate(tpl)}
-                      style={{
-                        flex: 1,
-                        padding: '0.55rem 0',
-                        borderRadius: '0.6rem',
-                        background: '#4f46e5',
-                        color: 'white',
-                        border: 'none',
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.4rem',
-                      }}
+                      type="button"
+                      onClick={() => setIsComposeModalOpen(false)}
+                      style={{ padding: '0.6rem 1rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      <Send size={14} /> Use Template
+                      Cancel
                     </button>
                     <button
-                      onClick={() => handleCopyTemplate(tpl)}
+                      type="submit"
+                      disabled={isBroadcasting}
                       style={{
-                        padding: '0.55rem 0.85rem',
-                        borderRadius: '0.6rem',
-                        border: '1px solid var(--border)',
-                        background: 'var(--background)',
-                        color: 'var(--foreground)',
-                        fontWeight: 600,
+                        padding: '0.6rem 1.35rem',
+                        borderRadius: '0.65rem',
+                        border: 'none',
+                        background: '#4f46e5',
+                        color: '#ffffff',
                         fontSize: '0.85rem',
-                        cursor: 'pointer',
+                        fontWeight: 700,
+                        cursor: isBroadcasting ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.35rem',
+                        gap: '0.45rem',
+                        boxShadow: '0 4px 15px rgba(79, 70, 229, 0.35)'
                       }}
-                      title="Copy text"
                     >
-                      {copiedTemplateId === tpl.id ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+                      {isBroadcasting ? (
+                        <>
+                          <RefreshCw size={15} className="animate-spin" />
+                          <span>Transmitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={15} />
+                          <span>Broadcast Now</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
-              );
-            })}
+
+              </form>
+
+              {/* Right Column: Live Recipient Smartphone Mockup */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.65rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                  <Smartphone size={15} /> Live Phone Preview
+                </div>
+
+                <div
+                  style={{
+                    width: '280px',
+                    height: '520px',
+                    background: '#0f172a',
+                    borderRadius: '38px',
+                    padding: '10px',
+                    boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.4)',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      borderRadius: '28px',
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Notch */}
+                    <div style={{ height: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ width: '65px', height: '10px', background: '#0f172a', borderRadius: '10px' }} />
+                    </div>
+
+                    {/* App Header */}
+                    <div style={{ padding: '0.4rem 0.75rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '0.82rem', marginBottom: '0.2rem' }}>
+                        SC
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{senderId}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#64748b' }}>Verified Telecom Sender</div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div style={{ flex: 1, padding: '0.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600, background: '#e2e8f0', padding: '0.1rem 0.45rem', borderRadius: '99px' }}>
+                          Today 10:30 AM
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          background: '#ffffff',
+                          color: '#1e293b',
+                          borderRadius: '14px 14px 14px 4px',
+                          padding: '0.75rem 0.85rem',
+                          maxWidth: '92%',
+                          alignSelf: 'flex-start',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '0.78rem',
+                          lineHeight: 1.45,
+                          wordBreak: 'break-word'
+                        }}
+                      >
+                        {message.trim() ? (
+                          getRenderedPreview()
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                            Type message on left to preview...
+                          </span>
+                        )}
+                        <div style={{ textAlign: 'right', marginTop: '0.25rem', fontSize: '0.6rem', color: '#94a3b8' }}>
+                          Delivered
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phone Footer */}
+                    <div style={{ height: '12px', background: '#ffffff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ width: '80px', height: '3px', background: '#cbd5e1', borderRadius: '99px' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB 4: Gateway Configuration ───────────────────────── */}
-      {activeTab === 'settings' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
-          
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.25rem', padding: '1.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck size={22} />
-              </div>
+      {/* ── Modal: Campaign Report & Details ─────────────────────── */}
+      {detailsModalOpen && selectedCampaign && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.55)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: '1.5rem',
+        }}>
+          <div
+            className="glass-card animate-fade-in"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: '1.25rem',
+              width: '100%',
+              maxWidth: '520px',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
+              color: '#ffffff',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--foreground)' }}>Telecom Gateway Status</h3>
-                <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Primary carrier connection</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Gateway Provider</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>SSL Wireless Telecom Hub</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Connection Health</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} /> Operational (Ping 38ms)
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.9, fontWeight: 700 }}>
+                  Campaign Report &bull; {selectedCampaign.senderId}
                 </span>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0.15rem 0 0' }}>
+                  {selectedCampaign.title}
+                </h3>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Masking Approval</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a' }}>SCHOOLCARE (BTRC Active)</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Throughput Rate</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>500 SMS / second</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setDetailsModalOpen(false)}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#ffffff', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <button
-              onClick={() => alert('Ping Test: Connection healthy! Latency: 38ms.')}
-              style={{ marginTop: '1.25rem', width: '100%', padding: '0.65rem 0', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
-            >
-              Test Gateway Ping
-            </button>
-          </div>
-
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.25rem', padding: '1.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Bell size={22} />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--foreground)' }}>Automatic Event Triggers</h3>
-                <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Auto-send SMS on school actions</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { title: 'Auto Absentee Alert', desc: 'Trigger SMS automatically when student marked absent by teacher', active: true },
-                { title: 'Fee Payment Confirmation', desc: 'Send receipt SMS instantly when accountant collects tuition', active: true },
-                { title: 'Exam Routine Publication', desc: 'Broadcast to parents when exam schedule is published', active: false },
-              ].map((ev, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>{ev.title}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', maxWidth: '280px' }}>{ev.desc}</div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '0.85rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Campaign ID</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
+                    {selectedCampaign.id}
                   </div>
-                  <input
-                    type="checkbox"
-                    defaultChecked={ev.active}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Target Group</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
+                    {selectedCampaign.targetGroup}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recipients</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
+                    {selectedCampaign.recipientsCount.toLocaleString()} ({selectedCampaign.smsCount} SMS/recp)
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Credits Deducted</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4f46e5', marginTop: '0.15rem' }}>
+                    {selectedCampaign.totalCredits.toLocaleString()} Credits
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sent Date & Time</div>
+                <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                  <Calendar size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(selectedCampaign.sentAt)}</span>
+                </div>
+              </div>
+
+              {selectedCampaign.messageText && (
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Broadcast Message</div>
+                  <div style={{ fontSize: '0.84rem', color: 'var(--foreground)', marginTop: '0.2rem', padding: '0.75rem', background: 'var(--muted)', borderRadius: '0.5rem', lineHeight: 1.45 }}>
+                    {selectedCampaign.messageText}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadCampaignPDF(selectedCampaign)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.6rem 1rem',
+                    borderRadius: '0.65rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--background)',
+                    color: 'var(--foreground)',
+                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Download size={15} />
+                  <span>Download Report (PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDetailsModalOpen(false)}
+                  style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: 'none', background: '#4f46e5', color: '#ffffff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Recharge Credits ──────────────────────────────── */}
+      {isRechargeModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.55)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: '1.5rem',
+        }}>
+          <div
+            className="glass-card animate-fade-in"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: '1.25rem',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '1.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Recharge SMS Credits</h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Choose a package to recharge instantly</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRechargeModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {[
+                { credits: 5000, price: '৳ 1,750', perSms: '৳ 0.35 / SMS', popular: false },
+                { credits: 15000, price: '৳ 4,800', perSms: '৳ 0.32 / SMS', popular: true },
+                { credits: 30000, price: '৳ 9,000', perSms: '৳ 0.30 / SMS', popular: false },
+                { credits: 60000, price: '৳ 16,800', perSms: '৳ 0.28 / SMS', popular: false },
+              ].map(pkg => (
+                <div
+                  key={pkg.credits}
+                  onClick={() => handleRechargeCredits(pkg.credits)}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '0.75rem',
+                    border: pkg.popular ? '2px solid #4f46e5' : '1px solid var(--border)',
+                    background: pkg.popular ? 'rgba(79, 70, 229, 0.05)' : 'var(--background)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#4f46e5')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = pkg.popular ? '#4f46e5' : 'var(--border)')}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>{pkg.credits.toLocaleString()} Credits</span>
+                      {pkg.popular && (
+                        <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '99px', background: '#4f46e5', color: 'white', fontWeight: 700 }}>
+                          Best Value
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>{pkg.perSms}</div>
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#16a34a' }}>
+                    {pkg.price}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
 
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setIsRechargeModalOpen(false)}
+                style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
 
     </div>
   );

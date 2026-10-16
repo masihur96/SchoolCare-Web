@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLanguage } from '@/components/language-provider';
 import {
-  BookOpen, Search, X, BookMarked, User,
-  Hash, AlertCircle, RefreshCw, Filter, Tag, Plus, Loader2, Pencil, CheckCircle
+  Search, Plus, Edit3, Trash2, Eye, Filter,
+  ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle,
+  BookOpen, BookMarked, Download, FileSpreadsheet, FileText,
+  ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, User, Hash
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -34,10 +38,12 @@ interface Book {
   coverImage?: string;
   coverImageUrl?: string;
   isAvailable?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   [key: string]: unknown;
 }
 
-interface BookForm {
+interface BookFormState {
   title: string;
   author: string;
   isbn: string;
@@ -45,522 +51,1861 @@ interface BookForm {
   coverImageUrl: string;
   isAvailable: boolean;
   description: string;
+  quantity: string | number;
+  available: string | number;
 }
 
 const BOOK_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'Mathematics',
   'History', 'Literature', 'Technology', 'Arts', 'Religion', 'Reference',
 ];
-const FILTER_CATEGORIES = ['All', ...BOOK_CATEGORIES];
 
-const EMPTY_FORM: BookForm = {
-  title: '', author: '', isbn: '', category: 'Fiction',
-  coverImageUrl: '', isAvailable: true, description: '',
+const getCategoryBadgeStyle = (cat?: string) => {
+  const styles: Record<string, { bg: string; text: string; border: string }> = {
+    'Fiction': { bg: 'rgba(99, 102, 241, 0.12)', text: '#6366f1', border: 'rgba(99, 102, 241, 0.25)' },
+    'Non-Fiction': { bg: 'rgba(14, 165, 233, 0.12)', text: '#0ea5e9', border: 'rgba(14, 165, 233, 0.25)' },
+    'Science': { bg: 'rgba(16, 185, 129, 0.12)', text: '#10b981', border: 'rgba(16, 185, 129, 0.25)' },
+    'Mathematics': { bg: 'rgba(245, 158, 11, 0.12)', text: '#d97706', border: 'rgba(245, 158, 11, 0.25)' },
+    'History': { bg: 'rgba(139, 92, 246, 0.12)', text: '#8b5cf6', border: 'rgba(139, 92, 246, 0.25)' },
+    'Literature': { bg: 'rgba(236, 72, 153, 0.12)', text: '#ec4899', border: 'rgba(236, 72, 153, 0.25)' },
+    'Technology': { bg: 'rgba(20, 184, 166, 0.12)', text: '#0d9488', border: 'rgba(20, 184, 166, 0.25)' },
+    'Arts': { bg: 'rgba(249, 115, 22, 0.12)', text: '#ea580c', border: 'rgba(249, 115, 22, 0.25)' },
+    'Religion': { bg: 'rgba(132, 204, 22, 0.12)', text: '#65a30d', border: 'rgba(132, 204, 22, 0.25)' },
+    'Reference': { bg: 'rgba(100, 116, 139, 0.12)', text: '#475569', border: 'rgba(100, 116, 139, 0.25)' },
+  };
+  return styles[cat || ''] || { bg: 'rgba(148, 163, 184, 0.12)', text: '#64748b', border: 'rgba(148, 163, 184, 0.25)' };
 };
 
-// ── Shared modal form ────────────────────────────────────────────────────────
-function BookModal({
-  mode,
-  initialForm,
-  onClose,
-  onSuccess,
-  bookId,
-}: {
-  mode: 'create' | 'edit';
-  initialForm: BookForm;
-  onClose: () => void;
-  onSuccess: () => void;
-  bookId?: string;
-}) {
-  const { t } = useLanguage();
-  const [form, setForm] = useState<BookForm>(initialForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-
-  const handleFormChange = (field: keyof BookForm, value: string | boolean) =>
-    setForm(prev => ({ ...prev, [field]: value }));
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '0.65rem 0.9rem',
-    border: '1px solid var(--border)', borderRadius: '0.6rem',
-    background: 'var(--background)', color: 'var(--foreground)',
-    fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box',
-  };
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)',
-    marginBottom: '0.35rem', display: 'block',
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setSubmitError('Title is required.'); return; }
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const body = {
-        title: form.title.trim(),
-        author: form.author.trim(),
-        isbn: form.isbn.trim(),
-        category: form.category,
-        coverImageUrl: form.coverImageUrl.trim(),
-        isAvailable: form.isAvailable,
-        description: form.description.trim(),
-      };
-      const url = mode === 'edit'
-        ? `${API_BASE_URL}/library/books/${bookId}`
-        : `${API_BASE_URL}/library/books`;
-      const method = mode === 'edit' ? 'PATCH' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: {
-          accept: '*/*',
-          Authorization: `Bearer ${getApiToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Request failed (${res.status})`);
-      }
-      setSubmitSuccess(true);
-      onSuccess();
-      setTimeout(() => onClose(), 1500);
-    } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Request failed.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const isEdit = mode === 'edit';
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={e => { if (e.target === e.currentTarget && !submitting) onClose(); }}
-    >
-      <div style={{ background: 'var(--background, #fff)', borderRadius: '1.25rem', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.25)', animation: 'modal-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
-        {/* Header */}
-        <div style={{ padding: '1.5rem 1.75rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--foreground)' }}>
-              {isEdit ? 'Update Book' : t('library.addBook')}
-            </h2>
-            <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
-              {isEdit ? 'Edit the book details below.' : 'Fill in the details to add a book to the library.'}
-            </p>
-          </div>
-          <button onClick={() => !submitting && onClose()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: '0.25rem', borderRadius: '6px', display: 'flex' }}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Success */}
-        {submitSuccess ? (
-          <div style={{ padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-              <CheckCircle size={32} color="#16a34a" />
-            </div>
-            <h3 style={{ margin: 0, fontWeight: 700, color: 'var(--foreground)', fontSize: '1.1rem' }}>
-              {isEdit ? 'Book Updated Successfully!' : 'Book Added Successfully!'}
-            </h3>
-            <p style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              {isEdit ? 'The book details have been saved.' : 'The book has been added to the library.'}
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ padding: '1.5rem 1.75rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-
-              {/* Title */}
-              <div>
-                <label style={labelStyle}>Title <span style={{ color: '#ef4444' }}>*</span></label>
-                <input type="text" placeholder="e.g. The Great Gatsby" value={form.title}
-                  onChange={e => handleFormChange('title', e.target.value)} required style={inputStyle} />
-              </div>
-
-              {/* Author */}
-              <div>
-                <label style={labelStyle}>Author</label>
-                <input type="text" placeholder="e.g. F. Scott Fitzgerald" value={form.author}
-                  onChange={e => handleFormChange('author', e.target.value)} style={inputStyle} />
-              </div>
-
-              {/* ISBN & Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={labelStyle}>{t('common.isbn')}</label>
-                  <input type="text" placeholder="e.g. 9780743273565" value={form.isbn}
-                    onChange={e => handleFormChange('isbn', e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>{t('common.category')}</label>
-                  <select value={form.category} onChange={e => handleFormChange('category', e.target.value)}
-                    style={{ ...inputStyle, cursor: 'pointer' }}>
-                    {BOOK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Cover Image URL */}
-              <div>
-                <label style={labelStyle}>{t('common.coverImageUrl')}</label>
-                <input type="url" placeholder="https://example.com/cover.jpg" value={form.coverImageUrl}
-                  onChange={e => handleFormChange('coverImageUrl', e.target.value)} style={inputStyle} />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label style={labelStyle}>{t('common.description')}</label>
-                <textarea placeholder="Brief description of the book..." value={form.description}
-                  onChange={e => handleFormChange('description', e.target.value)}
-                  rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-
-              {/* Is Available toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <button type="button" onClick={() => handleFormChange('isAvailable', !form.isAvailable)}
-                  style={{ width: '44px', height: '24px', borderRadius: '99px', border: 'none', cursor: 'pointer', background: form.isAvailable ? '#4f46e5' : '#d1d5db', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
-                  aria-label="Toggle availability">
-                  <span style={{ position: 'absolute', top: '3px', left: form.isAvailable ? '22px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }} />
-                </button>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                  {form.isAvailable ? 'Available for borrowing' : 'Not available'}
-                </span>
-              </div>
-
-              {/* Error */}
-              {submitError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: '#fef2f2', borderRadius: '0.6rem', border: '1px solid #fecaca' }}>
-                  <AlertCircle size={16} color="#ef4444" />
-                  <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 500 }}>{submitError}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.75rem', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => !submitting && onClose()} disabled={submitting}
-                style={{ padding: '0.65rem 1.4rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
-                Cancel
-              </button>
-              <button type="submit" disabled={submitting}
-                style={{ padding: '0.65rem 1.6rem', borderRadius: '0.65rem', background: isEdit ? '#0ea5e9' : '#4f46e5', color: 'white', border: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', opacity: submitting ? 0.75 : 1 }}>
-                {submitting
-                  ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> {isEdit ? 'Saving...' : 'Adding...'}</>
-                  : isEdit
-                    ? <><Pencil size={15} /> Save Changes</>
-                    : <><Plus size={16} /> Add Book</>
-                }
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [category, setCategory] = useState('All');
 
-  // Modal state
-  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; book?: Book } | null>(null);
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
-  const fetchBooks = useCallback(async (searchVal: string, categoryVal: string) => {
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterAvailability, setFilterAvailability] = useState(''); // 'available', 'unavailable', ''
+  const [sortBy, setSortBy] = useState<'title-asc' | 'title-desc' | 'qty-desc' | 'qty-asc' | 'none'>('title-asc');
+  const [titleSortOrder, setTitleSortOrder] = useState<'asc' | 'desc' | 'none'>('asc');
+
+  // Toggle filters visibility
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Export dropdown
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit' | 'view'>('add');
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Delete Confirmation Modal
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; title: string; isbn: string }>({
+    open: false,
+    id: '',
+    title: '',
+    isbn: ''
+  });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Form State
+  const [formState, setFormState] = useState<BookFormState>({
+    title: '',
+    author: '',
+    isbn: '',
+    category: 'Fiction',
+    coverImageUrl: '',
+    isAvailable: true,
+    description: '',
+    quantity: '',
+    available: ''
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Close export dropdown on click outside
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.export-dropdown-container')) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [exportDropdownOpen]);
+
+  // Fetch books
+  const fetchBooks = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
+      const headers = {
+        'accept': '*/*',
+        'Authorization': `Bearer ${getApiToken()}`
+      };
+
       const params = new URLSearchParams();
-      if (searchVal) params.set('search', searchVal);
-      if (categoryVal && categoryVal !== 'All') params.set('category', categoryVal);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filterCategory && filterCategory !== 'All') params.set('category', filterCategory);
+
       const url = `${API_BASE_URL}/library/books${params.toString() ? `?${params.toString()}` : ''}`;
-      const res = await fetch(url, {
-        headers: { accept: '*/*', Authorization: `Bearer ${getApiToken()}` },
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error(`Failed to fetch books (${res.status})`);
-      const json = await res.json();
-      let fetched: Book[] = [];
-      if (Array.isArray(json)) fetched = json;
-      else if (json.data && Array.isArray(json.data)) fetched = json.data;
-      else if (json.books && Array.isArray(json.books)) fetched = json.books;
-      setBooks(fetched);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const response = await fetch(url, { headers, cache: 'no-store' });
+
+      if (response.ok) {
+        const json = await response.json();
+        let fetched: Book[] = [];
+        if (Array.isArray(json)) {
+          fetched = json;
+        } else if (json.data && Array.isArray(json.data)) {
+          fetched = json.data;
+        } else if (json.data?.data && Array.isArray(json.data.data)) {
+          fetched = json.data.data;
+        } else if (json.books && Array.isArray(json.books)) {
+          fetched = json.books;
+        }
+        setBooks(fetched);
+      } else {
+        setBooks([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch books:', error);
+      setBooks([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearch, filterCategory]);
 
-  useEffect(() => { fetchBooks(search, category); }, [search, category, fetchBooks]);
+  useEffect(() => {
+    fetchBooks();
+  }, [fetchBooks]);
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setSearch(searchInput.trim()); };
-  const clearSearch = () => { setSearchInput(''); setSearch(''); };
-
-  const getCategoryColor = (cat?: string) => {
-    const colors: Record<string, string> = {
-      Fiction: '#6366f1', 'Non-Fiction': '#0ea5e9', Science: '#10b981',
-      Mathematics: '#f59e0b', History: '#8b5cf6', Literature: '#ec4899',
-      Technology: '#14b8a6', Arts: '#f97316', Religion: '#84cc16', Reference: '#64748b',
-    };
-    return colors[cat || ''] || '#94a3b8';
+  // Reset form
+  const resetForm = () => {
+    setFormState({
+      title: '',
+      author: '',
+      isbn: '',
+      category: 'Fiction',
+      coverImageUrl: '',
+      isAvailable: true,
+      description: '',
+      quantity: '',
+      available: ''
+    });
+    setSelectedBook(null);
+    setSubmitError(null);
   };
 
-  const openCreate = () => setModal({ mode: 'create' });
-  const openEdit = (book: Book) => setModal({ mode: 'edit', book });
-  const closeModal = () => setModal(null);
-  const onSuccess = () => fetchBooks(search, category);
+  const openAddModal = () => {
+    resetForm();
+    setModalMode('add');
+    setIsModalOpen(true);
+  };
 
-  const getEditForm = (book: Book): BookForm => ({
-    title: book.title || '',
-    author: book.author || '',
-    isbn: book.isbn || '',
-    category: book.category || 'Fiction',
-    coverImageUrl: (book.coverImageUrl || book.coverImage || '') as string,
-    isAvailable: book.isAvailable !== false,
-    description: book.description || '',
-  });
+  const openEditModal = (book: Book) => {
+    setFormState({
+      title: book.title || '',
+      author: book.author || '',
+      isbn: book.isbn || '',
+      category: book.category || 'Fiction',
+      coverImageUrl: (book.coverImageUrl || book.coverImage || '') as string,
+      isAvailable: book.isAvailable !== false,
+      description: book.description || '',
+      quantity: book.quantity !== undefined ? book.quantity : '',
+      available: book.available !== undefined ? book.available : ''
+    });
+    setSelectedBook(book);
+    setSubmitError(null);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const openViewModal = (book: Book) => {
+    setSelectedBook(book);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (book: Book) => {
+    setDeleteModal({
+      open: true,
+      id: book.id,
+      title: book.title || 'Untitled Book',
+      isbn: book.isbn || 'N/A'
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/library/books/${deleteModal.id}`, {
+        method: 'DELETE',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${getApiToken()}`
+        }
+      });
+      if (response.ok) {
+        setDeleteModal({ open: false, id: '', title: '', isbn: '' });
+        fetchBooks();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(`Failed to delete book: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error deleting book.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (modalMode === 'view') return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingImage(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/general/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getApiToken()}`
+        },
+        body: formData
+      });
+      const result = await response.json();
+      if (result.statusCode === 200 && result.data?.url) {
+        setFormState(prev => ({ ...prev, coverImageUrl: result.data.url }));
+      } else {
+        alert('Failed to upload image.');
+      }
+    } catch {
+      alert('Error uploading image.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (modalMode === 'view') return;
+    if (!formState.title.trim()) {
+      setSubmitError('Book title is required.');
+      return;
+    }
+
+    setActionLoading(true);
+    setSubmitError(null);
+
+    const body: Record<string, unknown> = {
+      title: formState.title.trim(),
+      author: formState.author.trim(),
+      isbn: formState.isbn.trim(),
+      category: formState.category,
+      coverImageUrl: formState.coverImageUrl.trim(),
+      isAvailable: formState.isAvailable,
+      description: formState.description.trim(),
+    };
+
+    if (formState.quantity !== '' && !isNaN(Number(formState.quantity))) {
+      body.quantity = Number(formState.quantity);
+    }
+    if (formState.available !== '' && !isNaN(Number(formState.available))) {
+      body.available = Number(formState.available);
+    }
+
+    try {
+      const isEdit = modalMode === 'edit' && selectedBook?.id;
+      const url = isEdit
+        ? `${API_BASE_URL}/library/books/${selectedBook.id}`
+        : `${API_BASE_URL}/library/books`;
+      const method = isEdit ? 'PATCH' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${getApiToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (response.ok) {
+        setIsModalOpen(false);
+        resetForm();
+        fetchBooks();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setSubmitError(errorData.message || `Request failed (${response.status})`);
+      }
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Error saving book information.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Filtered and Sorted books
+  const filteredAndSortedBooks = useMemo(() => {
+    let result = [...books];
+
+    // Client-side search across title, author, isbn, category
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter(b =>
+        (b.title && b.title.toLowerCase().includes(q)) ||
+        (b.author && b.author.toLowerCase().includes(q)) ||
+        (b.isbn && b.isbn.toLowerCase().includes(q)) ||
+        (b.category && b.category.toLowerCase().includes(q))
+      );
+    }
+
+    // Category filter
+    if (filterCategory && filterCategory !== 'All') {
+      result = result.filter(b => b.category?.toLowerCase() === filterCategory.toLowerCase());
+    }
+
+    // Availability filter
+    if (filterAvailability === 'available') {
+      result = result.filter(b => b.isAvailable !== false && (b.available === undefined || b.available > 0));
+    } else if (filterAvailability === 'unavailable') {
+      result = result.filter(b => b.isAvailable === false || (b.available !== undefined && b.available <= 0));
+    }
+
+    // Sorting
+    if (sortBy === 'title-asc' || (sortBy === 'none' && titleSortOrder === 'asc')) {
+      result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    } else if (sortBy === 'title-desc' || (sortBy === 'none' && titleSortOrder === 'desc')) {
+      result.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+    } else if (sortBy === 'qty-desc') {
+      result.sort((a, b) => ((b.available ?? b.quantity ?? 0) - (a.available ?? a.quantity ?? 0)));
+    } else if (sortBy === 'qty-asc') {
+      result.sort((a, b) => ((a.available ?? a.quantity ?? 0) - (b.available ?? b.quantity ?? 0)));
+    }
+
+    return result;
+  }, [books, debouncedSearch, filterCategory, filterAvailability, sortBy, titleSortOrder]);
+
+  const total = filteredAndSortedBooks.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  const paginatedBooks = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return filteredAndSortedBooks.slice(startIndex, startIndex + limit);
+  }, [filteredAndSortedBooks, page, limit]);
+
+  const toggleTitleSort = () => {
+    setTitleSortOrder(current => {
+      const next = current === 'asc' ? 'desc' : current === 'desc' ? 'none' : 'asc';
+      if (next === 'asc') setSortBy('title-asc');
+      else if (next === 'desc') setSortBy('title-desc');
+      else setSortBy('none');
+      return next;
+    });
+  };
+
+  const activeFiltersCount =
+    (filterCategory && filterCategory !== 'All' ? 1 : 0) +
+    (filterAvailability !== '' ? 1 : 0) +
+    (debouncedSearch ? 1 : 0) +
+    (sortBy !== 'title-asc' ? 1 : 0);
+
+  const resetAllFilters = () => {
+    setFilterCategory('All');
+    setFilterAvailability('');
+    setSortBy('title-asc');
+    setTitleSortOrder('asc');
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setPage(1);
+  };
+
+  // Export current view to CSV
+  const handleExportCSV = () => {
+    setExportDropdownOpen(false);
+    if (paginatedBooks.length === 0) return;
+
+    const headers = ["SL", "Title", "Author", "Category", "ISBN", "Total Quantity", "Available Copies", "Status"];
+    const rows = paginatedBooks.map((b, idx) => [
+      ((page - 1) * limit + idx + 1).toString(),
+      `"${(b.title || '').replace(/"/g, '""')}"`,
+      `"${(b.author || '').replace(/"/g, '""')}"`,
+      `"${(b.category || '').replace(/"/g, '""')}"`,
+      `"${(b.isbn || '').replace(/"/g, '""')}"`,
+      b.quantity !== undefined ? b.quantity.toString() : 'N/A',
+      b.available !== undefined ? b.available.toString() : 'N/A',
+      b.isAvailable !== false ? "Available" : "Unavailable"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `library_books_page_${page}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export current view to PDF
+  const handleExportPDF = () => {
+    setExportDropdownOpen(false);
+    if (paginatedBooks.length === 0) return;
+
+    const doc = new jsPDF('portrait');
+
+    // Header
+    doc.setFontSize(18);
+    doc.setTextColor(79, 70, 229);
+    doc.text("Library Books Report", 14, 18);
+
+    doc.setFontSize(9);
+    doc.setTextColor(110, 110, 110);
+    const subtitleParts = [
+      `Page: ${page} of ${totalPages}`,
+      `Total: ${total} books`,
+      `Generated: ${new Date().toLocaleDateString()}`
+    ];
+    if (filterCategory && filterCategory !== 'All') {
+      subtitleParts.push(`Category: ${filterCategory}`);
+    }
+    if (filterAvailability) {
+      subtitleParts.push(`Status: ${filterAvailability === 'available' ? 'Available' : 'Unavailable'}`);
+    }
+    doc.text(subtitleParts.join(' | '), 14, 25);
+
+    const tableColumn = ["#", "Title", "Author", "Category", "ISBN", "Quantity", "Available", "Status"];
+    const tableRows = paginatedBooks.map((b, idx) => [
+      ((page - 1) * limit + idx + 1).toString(),
+      b.title || 'N/A',
+      b.author || 'N/A',
+      b.category || 'N/A',
+      b.isbn || 'N/A',
+      b.quantity !== undefined ? String(b.quantity) : 'N/A',
+      b.available !== undefined ? String(b.available) : 'N/A',
+      b.isAvailable !== false ? 'Available' : 'Unavailable'
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 249, 252] },
+      didDrawPage: (data) => {
+        const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.width - 25,
+          doc.internal.pageSize.height - 10
+        );
+      }
+    });
+
+    doc.save(`library_books_page_${page}.pdf`);
+  };
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--primary), var(--accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.025em' }}>
-            Library
-          </h1>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '1rem' }}>
-            Browse and manage the school book collection.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={() => fetchBooks(search, category)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.2rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
-          >
-            <RefreshCw size={16} /> Refresh
-          </button>
-          <button
-            onClick={openCreate}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.35rem', borderRadius: '0.65rem', background: '#4f46e5', color: 'white', border: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 14px -4px rgba(79,70,229,0.4)' }}
-          >
-            <Plus size={18} /> Add Book
-          </button>
-        </div>
-      </div>
+    <div className="page-container animate-fade-in" style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}>
 
-      {/* Search & Filter */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <form onSubmit={handleSearch} style={{ flex: '1 1 280px', display: 'flex', gap: '0.5rem' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
-            <input type="text" placeholder="Search by title, author..." value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem', paddingRight: searchInput ? '2.5rem' : '0.9rem', paddingTop: '0.65rem', paddingBottom: '0.65rem', border: '1px solid var(--border)', borderRadius: '0.65rem', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
-            />
-            {searchInput && (
-              <button type="button" onClick={clearSearch} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', padding: 0 }}>
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <button type="submit" style={{ padding: '0.65rem 1.2rem', borderRadius: '0.65rem', background: '#4f46e5', color: 'white', border: 'none', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
-            Search
-          </button>
-        </form>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Filter size={15} style={{ color: 'var(--muted-foreground)' }} />
-          <select value={category} onChange={e => setCategory(e.target.value)}
-            style={{ padding: '0.65rem 1rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.9rem', cursor: 'pointer', outline: 'none' }}>
-            {FILTER_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        </div>
-      </div>
+      {/* ── Main Data Table Card ───────────────────────────────── */}
+      <div className="data-table-wrapper glass-card" style={{ background: 'var(--card)', borderRadius: '1.25rem', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
 
-      {/* Active filter pills */}
-      {(search || category !== 'All') && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          {search && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.75rem', borderRadius: '99px', background: '#eef2ff', color: '#4f46e5', fontSize: '0.82rem', fontWeight: 600 }}>
-              <Search size={12} /> &ldquo;{search}&rdquo;
-              <button onClick={clearSearch} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', padding: 0, display: 'flex' }}><X size={12} /></button>
-            </span>
-          )}
-          {category !== 'All' && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.75rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.82rem', fontWeight: 600 }}>
-              <Tag size={12} /> {category}
-              <button onClick={() => setCategory('All')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', padding: 0, display: 'flex' }}><X size={12} /></button>
-            </span>
-          )}
-        </div>
-      )}
+        {/* Table Search & Filter Toolbar */}
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
 
-      {/* Content */}
-      {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '1.5rem' }}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1rem', overflow: 'hidden' }}>
-              <div style={{ height: '150px', background: 'var(--muted)', animation: 'lib-pulse 1.5s ease-in-out infinite' }} />
-              <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {[70, 50, 40].map((w, j) => (
-                  <div key={j} style={{ height: j === 0 ? '16px' : '13px', background: 'var(--muted)', borderRadius: '4px', width: `${w}%`, animation: 'lib-pulse 1.5s ease-in-out infinite' }} />
-                ))}
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '260px', maxWidth: '400px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                border: '1px solid var(--border)',
+                borderRadius: '0.75rem',
+                padding: '0 0.875rem',
+                height: '42px',
+                background: 'var(--background)',
+                transition: 'all 0.2s',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+              }}>
+                <Search size={18} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder={t('library.searchPlaceholder') || "Search book title, author, category, or ISBN..."}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    width: '100%',
+                    color: 'var(--foreground)',
+                    fontSize: '0.9rem'
+                  }}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    style={{ background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', color: 'var(--muted-foreground)' }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      ) : error ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6rem 2rem', background: 'var(--card)', borderRadius: '1.25rem', border: '1px dashed var(--border)', textAlign: 'center' }}>
-          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-            <AlertCircle size={36} color="#ef4444" />
-          </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('library.noBooks')}</h3>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '0.95rem' }}>{error}</p>
-          <button onClick={() => fetchBooks(search, category)} style={{ marginTop: '1.5rem', padding: '0.65rem 1.5rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <RefreshCw size={16} /> Try Again
-          </button>
-        </div>
-      ) : books.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 2rem', background: 'var(--card)', borderRadius: '1.25rem', border: '1px dashed var(--border)', textAlign: 'center' }}>
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', opacity: 0.5 }}>
-            <BookOpen size={40} />
-          </div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('library.noBooks')}</h3>
-          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
-            {search || category !== 'All' ? 'Try adjusting your search or filter.' : 'The library collection is currently empty.'}
-          </p>
-          <button onClick={openCreate} style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.65rem 1.5rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
-            <Plus size={16} /> Add First Book
-          </button>
-        </div>
-      ) : (
-        <>
-          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Showing <strong>{books.length}</strong> book{books.length !== 1 ? 's' : ''}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '1.5rem' }}>
-            {books.map((book) => (
-              <div
-                key={book.id}
-                style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1rem', overflow: 'hidden', transition: 'transform 0.22s, box-shadow 0.22s', display: 'flex', flexDirection: 'column' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 28px -8px rgba(0,0,0,0.12)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+
+            {/* Filter, Export & Add Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* Filters Toggle Button */}
+              <button
+                className="btn"
+                onClick={() => setShowFilters(!showFilters)}
+                style={{
+                  border: showFilters || activeFiltersCount > 0 ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  gap: '0.5rem',
+                  borderRadius: '0.75rem',
+                  height: '42px',
+                  padding: '0 1rem',
+                  background: showFilters ? 'var(--primary)' : 'var(--background)',
+                  color: showFilters ? 'var(--primary-foreground)' : 'var(--foreground)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer'
+                }}
               >
-                {/* Cover */}
-                <div style={{ height: '150px', position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg, ${getCategoryColor(book.category)}22, ${getCategoryColor(book.category)}55)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {(book.coverImage || book.coverImageUrl) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={(book.coverImage || book.coverImageUrl) as string} alt={book.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={e => { e.currentTarget.style.display = 'none'; }} />
-                  ) : (
-                    <BookMarked size={52} color={getCategoryColor(book.category)} style={{ opacity: 0.6 }} />
-                  )}
-                  {book.category && (
-                    <span style={{ position: 'absolute', top: '0.6rem', right: '0.6rem', background: getCategoryColor(book.category), color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '99px' }}>
-                      {book.category}
-                    </span>
-                  )}
-                  {book.isAvailable === false && (
-                    <span style={{ position: 'absolute', top: '0.6rem', left: '0.6rem', background: '#ef4444', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '99px' }}>
-                      Unavailable
-                    </span>
-                  )}
-                </div>
+                <Filter size={16} />
+                <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span style={{
+                    background: showFilters ? '#ffffff' : 'var(--primary)',
+                    color: showFilters ? 'var(--primary)' : '#ffffff',
+                    fontSize: '0.75rem',
+                    borderRadius: '999px',
+                    padding: '0.1rem 0.5rem',
+                    fontWeight: 700
+                  }}>
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
 
-                {/* Info */}
-                <div style={{ padding: '1.2rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--foreground)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {book.title}
-                  </h3>
-                  {book.author && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--muted-foreground)', fontSize: '0.84rem' }}>
-                      <User size={13} /> <span>{book.author}</span>
-                    </div>
-                  )}
-                  {book.isbn && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
-                      <Hash size={13} /> <span>ISBN: {book.isbn}</span>
-                    </div>
-                  )}
-                  {book.description && (
-                    <p style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', margin: '0.25rem 0 0', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {book.description}
-                    </p>
-                  )}
+              {/* Export Dropdown */}
+              <div className="export-dropdown-container" style={{ position: 'relative' }}>
+                <button
+                  className="btn"
+                  onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                  disabled={paginatedBooks.length === 0}
+                  title="Export Options"
+                  style={{
+                    background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--foreground)',
+                    height: '42px',
+                    padding: '0 0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    borderRadius: '0.75rem',
+                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                    opacity: paginatedBooks.length === 0 ? 0.6 : 1,
+                    cursor: paginatedBooks.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Download size={16} />
+                  <span>Export</span>
+                  <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
 
-                  {/* Availability */}
-                  {(book.quantity !== undefined || book.available !== undefined) && (
-                    <div style={{ paddingTop: '0.6rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>{t('library.available')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: (book.available ?? book.quantity ?? 0) > 0 ? '#16a34a' : '#ef4444' }}>
-                        {book.available ?? book.quantity ?? 0}
-                        {book.quantity !== undefined && book.available !== undefined ? ` / ${book.quantity}` : ''}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Update Button */}
-                  <button
-                    onClick={() => openEdit(book)}
+                {exportDropdownOpen && (
+                  <div
+                    className="glass-card animate-fade-in"
                     style={{
-                      marginTop: 'auto',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                      padding: '0.55rem 0', width: '100%',
-                      borderRadius: '0.6rem', border: '1px solid #bfdbfe',
-                      background: '#eff6ff', color: '#2563eb',
-                      fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-                      transition: 'background 0.18s, border-color 0.18s',
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      left: 0,
+                      zIndex: 50,
+                      minWidth: '160px',
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      padding: '0.35rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.2rem'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#93c5fd'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
                   >
-                    <Pencil size={14} /> Update
-                  </button>
+                    <button
+                      onClick={handleExportCSV}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        width: '100%',
+                        padding: '0.55rem 0.75rem',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--foreground)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                      <span>Export as CSV</span>
+                    </button>
+                    <button
+                      onClick={handleExportPDF}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        width: '100%',
+                        padding: '0.55rem 0.75rem',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--foreground)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <FileText size={15} style={{ color: '#ef4444' }} />
+                      <span>Export as PDF</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Book Button */}
+              <button
+                className="btn btn-primary"
+                onClick={openAddModal}
+                style={{
+                  height: '42px',
+                  padding: '0 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 15px rgba(79, 70, 229, 0.35)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={18} /> {t('library.addBook') || 'Add Book'}
+              </button>
+
+              {/* Page Sizer */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={resetAllFilters}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.825rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Collapsible Filter Tray */}
+          {showFilters && (
+            <div className="animate-fade-in" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+              padding: '1.25rem',
+              background: 'var(--background)',
+              borderRadius: '0.875rem',
+              border: '1px solid var(--border)'
+            }}>
+              {/* Category Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  {t('library.category') || 'Category'}
+                </label>
+                <select
+                  className="input"
+                  value={filterCategory}
+                  onChange={(e) => {
+                    setFilterCategory(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
+                >
+                  <option value="All">All Categories</option>
+                  {BOOK_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Availability Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  Availability Status
+                </label>
+                <select
+                  className="input"
+                  value={filterAvailability}
+                  onChange={(e) => {
+                    setFilterAvailability(e.target.value);
+                    setPage(1);
+                  }}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="available">Available for Borrowing</option>
+                  <option value="unavailable">Currently Unavailable</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  Sort Order
+                </label>
+                <select
+                  className="input"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'title-asc' | 'title-desc' | 'qty-desc' | 'qty-asc' | 'none')}
+                  style={{ height: '38px', borderRadius: '0.5rem' }}
+                >
+                  <option value="title-asc">Title: A to Z</option>
+                  <option value="title-desc">Title: Z to A</option>
+                  <option value="qty-desc">Available Stock: High to Low</option>
+                  <option value="qty-asc">Available Stock: Low to High</option>
+                  <option value="none">Original Order</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Table Layout ────────────────────────────────────────── */}
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px' }}>
+                  #
+                </th>
+                <th
+                  onClick={toggleTitleSort}
+                  title="Click to sort by Title"
+                  style={{
+                    padding: '0.875rem 1.25rem',
+                    color: titleSortOrder !== 'none' ? 'var(--primary)' : 'var(--muted-foreground)',
+                    fontWeight: 600,
+                    fontSize: '0.78rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>Book Details</span>
+                    {titleSortOrder === 'asc' ? (
+                      <ArrowUp size={14} style={{ color: 'var(--primary)' }} />
+                    ) : titleSortOrder === 'desc' ? (
+                      <ArrowDown size={14} style={{ color: 'var(--primary)' }} />
+                    ) : (
+                      <ArrowUpDown size={14} style={{ opacity: 0.4 }} />
+                    )}
+                  </div>
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '140px' }}>
+                  {t('library.category') || 'Category'}
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>
+                  ISBN
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>
+                  Stock & Quantity
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '120px' }}>
+                  Status
+                </th>
+                <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '20px', margin: 0 }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '42px', height: '42px', flexShrink: 0, borderRadius: '0.5rem' }}></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '180px' }}>
+                          <div className="shimmer shimmer-text"></div>
+                          <div className="shimmer shimmer-text short" style={{ margin: 0 }}></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-block" style={{ width: '85px', height: '24px', borderRadius: '999px' }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '100px', margin: 0 }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-text" style={{ width: '65px', margin: 0 }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem' }}>
+                      <div className="shimmer shimmer-block" style={{ width: '75px', height: '22px', borderRadius: '999px' }}></div>
+                    </td>
+                    <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: '0.5rem' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: '0.5rem' }}></div>
+                        <div className="shimmer shimmer-block" style={{ width: '32px', height: '32px', borderRadius: '0.5rem' }}></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : paginatedBooks.length > 0 ? (
+                paginatedBooks.map((book, index) => {
+                  const sl = (page - 1) * limit + index + 1;
+                  const catStyle = getCategoryBadgeStyle(book.category);
+                  const isAvail = book.isAvailable !== false && (book.available === undefined || book.available > 0);
+                  const coverSrc = (book.coverImageUrl || book.coverImage) as string;
+
+                  return (
+                    <tr
+                      key={book.id}
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      {/* SL No */}
+                      <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {sl}
+                      </td>
+
+                      {/* Book Details (Cover + Title + Author) */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '0.5rem',
+                            overflow: 'hidden',
+                            background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(129,140,248,0.2))',
+                            flexShrink: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1.5px solid var(--border)'
+                          }}>
+                            {coverSrc ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={coverSrc}
+                                alt={book.title}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <BookMarked size={20} style={{ color: 'var(--primary)' }} />
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span
+                              style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }}
+                              onClick={() => openViewModal(book)}
+                              title="Click to view full details"
+                            >
+                              {book.title}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <User size={12} />
+                              {book.author ? book.author : 'Unknown author'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Category Badge */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        {book.category ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            background: catStyle.bg,
+                            color: catStyle.text,
+                            border: `1px solid ${catStyle.border}`
+                          }}>
+                            {book.category}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>General</span>
+                        )}
+                      </td>
+
+                      {/* ISBN */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        {book.isbn ? (
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '0.2rem 0.55rem',
+                            background: 'rgba(79, 70, 229, 0.08)',
+                            color: 'var(--primary)',
+                            borderRadius: '0.4rem',
+                            fontSize: '0.825rem',
+                            fontWeight: 700,
+                            fontFamily: 'monospace'
+                          }}>
+                            {book.isbn}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Stock & Quantity */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                            {book.available !== undefined ? book.available : (book.quantity !== undefined ? book.quantity : '—')}
+                            {book.quantity !== undefined && book.available !== undefined ? (
+                              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: '0.8rem' }}> / {book.quantity}</span>
+                            ) : ''}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                            {book.available !== undefined && book.quantity !== undefined
+                              ? `${Math.max(0, book.quantity - book.available)} borrowed`
+                              : 'copies registered'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '1rem 1.25rem' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: isAvail ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: isAvail ? '#10b981' : '#ef4444',
+                          border: `1px solid ${isAvail ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`
+                        }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: isAvail ? '#10b981' : '#ef4444'
+                          }}></span>
+                          {isAvail ? (t('library.available') || 'Available') : 'Unavailable'}
+                        </span>
+                      </td>
+
+                      {/* Action buttons */}
+                      <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            className="action-btn"
+                            title="View book details"
+                            onClick={() => openViewModal(book)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--background)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            <Eye size={15} />
+                          </button>
+
+                          <button
+                            className="action-btn"
+                            title="Edit book"
+                            onClick={() => openEditModal(book)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--background)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            <Edit3 size={15} />
+                          </button>
+
+                          <button
+                            className="action-btn"
+                            title="Delete book"
+                            onClick={() => handleDelete(book)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '0.5rem',
+                              border: '1px solid rgba(239, 68, 68, 0.2)',
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: '#ef4444'
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '4.5rem 1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', maxWidth: '380px', margin: '0 auto' }}>
+                      <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted-foreground)' }}>
+                        <BookOpen size={28} />
+                      </div>
+                      <p style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                        {t('library.noBooks') || 'No books found'}
+                      </p>
+                      <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+                        {searchTerm || (filterCategory && filterCategory !== 'All') || filterAvailability
+                          ? 'Try adjusting your search keywords or resetting filters.'
+                          : 'No books have been added to the library yet. Click "Add Book" to begin.'}
+                      </p>
+                      {(searchTerm || (filterCategory && filterCategory !== 'All') || filterAvailability) && (
+                        <button
+                          onClick={resetAllFilters}
+                          className="btn"
+                          style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Table Footer & Pagination ──────────────────────────── */}
+        {!loading && total > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '1rem 1.5rem',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--background)',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
+              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> books
+            </span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
+                Page {page} of {totalPages}
+              </span>
+
+              <button
+                className="btn"
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid var(--border)',
+                  cursor: page === 1 ? 'not-allowed' : 'pointer',
+                  opacity: page === 1 ? 0.4 : 1,
+                  background: 'var(--card)',
+                  borderRadius: '0.5rem'
+                }}
+                disabled={page === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                title="Previous page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <button
+                className="btn"
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid var(--border)',
+                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                  opacity: page >= totalPages ? 0.4 : 1,
+                  background: 'var(--card)',
+                  borderRadius: '0.5rem'
+                }}
+                disabled={page >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                title="Next page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── View / Add / Edit Modal ────────────────────────────── */}
+      {isModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 110,
+          padding: '1rem'
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            background: 'var(--card)',
+            width: '100%',
+            maxWidth: modalMode === 'view' ? '600px' : '680px',
+            borderRadius: '1.25rem',
+            overflow: 'hidden',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            border: '1px solid var(--border)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.75rem',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--background)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '0.6rem',
+                  background: modalMode === 'view' ? 'rgba(79, 70, 229, 0.1)' : modalMode === 'edit' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  color: modalMode === 'view' ? 'var(--primary)' : modalMode === 'edit' ? '#f59e0b' : '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {modalMode === 'view' ? <Eye size={18} /> : modalMode === 'edit' ? <Edit3 size={18} /> : <Plus size={18} />}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                    {modalMode === 'add' ? 'Add New Book' : modalMode === 'edit' ? 'Edit Book Details' : 'Book Details'}
+                  </h2>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
+                    {modalMode === 'view' ? 'Read-only book information' : 'Fill in the information below to continue'}
+                  </p>
                 </div>
               </div>
-            ))}
+              <button
+                className="action-btn"
+                onClick={() => setIsModalOpen(false)}
+                disabled={actionLoading}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--card)',
+                  cursor: 'pointer',
+                  color: 'var(--foreground)'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ overflowY: 'auto', padding: '1.75rem' }}>
+              {modalMode === 'view' && selectedBook ? (
+                /* View Only Profile Card */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '1.25rem', borderRadius: '1rem', background: 'var(--background)', border: '1px solid var(--border)' }}>
+                    <div style={{
+                      width: '64px',
+                      height: '76px',
+                      borderRadius: '0.5rem',
+                      overflow: 'hidden',
+                      background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(129,140,248,0.2))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1.5px solid var(--border)',
+                      flexShrink: 0
+                    }}>
+                      {(selectedBook.coverImageUrl || selectedBook.coverImage) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={(selectedBook.coverImageUrl || selectedBook.coverImage) as string}
+                          alt={selectedBook.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <BookMarked size={32} style={{ color: 'var(--primary)' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                        {selectedBook.title}
+                      </h3>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+                        {selectedBook.author ? `by ${selectedBook.author}` : 'Unknown author'}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '999px',
+                          fontSize: '0.725rem',
+                          fontWeight: 600,
+                          background: selectedBook.isAvailable !== false ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: selectedBook.isAvailable !== false ? '#10b981' : '#ef4444',
+                        }}>
+                          {selectedBook.isAvailable !== false ? 'Available' : 'Unavailable'}
+                        </span>
+                        {selectedBook.category && (
+                          <span style={{
+                            padding: '0.15rem 0.55rem',
+                            borderRadius: '999px',
+                            fontSize: '0.725rem',
+                            fontWeight: 600,
+                            background: getCategoryBadgeStyle(selectedBook.category).bg,
+                            color: getCategoryBadgeStyle(selectedBook.category).text,
+                          }}>
+                            {selectedBook.category}
+                          </span>
+                        )}
+                        {selectedBook.isbn && (
+                          <span style={{
+                            padding: '0.15rem 0.55rem',
+                            borderRadius: '999px',
+                            fontSize: '0.725rem',
+                            fontWeight: 600,
+                            background: 'rgba(79, 70, 229, 0.1)',
+                            color: 'var(--primary)',
+                            fontFamily: 'monospace'
+                          }}>
+                            ISBN: {selectedBook.isbn}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Category</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
+                        {selectedBook.category || 'General'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>ISBN / Code</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)', fontFamily: 'monospace' }}>
+                        {selectedBook.isbn || 'Not specified'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Available Copies</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: (selectedBook.available ?? selectedBook.quantity ?? 0) > 0 ? '#10b981' : '#ef4444' }}>
+                        {selectedBook.available !== undefined ? selectedBook.available : (selectedBook.quantity !== undefined ? selectedBook.quantity : 'N/A')}
+                      </div>
+                    </div>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Registered Copies</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
+                        {selectedBook.quantity !== undefined ? selectedBook.quantity : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedBook.description && (
+                    <div style={{ padding: '1.1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600, marginBottom: '0.4rem' }}>
+                        Description
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--foreground)', lineHeight: 1.6 }}>
+                        {selectedBook.description}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '0.5rem 1.25rem' }}
+                      onClick={() => setIsModalOpen(false)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem' }}
+                      onClick={() => openEditModal(selectedBook)}
+                    >
+                      <Edit3 size={16} /> Edit Book
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Form for Add and Edit */
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+                  {/* Cover Photo & Identity Section */}
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', padding: '1rem', background: 'var(--background)', borderRadius: '0.875rem', border: '1px solid var(--border)' }}>
+                    <div style={{
+                      width: '56px',
+                      height: '66px',
+                      borderRadius: '0.5rem',
+                      overflow: 'hidden',
+                      border: '1.5px solid var(--border)',
+                      background: 'var(--card)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {formState.coverImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={formState.coverImageUrl} alt="Cover Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <BookMarked size={24} style={{ color: 'var(--muted-foreground)' }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>
+                        Book Cover Image
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="btn" style={{
+                          border: '1px solid var(--border)',
+                          background: 'var(--card)',
+                          cursor: 'pointer',
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.825rem',
+                          borderRadius: '0.5rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}>
+                          {uploadingImage ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                          <span>{uploadingImage ? 'Uploading...' : 'Upload Cover'}</span>
+                          <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingImage} />
+                        </label>
+                        {formState.coverImageUrl && (
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => setFormState(prev => ({ ...prev, coverImageUrl: '' }))}
+                            style={{
+                              border: '1px solid var(--border)',
+                              background: 'transparent',
+                              color: 'var(--destructive)',
+                              padding: '0.4rem 0.75rem',
+                              fontSize: '0.825rem',
+                              borderRadius: '0.5rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Direct Cover Image URL */}
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                      Or Cover Image URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/book-cover.jpg"
+                      value={formState.coverImageUrl}
+                      onChange={(e) => setFormState(prev => ({ ...prev, coverImageUrl: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.9rem',
+                        border: '1px solid var(--border)',
+                        borderRadius: '0.6rem',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                      Book Title <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. To Kill a Mockingbird"
+                      value={formState.title}
+                      onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.9rem',
+                        border: '1px solid var(--border)',
+                        borderRadius: '0.6rem',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Author */}
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                      Author
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder="e.g. Harper Lee"
+                        value={formState.author}
+                        onChange={(e) => setFormState(prev => ({ ...prev, author: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.6rem',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontSize: '0.9rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* ISBN and Category in 2-column grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                        ISBN
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 9780061120084"
+                        value={formState.isbn}
+                        onChange={(e) => setFormState(prev => ({ ...prev, isbn: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.6rem',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontSize: '0.9rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                        {t('library.category') || 'Category'}
+                      </label>
+                      <select
+                        value={formState.category}
+                        onChange={(e) => setFormState(prev => ({ ...prev, category: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.6rem',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {BOOK_CATEGORIES.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Total Quantity & Available Copies */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                        Total Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 10"
+                        value={formState.quantity}
+                        onChange={(e) => setFormState(prev => ({ ...prev, quantity: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.6rem',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontSize: '0.9rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                        Available for Borrowing
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 8"
+                        value={formState.available}
+                        onChange={(e) => setFormState(prev => ({ ...prev, available: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.6rem',
+                          background: 'var(--background)',
+                          color: 'var(--foreground)',
+                          fontSize: '0.9rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
+                      Description
+                    </label>
+                    <textarea
+                      placeholder="Brief summary or description of the book..."
+                      value={formState.description}
+                      onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.9rem',
+                        border: '1px solid var(--border)',
+                        borderRadius: '0.6rem',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Availability Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormState(prev => ({ ...prev, isAvailable: !prev.isAvailable }))}
+                      style={{
+                        width: '44px',
+                        height: '24px',
+                        borderRadius: '99px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: formState.isAvailable ? 'var(--primary)' : 'var(--muted)',
+                        position: 'relative',
+                        transition: 'background 0.2s',
+                        flexShrink: 0
+                      }}
+                      aria-label="Toggle availability"
+                    >
+                      <span style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: formState.isAvailable ? '22px' : '3px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: 'white',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                      }} />
+                    </button>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {formState.isAvailable ? 'Available for borrowing' : 'Not available'}
+                    </span>
+                  </div>
+
+                  {/* Error Notification */}
+                  {submitError && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1rem',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      borderRadius: '0.6rem',
+                      border: '1px solid rgba(239, 68, 68, 0.25)'
+                    }}>
+                      <AlertTriangle size={16} color="#ef4444" />
+                      <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 500 }}>{submitError}</span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => !actionLoading && setIsModalOpen(false)}
+                      disabled={actionLoading}
+                      style={{
+                        padding: '0.65rem 1.4rem',
+                        borderRadius: '0.65rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontWeight: 600,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={actionLoading}
+                      style={{
+                        padding: '0.65rem 1.6rem',
+                        borderRadius: '0.65rem',
+                        background: 'var(--primary)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: actionLoading ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        opacity: actionLoading ? 0.75 : 1,
+                        boxShadow: '0 4px 15px rgba(79, 70, 229, 0.35)'
+                      }}
+                    >
+                      {actionLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>{modalMode === 'edit' ? 'Saving...' : 'Adding...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          {modalMode === 'edit' ? <Edit3 size={15} /> : <Plus size={16} />}
+                          <span>{modalMode === 'edit' ? 'Save Changes' : 'Add Book'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Shared Modal */}
-      {modal && (
-        <BookModal
-          mode={modal.mode}
-          initialForm={modal.mode === 'edit' && modal.book ? getEditForm(modal.book) : EMPTY_FORM}
-          bookId={modal.book?.id}
-          onClose={closeModal}
-          onSuccess={onSuccess}
-        />
+      {/* ── Delete Confirmation Modal ──────────────────────────── */}
+      {deleteModal.open && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 120,
+          padding: '1rem'
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            background: 'var(--card)',
+            width: '100%',
+            maxWidth: '440px',
+            borderRadius: '1.25rem',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ padding: '2rem 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', textAlign: 'center' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1.5px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444'
+              }}>
+                <AlertTriangle size={32} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>
+                  Delete Book Record
+                </h2>
+                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
+                  Are you sure you want to permanently delete <strong style={{ color: 'var(--foreground)' }}>{deleteModal.title}</strong>
+                  {deleteModal.isbn && deleteModal.isbn !== 'N/A' ? ` (ISBN: ${deleteModal.isbn})` : ''}? This will remove it from the library catalog.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
+              <button
+                className="btn"
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: '0.75rem', fontSize: '0.9rem' }}
+                onClick={() => setDeleteModal({ open: false, id: '', title: '', isbn: '' })}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                style={{
+                  flex: 1,
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  color: '#ffffff',
+                  fontSize: '0.9rem',
+                  borderRadius: '0.75rem',
+                  border: 'none',
+                  boxShadow: '0 4px 15px rgba(239,68,68,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontWeight: 600,
+                  cursor: deleteLoading ? 'not-allowed' : 'pointer'
+                }}
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                <span>{deleteLoading ? 'Deleting...' : 'Delete'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      <style>{`
-        @keyframes lib-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.45; }
-        }
-        @keyframes modal-in {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
