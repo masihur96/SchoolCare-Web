@@ -112,7 +112,17 @@ const STATUS_CONFIG: Record<
 };
 
 export default function HomeworkPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const getStatusInfo = useCallback((statusKey: string) => {
+    const config = STATUS_CONFIG[statusKey] || STATUS_CONFIG.Assigned;
+    let label = config.label;
+    if (statusKey === 'Assigned') label = t('homework.statusAssigned') || 'Assigned';
+    else if (statusKey === 'Pending') label = t('homework.statusPending') || 'Pending';
+    else if (statusKey === 'Completed') label = t('homework.statusCompleted') || 'Completed';
+    else if (statusKey === 'Late') label = t('homework.statusLate') || 'Late / Overdue';
+    return { ...config, label };
+  }, [t]);
 
   // Core Data States
   const [homeworks, setHomeworks] = useState<HomeworkRecord[]>([]);
@@ -441,7 +451,7 @@ export default function HomeworkPage() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('en-US', {
+      return d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -589,13 +599,13 @@ export default function HomeworkPage() {
   const handleSaveHomework = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignForm.title.trim() || !assignForm.classId || !assignForm.subjectId || !assignForm.dueDate) {
-      setError('Please fill in all required fields (Title, Class, Subject, Due Date).');
+      setError(t('homework.validationRequired') || 'Please fill in all required fields (Title, Class, Subject, Due Date).');
       return;
     }
 
     const schoolId = getUserSchoolId();
     if (!schoolId) {
-      setError('Authentication error: School ID not found.');
+      setError(t('homework.authError') || 'Authentication error: School ID not found.');
       return;
     }
 
@@ -629,17 +639,17 @@ export default function HomeworkPage() {
       if (res.ok && (json.statusCode === 200 || json.statusCode === 201 || !json.statusCode)) {
         setSuccessToast(
           assignMode === 'edit'
-            ? 'Homework updated successfully!'
-            : 'New homework assigned successfully!'
+            ? (t('homework.updatedSuccess') || 'Homework updated successfully!')
+            : (t('homework.createdSuccess') || 'New homework assigned successfully!')
         );
         setAssignModalOpen(false);
         fetchHomework();
       } else {
-        setError(json.message || 'Failed to save homework.');
+        setError(json.message || (t('homework.failedSave') || 'Failed to save homework.'));
       }
     } catch (err) {
       console.error('Error saving homework:', err);
-      setError('Network error occurred while saving homework.');
+      setError(t('homework.networkErrorSave') || 'Network error occurred while saving homework.');
     } finally {
       setAssignSubmitting(false);
     }
@@ -659,16 +669,16 @@ export default function HomeworkPage() {
       });
 
       if (res.ok) {
-        setSuccessToast('Homework deleted successfully.');
+        setSuccessToast(t('homework.deletedSuccess') || 'Homework deleted successfully.');
         setDeleteModal({ open: false, id: '', title: '' });
         setHomeworks(prev => prev.filter(h => h.id !== deleteModal.id));
       } else {
         const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Failed to delete homework.');
+        setError(json.message || (t('homework.failedDelete') || 'Failed to delete homework.'));
       }
     } catch (err) {
       console.error('Delete error:', err);
-      setError('Network error occurred while deleting homework.');
+      setError(t('homework.networkErrorDelete') || 'Network error occurred while deleting homework.');
     } finally {
       setDeleteLoading(false);
     }
@@ -680,25 +690,25 @@ export default function HomeworkPage() {
     setShowExportMenu(false);
 
     const headers = [
-      'Title',
-      'Description',
-      'Class',
-      'Section',
-      'Subject',
-      'Teacher',
-      'Due Date',
-      'Status',
+      t('homework.fieldTitle') || 'Title',
+      t('homework.fieldInstructions') || 'Description',
+      t('homework.fieldClass') || 'Class',
+      t('homework.fieldSection') || 'Section',
+      t('homework.fieldSubject') || 'Subject',
+      t('homework.teacher') || 'Teacher',
+      t('homework.dueDate') || 'Due Date',
+      t('homework.status') || 'Status',
     ];
 
     const rows = filteredHomeworks.map(hw => [
       `"${(hw.title || '').replace(/"/g, '""')}"`,
       `"${(hw.description || '').replace(/"/g, '""')}"`,
       `"${(hw.classEntity?.name || '').replace(/"/g, '""')}"`,
-      `"${(hw.sectionEntity?.name || 'All').replace(/"/g, '""')}"`,
+      `"${(hw.sectionEntity?.name || (t('homework.allSections') || 'All Sections')).replace(/"/g, '""')}"`,
       `"${(hw.subjectEntity?.name || '').replace(/"/g, '""')}"`,
-      `"${(hw.teacherEntity?.name || '').replace(/"/g, '""')}"`,
+      `"${(hw.teacherEntity?.name || (t('homework.assignedByStaff') || 'Assigned by Staff')).replace(/"/g, '""')}"`,
       `"${formatDate(hw.dueDate)}"`,
-      `"${resolveStatus(hw)}"`,
+      `"${getStatusInfo(resolveStatus(hw)).label}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -720,36 +730,45 @@ export default function HomeworkPage() {
     // Document Title & Header
     doc.setFontSize(18);
     doc.setTextColor(30, 41, 59);
-    doc.text('Smart School – Homework Report', 14, 16);
+    doc.text(t('homework.reportTitle') || 'Smart School – Homework Report', 14, 16);
 
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    const dateGenerated = new Date().toLocaleDateString('en-US', {
+    const dateGenerated = new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
     doc.text(
-      `Generated on: ${dateGenerated} | Total Records: ${filteredHomeworks.length}`,
+      `${t('homework.generatedOn') || 'Generated on:'} ${dateGenerated} | ${t('homework.totalRecords') || 'Total Records:'} ${filteredHomeworks.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`,
       14,
       23
     );
 
     const tableRows = filteredHomeworks.map((hw, idx) => [
-      idx + 1,
+      (idx + 1).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US'),
       hw.title || '—',
       hw.classEntity?.name || '—',
-      hw.sectionEntity?.name || 'All',
+      hw.sectionEntity?.name || (t('homework.allSections') || 'All Sections'),
       hw.subjectEntity?.name || '—',
-      hw.teacherEntity?.name || '—',
+      hw.teacherEntity?.name || (t('homework.assignedByStaff') || 'Assigned by Staff'),
       formatDate(hw.dueDate),
-      resolveStatus(hw),
+      getStatusInfo(resolveStatus(hw)).label,
     ]);
 
     autoTable(doc, {
       startY: 28,
-      head: [['#', 'Title', 'Class', 'Section', 'Subject', 'Teacher', 'Due Date', 'Status']],
+      head: [[
+        '#',
+        t('homework.fieldTitle') || 'Title',
+        t('homework.fieldClass') || 'Class',
+        t('homework.fieldSection') || 'Section',
+        t('homework.fieldSubject') || 'Subject',
+        t('homework.teacher') || 'Teacher',
+        t('homework.dueDate') || 'Due Date',
+        t('homework.status') || 'Status'
+      ]],
       body: tableRows,
       theme: 'grid',
       headStyles: {
@@ -776,6 +795,16 @@ export default function HomeworkPage() {
       className="page-container animate-fade-in"
       style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}
     >
+      {/* Page Header */}
+      <div style={{ marginBottom: '1.75rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--foreground)', margin: 0, letterSpacing: '-0.02em' }}>
+          {t('homework.title') || 'Homework'}
+        </h1>
+        <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', margin: '0.25rem 0 0' }}>
+          {t('homework.subtitle') || 'View and manage homework assignments across classes and subjects'}
+        </p>
+      </div>
+
       {/* Success Notification Banner */}
       {successToast && (
         <div
@@ -846,8 +875,6 @@ export default function HomeworkPage() {
         </div>
       )}
 
-
-
       {/* 4-Stat Metric Strip */}
       <div
         style={{
@@ -880,7 +907,7 @@ export default function HomeworkPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Total Homework
+              {t('homework.totalHomework') || 'Total Homework'}
             </span>
             <div
               style={{
@@ -890,10 +917,10 @@ export default function HomeworkPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.total}
+              {stats.total.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-              All recorded assignments
+              {t('homework.allRecorded') || 'All recorded assignments'}
             </span>
           </div>
           <div
@@ -936,7 +963,7 @@ export default function HomeworkPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Active / Assigned
+              {t('homework.activeAssigned') || 'Active / Assigned'}
             </span>
             <div
               style={{
@@ -946,7 +973,7 @@ export default function HomeworkPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.assigned}
+              {stats.assigned.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -959,10 +986,10 @@ export default function HomeworkPage() {
                   color: '#6366f1',
                 }}
               >
-                {stats.activePct}% of total
+                {stats.activePct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}{t('homework.pctOfTotal') || '% of total'}
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Pending submission
+                {t('homework.pendingSubmission') || 'Pending submission'}
               </span>
             </div>
           </div>
@@ -1006,7 +1033,7 @@ export default function HomeworkPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Completed
+              {t('homework.completed') || 'Completed'}
             </span>
             <div
               style={{
@@ -1016,7 +1043,7 @@ export default function HomeworkPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.completed}
+              {stats.completed.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -1029,10 +1056,10 @@ export default function HomeworkPage() {
                   color: '#10b981',
                 }}
               >
-                {stats.completedPct}%
+                {stats.completedPct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Turned in / verified
+                {t('homework.turnedInVerified') || 'Turned in / verified'}
               </span>
             </div>
           </div>
@@ -1076,7 +1103,7 @@ export default function HomeworkPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Overdue / Late
+              {t('homework.overdueLate') || 'Overdue / Late'}
             </span>
             <div
               style={{
@@ -1086,7 +1113,7 @@ export default function HomeworkPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.late}
+              {stats.late.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -1099,10 +1126,10 @@ export default function HomeworkPage() {
                   color: '#ef4444',
                 }}
               >
-                {stats.latePct}%
+                {stats.latePct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Past deadline
+                {t('homework.pastDeadline') || 'Past deadline'}
               </span>
             </div>
           </div>
@@ -1168,7 +1195,7 @@ export default function HomeworkPage() {
             />
             <input
               type="text"
-              placeholder="Search by title, subject, class, teacher..."
+              placeholder={t('homework.searchPlaceholder') || "Search by title, subject, class, teacher..."}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
@@ -1231,7 +1258,7 @@ export default function HomeworkPage() {
               }}
             >
               <Filter size={15} />
-              <span>Filters</span>
+              <span>{t('homework.filters') || 'Filters'}</span>
               {loadingMeta && (
                 <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
               )}
@@ -1246,7 +1273,7 @@ export default function HomeworkPage() {
                     fontWeight: 700,
                   }}
                 >
-                  {activeFiltersCount}
+                  {activeFiltersCount.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
                 </span>
               )}
             </button>
@@ -1264,7 +1291,7 @@ export default function HomeworkPage() {
             >
               <button
                 onClick={() => setViewMode('table')}
-                title="Table View"
+                title={t('homework.table') || "Table View"}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1280,11 +1307,11 @@ export default function HomeworkPage() {
                 }}
               >
                 <Layers size={14} />
-                <span className="hidden sm:inline">Table</span>
+                <span className="hidden sm:inline">{t('homework.table') || 'Table'}</span>
               </button>
               <button
                 onClick={() => setViewMode('cards')}
-                title="Card Grid View"
+                title={t('homework.cards') || "Card Grid View"}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1300,7 +1327,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <LayoutGrid size={14} />
-                <span className="hidden sm:inline">Cards</span>
+                <span className="hidden sm:inline">{t('homework.cards') || 'Cards'}</span>
               </button>
             </div>
 
@@ -1323,7 +1350,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <Download size={15} />
-                <span>Export</span>
+                <span>{t('homework.export') || 'Export'}</span>
                 <ChevronDown size={14} />
               </button>
 
@@ -1363,7 +1390,7 @@ export default function HomeworkPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileSpreadsheet size={16} style={{ color: '#10b981' }} />
-                    <span>Export to CSV</span>
+                    <span>{t('homework.exportCsv') || 'Export to CSV'}</span>
                   </button>
                   <button
                     onClick={handleExportPDF}
@@ -1386,7 +1413,7 @@ export default function HomeworkPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileText size={16} style={{ color: '#ef4444' }} />
-                    <span>Export to PDF</span>
+                    <span>{t('homework.exportPdf') || 'Export to PDF'}</span>
                   </button>
                 </div>
               )}
@@ -1401,7 +1428,7 @@ export default function HomeworkPage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Show:
+                {t('homework.show') || 'Show:'}
               </span>
               <select
                 value={limit}
@@ -1445,14 +1472,14 @@ export default function HomeworkPage() {
               }}
             >
               <Plus size={16} />
-              <span>Assign Homework</span>
+              <span>{t('homework.assignHomework') || 'Assign Homework'}</span>
             </button>
 
             {/* Refresh Button */}
             <button
               onClick={fetchHomework}
               disabled={loadingHomework}
-              title="Refresh records"
+              title={t('homework.refreshRecords') || "Refresh records"}
               style={{
                 width: '38px',
                 height: '38px',
@@ -1500,7 +1527,7 @@ export default function HomeworkPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Class
+                {t('homework.class') || 'Class'}
               </label>
               <div style={{ position: 'relative' }}>
                 <School
@@ -1534,7 +1561,7 @@ export default function HomeworkPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('homework.allClasses') || 'All Classes'}</option>
                   {availableClasses.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -1555,7 +1582,7 @@ export default function HomeworkPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Section
+                {t('homework.section') || 'Section'}
               </label>
               <select
                 value={selectedSectionId}
@@ -1577,7 +1604,7 @@ export default function HomeworkPage() {
                   opacity: selectedClassId ? 1 : 0.6,
                 }}
               >
-                <option value="">All Sections</option>
+                <option value="">{t('homework.allSections') || 'All Sections'}</option>
                 {activeClassSections.map(s => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -1597,7 +1624,7 @@ export default function HomeworkPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Subject
+                {t('homework.subject') || 'Subject'}
               </label>
               <div style={{ position: 'relative' }}>
                 <BookMarked
@@ -1630,7 +1657,7 @@ export default function HomeworkPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="">All Subjects</option>
+                  <option value="">{t('homework.allSubjects') || 'All Subjects'}</option>
                   {availableSubjects.map(sub => (
                     <option key={sub.id} value={sub.id}>
                       {sub.name}
@@ -1652,7 +1679,7 @@ export default function HomeworkPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Status
+                {t('homework.status') || 'Status'}
               </label>
               <select
                 value={selectedStatus}
@@ -1672,11 +1699,11 @@ export default function HomeworkPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="">All Statuses</option>
-                <option value="Assigned">Assigned</option>
-                <option value="Pending">Pending</option>
-                <option value="Completed">Completed</option>
-                <option value="Late">Late / Overdue</option>
+                <option value="">{t('homework.allStatuses') || 'All Statuses'}</option>
+                <option value="Assigned">{t('homework.statusAssigned') || 'Assigned'}</option>
+                <option value="Pending">{t('homework.statusPending') || 'Pending'}</option>
+                <option value="Completed">{t('homework.statusCompleted') || 'Completed'}</option>
+                <option value="Late">{t('homework.statusLate') || 'Late / Overdue'}</option>
               </select>
             </div>
 
@@ -1691,7 +1718,7 @@ export default function HomeworkPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Due Date
+                {t('homework.dueDate') || 'Due Date'}
               </label>
               <input
                 type="date"
@@ -1735,7 +1762,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <X size={14} />
-                <span>Reset</span>
+                <span>{t('homework.reset') || 'Reset'}</span>
               </button>
             )}
           </div>
@@ -1755,7 +1782,7 @@ export default function HomeworkPage() {
             }}
           >
             <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
-            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Fetching homework assignments...</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>{t('homework.fetchingHomework') || 'Fetching homework assignments...'}</span>
           </div>
         )}
 
@@ -1799,8 +1826,8 @@ export default function HomeworkPage() {
                 }}
               >
                 {searchTerm || activeFiltersCount > 0
-                  ? 'No homework assignments match your current filters. Try resetting your search filters.'
-                  : 'No homework has been assigned yet. Click "Assign Homework" to create the first assignment.'}
+                  ? (t('homework.noMatchingFilters') || 'No homework assignments match your current filters. Try resetting your search filters.')
+                  : (t('homework.noHomeworkAssignedYet') || 'No homework has been assigned yet. Click "Assign Homework" to create the first assignment.')}
               </p>
             </div>
             {searchTerm || activeFiltersCount > 0 ? (
@@ -1818,7 +1845,7 @@ export default function HomeworkPage() {
                   padding: '0.55rem 1rem',
                 }}
               >
-                Clear all filters
+                {t('homework.clearAllFilters') || 'Clear all filters'}
               </button>
             ) : (
               <button
@@ -1834,7 +1861,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Assign Homework</span>
+                <span>{t('homework.assignHomework') || 'Assign Homework'}</span>
               </button>
             )}
           </div>
@@ -1856,19 +1883,19 @@ export default function HomeworkPage() {
                     color: 'var(--muted-foreground)',
                   }}
                 >
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Homework Details</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Class & Section</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Subject</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Teacher</th>
-                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Due Date</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Status</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('homework.homeworkDetails') || 'Homework Details'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('homework.classAndSection') || 'Class & Section'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('homework.subject') || 'Subject'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('homework.teacher') || 'Teacher'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('homework.dueDate') || 'Due Date'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('homework.status') || 'Status'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>{t('homework.actions') || 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedHomeworks.map((hw, idx) => {
                   const statusKey = resolveStatus(hw);
-                  const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.Assigned;
+                  const st = getStatusInfo(statusKey);
 
                   return (
                     <tr
@@ -1929,7 +1956,7 @@ export default function HomeworkPage() {
                               </div>
                             ) : (
                               <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                                No instructions provided
+                                {t('homework.noInstructions') || 'No instructions provided'}
                               </span>
                             )}
                           </div>
@@ -1950,7 +1977,7 @@ export default function HomeworkPage() {
                               border: '1px solid rgba(99, 102, 241, 0.2)',
                             }}
                           >
-                            {hw.classEntity?.name || 'Class —'}
+                            {hw.classEntity?.name || `${t('homework.classPrefix') || 'Class'} —`}
                           </span>
                           <span
                             style={{
@@ -1963,7 +1990,7 @@ export default function HomeworkPage() {
                               color: 'var(--muted-foreground)',
                             }}
                           >
-                            {hw.sectionEntity?.name ? `Sec ${hw.sectionEntity.name}` : 'All Sections'}
+                            {hw.sectionEntity?.name ? `${t('homework.secPrefix') || 'Sec'} ${hw.sectionEntity.name}` : (t('homework.allSections') || 'All Sections')}
                           </span>
                         </div>
                       </td>
@@ -2010,7 +2037,7 @@ export default function HomeworkPage() {
                             <User size={13} />
                           </div>
                           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--foreground)' }}>
-                            {hw.teacherEntity?.name || 'Assigned by Staff'}
+                            {hw.teacherEntity?.name || (t('homework.assignedByStaff') || 'Assigned by Staff')}
                           </span>
                         </div>
                       </td>
@@ -2087,7 +2114,7 @@ export default function HomeworkPage() {
                           {/* View Details */}
                           <button
                             onClick={() => setDetailsModal({ open: true, homework: hw })}
-                            title="View assignment details"
+                            title={t('homework.viewDetails') || "View assignment details"}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2115,7 +2142,7 @@ export default function HomeworkPage() {
                           {/* Edit / Update */}
                           <button
                             onClick={() => handleOpenAssignModal(hw)}
-                            title="Edit assignment"
+                            title={t('homework.editAssignment') || "Edit assignment"}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2149,7 +2176,7 @@ export default function HomeworkPage() {
                                 title: hw.title,
                               })
                             }
-                            title="Delete assignment"
+                            title={t('homework.deleteAssignment') || "Delete assignment"}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2195,7 +2222,7 @@ export default function HomeworkPage() {
           >
             {paginatedHomeworks.map((hw, idx) => {
               const statusKey = resolveStatus(hw);
-              const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.Assigned;
+              const st = getStatusInfo(statusKey);
 
               return (
                 <div
@@ -2299,7 +2326,7 @@ export default function HomeworkPage() {
                         overflow: 'hidden',
                       }}
                     >
-                      {hw.description || 'No additional instructions provided for this assignment.'}
+                      {hw.description || (t('homework.noInstructionsProvided') || 'No additional instructions provided for this assignment.')}
                     </p>
 
                     {/* Metadata Badges */}
@@ -2321,16 +2348,16 @@ export default function HomeworkPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <School size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
-                          {hw.classEntity?.name || 'Class —'}
+                          {hw.classEntity?.name || `${t('homework.classPrefix') || 'Class'} —`}
                         </span>
                         <span style={{ color: 'var(--muted-foreground)' }}>•</span>
-                        <span>{hw.sectionEntity?.name ? `Sec ${hw.sectionEntity.name}` : 'All Sections'}</span>
+                        <span>{hw.sectionEntity?.name ? `${t('homework.secPrefix') || 'Sec'} ${hw.sectionEntity.name}` : (t('homework.allSections') || 'All Sections')}</span>
                       </div>
 
                       {/* Subject */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <BookMarked size={13} style={{ color: '#8b5cf6', flexShrink: 0 }} />
-                        <span>Subject:</span>
+                        <span>{t('homework.subjectColon') || 'Subject:'}</span>
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
                           {hw.subjectEntity?.name || '—'}
                         </span>
@@ -2344,9 +2371,9 @@ export default function HomeworkPage() {
                       {/* Teacher */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <User size={13} style={{ color: '#10b981', flexShrink: 0 }} />
-                        <span>Teacher:</span>
+                        <span>{t('homework.teacherColon') || 'Teacher:'}</span>
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
-                          {hw.teacherEntity?.name || 'Assigned by Staff'}
+                          {hw.teacherEntity?.name || (t('homework.assignedByStaff') || 'Assigned by Staff')}
                         </span>
                       </div>
                     </div>
@@ -2380,13 +2407,13 @@ export default function HomeworkPage() {
                       }}
                     >
                       <Eye size={13} />
-                      <span>Details</span>
+                      <span>{t('homework.detailsBtn') || 'Details'}</span>
                     </button>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <button
                         onClick={() => handleOpenAssignModal(hw)}
-                        title="Edit assignment"
+                        title={t('homework.editAssignment') || "Edit assignment"}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -2410,7 +2437,7 @@ export default function HomeworkPage() {
                             title: hw.title,
                           })
                         }
-                        title="Delete assignment"
+                        title={t('homework.deleteAssignment') || "Delete assignment"}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -2448,16 +2475,15 @@ export default function HomeworkPage() {
             }}
           >
             <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              Showing{' '}
+              {t('homework.showing') || 'Showing'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min((page - 1) * limit + 1, filteredHomeworks.length)}
+                {Math.min((page - 1) * limit + 1, filteredHomeworks.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              to{' '}
+              {t('homework.to') || 'to'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min(page * limit, filteredHomeworks.length)}
+                {Math.min(page * limit, filteredHomeworks.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              of <strong style={{ color: 'var(--foreground)' }}>{filteredHomeworks.length}</strong> homework
-              records
+              {t('homework.of') || 'of'} <strong style={{ color: 'var(--foreground)' }}>{filteredHomeworks.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}</strong> {t('homework.records') || 'homework records'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2480,7 +2506,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <ChevronLeft size={16} />
-                <span>Prev</span>
+                <span>{t('homework.prev') || 'Prev'}</span>
               </button>
 
               <div
@@ -2491,7 +2517,7 @@ export default function HomeworkPage() {
                   padding: '0 0.5rem',
                 }}
               >
-                Page {page} of {totalPages}
+                {t('homework.page') || 'Page'} {page.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')} {t('homework.of') || 'of'} {totalPages.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </div>
 
               <button
@@ -2512,7 +2538,7 @@ export default function HomeworkPage() {
                   opacity: page >= totalPages ? 0.6 : 1,
                 }}
               >
-                <span>Next</span>
+                <span>{t('homework.next') || 'Next'}</span>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -2564,12 +2590,14 @@ export default function HomeworkPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    {assignMode === 'edit' ? 'Edit Homework' : 'Assign Homework'}
+                    {assignMode === 'edit'
+                      ? (t('homework.modalEditTitle') || 'Edit Homework')
+                      : (t('homework.modalAssignTitle') || 'Assign Homework')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: '0.15rem 0 0' }}>
                     {assignMode === 'edit'
-                      ? 'Update details, instructions, or deadline'
-                      : 'Create a new homework task for your students'}
+                      ? (t('homework.modalEditSubtitle') || 'Update details, instructions, or deadline')
+                      : (t('homework.modalAssignSubtitle') || 'Create a new homework task for your students')}
                   </p>
                 </div>
               </div>
@@ -2594,12 +2622,12 @@ export default function HomeworkPage() {
                 {/* Title */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Homework Title <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('homework.fieldTitle') || 'Homework Title'} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Chapter 4 Exercises: Fractions & Decimals"
+                    placeholder={t('homework.placeholderTitle') || "e.g. Chapter 4 Exercises: Fractions & Decimals"}
                     value={assignForm.title}
                     onChange={e => setAssignForm({ ...assignForm, title: e.target.value })}
                     style={{
@@ -2619,7 +2647,7 @@ export default function HomeworkPage() {
                   {/* Class */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Class <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('homework.fieldClass') || 'Class'} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <select
                       required
@@ -2642,7 +2670,7 @@ export default function HomeworkPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">Select Class</option>
+                      <option value="">{t('homework.selectClass') || 'Select Class'}</option>
                       {availableClasses.map(c => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -2654,7 +2682,7 @@ export default function HomeworkPage() {
                   {/* Section */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Section <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>(Optional)</span>
+                      {t('homework.fieldSection') || 'Section'} <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('homework.optional') || '(Optional)'}</span>
                     </label>
                     <select
                       value={assignForm.sectionId}
@@ -2671,7 +2699,7 @@ export default function HomeworkPage() {
                         cursor: assignForm.classId ? 'pointer' : 'not-allowed',
                       }}
                     >
-                      <option value="">All Sections</option>
+                      <option value="">{t('homework.allSections') || 'All Sections'}</option>
                       {assignClassSections.map(s => (
                         <option key={s.id} value={s.id}>
                           {s.name}
@@ -2686,7 +2714,7 @@ export default function HomeworkPage() {
                   {/* Subject */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Subject <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('homework.fieldSubject') || 'Subject'} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <select
                       required
@@ -2703,7 +2731,7 @@ export default function HomeworkPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">Select Subject</option>
+                      <option value="">{t('homework.selectSubject') || 'Select Subject'}</option>
                       {availableSubjects.map(sub => (
                         <option key={sub.id} value={sub.id}>
                           {sub.name}
@@ -2716,7 +2744,7 @@ export default function HomeworkPage() {
                   {/* Teacher */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Assigning Teacher
+                      {t('homework.fieldTeacher') || 'Assigning Teacher'}
                     </label>
                     <select
                       value={assignForm.teacherId}
@@ -2732,7 +2760,7 @@ export default function HomeworkPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">Auto / Current Teacher</option>
+                      <option value="">{t('homework.autoTeacher') || 'Auto / Current Teacher'}</option>
                       {availableTeachers.map(tch => (
                         <option key={tch.id} value={tch.id}>
                           {tch.name}
@@ -2747,7 +2775,7 @@ export default function HomeworkPage() {
                   {/* Due Date */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Due Date <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('homework.fieldDueDate') || 'Due Date'} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <input
                       type="date"
@@ -2770,7 +2798,7 @@ export default function HomeworkPage() {
                   {/* Status */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Status
+                      {t('homework.fieldStatus') || 'Status'}
                     </label>
                     <select
                       value={assignForm.status}
@@ -2786,10 +2814,10 @@ export default function HomeworkPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="Assigned">Assigned</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Late">Late / Overdue</option>
+                      <option value="Assigned">{t('homework.statusAssigned') || 'Assigned'}</option>
+                      <option value="Pending">{t('homework.statusPending') || 'Pending'}</option>
+                      <option value="Completed">{t('homework.statusCompleted') || 'Completed'}</option>
+                      <option value="Late">{t('homework.statusLate') || 'Late / Overdue'}</option>
                     </select>
                   </div>
                 </div>
@@ -2797,11 +2825,11 @@ export default function HomeworkPage() {
                 {/* Description */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Instructions & Description
+                    {t('homework.fieldInstructions') || 'Instructions & Description'}
                   </label>
                   <textarea
                     rows={4}
-                    placeholder="Provide detailed instructions, textbook pages, questions, or submission guidelines..."
+                    placeholder={t('homework.placeholderInstructions') || "Provide detailed instructions, textbook pages, questions, or submission guidelines..."}
                     value={assignForm.description}
                     onChange={e => setAssignForm({ ...assignForm, description: e.target.value })}
                     style={{
@@ -2844,7 +2872,7 @@ export default function HomeworkPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  {t('common.cancel') || 'Cancel'}
                 </button>
                 <button
                   type="submit"
@@ -2865,12 +2893,16 @@ export default function HomeworkPage() {
                   {assignSubmitting ? (
                     <>
                       <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>Saving...</span>
+                      <span>{t('homework.saving') || 'Saving...'}</span>
                     </>
                   ) : (
                     <>
                       <Check size={16} />
-                      <span>{assignMode === 'edit' ? 'Save Changes' : 'Assign Homework'}</span>
+                      <span>
+                        {assignMode === 'edit'
+                          ? (t('homework.saveChanges') || 'Save Changes')
+                          : (t('homework.assignHomework') || 'Assign Homework')}
+                      </span>
                     </>
                   )}
                 </button>
@@ -2924,10 +2956,10 @@ export default function HomeworkPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    Homework Details
+                    {t('homework.detailsModalTitle') || 'Homework Details'}
                   </h2>
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    Assignment Overview
+                    {t('homework.assignmentOverview') || 'Assignment Overview'}
                   </span>
                 </div>
               </div>
@@ -2956,15 +2988,15 @@ export default function HomeworkPage() {
                       fontWeight: 700,
                       padding: '0.2rem 0.6rem',
                       borderRadius: '9999px',
-                      background: STATUS_CONFIG[resolveStatus(detailsModal.homework)]?.bg,
-                      color: STATUS_CONFIG[resolveStatus(detailsModal.homework)]?.color,
-                      border: `1px solid ${STATUS_CONFIG[resolveStatus(detailsModal.homework)]?.border}`,
+                      background: getStatusInfo(resolveStatus(detailsModal.homework)).bg,
+                      color: getStatusInfo(resolveStatus(detailsModal.homework)).color,
+                      border: `1px solid ${getStatusInfo(resolveStatus(detailsModal.homework)).border}`,
                     }}
                   >
-                    {STATUS_CONFIG[resolveStatus(detailsModal.homework)]?.label}
+                    {getStatusInfo(resolveStatus(detailsModal.homework)).label}
                   </span>
                   <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>
-                    Due: <strong>{formatDate(detailsModal.homework.dueDate)}</strong>
+                    {t('homework.dueColon') || 'Due:'} <strong>{formatDate(detailsModal.homework.dueDate)}</strong>
                   </span>
                 </div>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>
@@ -2992,10 +3024,10 @@ export default function HomeworkPage() {
                     marginBottom: '0.35rem',
                   }}
                 >
-                  Instructions & Guidelines
+                  {t('homework.instructionsGuidelines') || 'Instructions & Guidelines'}
                 </span>
                 <p style={{ fontSize: '0.9rem', color: 'var(--foreground)', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {detailsModal.homework.description || 'No detailed instructions provided.'}
+                  {detailsModal.homework.description || (t('homework.noDetailedInstructions') || 'No detailed instructions provided.')}
                 </p>
               </div>
 
@@ -3016,12 +3048,12 @@ export default function HomeworkPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Class & Section
+                    {t('homework.classAndSection') || 'Class & Section'}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
                     {detailsModal.homework.classEntity?.name || '—'}{' '}
                     <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
-                      ({detailsModal.homework.sectionEntity?.name ? `Sec ${detailsModal.homework.sectionEntity.name}` : 'All Sections'})
+                      ({detailsModal.homework.sectionEntity?.name ? `${t('homework.secPrefix') || 'Sec'} ${detailsModal.homework.sectionEntity.name}` : (t('homework.allSections') || 'All Sections')})
                     </span>
                   </div>
                 </div>
@@ -3035,7 +3067,7 @@ export default function HomeworkPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Subject
+                    {t('homework.subject') || 'Subject'}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
                     {detailsModal.homework.subjectEntity?.name || '—'}
@@ -3052,10 +3084,10 @@ export default function HomeworkPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Teacher
+                    {t('homework.teacher') || 'Teacher'}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
-                    {detailsModal.homework.teacherEntity?.name || 'Assigned by Staff'}
+                    {detailsModal.homework.teacherEntity?.name || (t('homework.assignedByStaff') || 'Assigned by Staff')}
                   </div>
                 </div>
 
@@ -3068,7 +3100,7 @@ export default function HomeworkPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Deadline
+                    {t('homework.deadline') || 'Deadline'}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
                     {formatDate(detailsModal.homework.dueDate)}
@@ -3099,7 +3131,7 @@ export default function HomeworkPage() {
                   cursor: 'pointer',
                 }}
               >
-                Close
+                {t('common.close') || 'Close'}
               </button>
               <button
                 className="btn btn-primary"
@@ -3119,7 +3151,7 @@ export default function HomeworkPage() {
                 }}
               >
                 <Edit3 size={15} />
-                <span>Edit Homework</span>
+                <span>{t('homework.editHomework') || 'Edit Homework'}</span>
               </button>
             </div>
           </div>
@@ -3158,18 +3190,17 @@ export default function HomeworkPage() {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                  Delete Homework
+                  {t('homework.deleteModalTitle') || 'Delete Homework'}
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  This action cannot be undone
+                  {t('homework.cannotBeUndone') || 'This action cannot be undone'}
                 </span>
               </div>
             </div>
 
             <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '0 0 1.5rem' }}>
-              Are you sure you want to permanently delete{' '}
-              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>? Students will no
-              longer see this assignment in their dashboard.
+              {t('homework.deleteConfirmPre') || 'Are you sure you want to permanently delete'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>{t('homework.deleteConfirmPost') || '? Students will no longer see this assignment in their dashboard.'}
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -3186,7 +3217,7 @@ export default function HomeworkPage() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
               <button
                 onClick={handleDeleteHomework}
@@ -3210,7 +3241,7 @@ export default function HomeworkPage() {
                 ) : (
                   <Trash2 size={16} />
                 )}
-                <span>{deleteLoading ? 'Deleting...' : 'Delete'}</span>
+                <span>{deleteLoading ? (t('homework.deleting') || 'Deleting...') : (t('common.delete') || 'Delete')}</span>
               </button>
             </div>
           </div>

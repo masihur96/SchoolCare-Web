@@ -49,30 +49,26 @@ interface Notice {
   updatedAt?: string;
 }
 
-const AUDIENCE_CONFIG: Record<
+const AUDIENCE_STYLES: Record<
   string,
-  { label: string; color: string; bg: string; border: string }
+  { color: string; bg: string; border: string }
 > = {
   All: {
-    label: 'Everyone',
     color: '#6366f1',
     bg: 'rgba(99, 102, 241, 0.08)',
     border: 'rgba(99, 102, 241, 0.25)',
   },
   Students: {
-    label: 'Students',
     color: '#10b981',
     bg: 'rgba(16, 185, 129, 0.08)',
     border: 'rgba(16, 185, 129, 0.25)',
   },
   Teachers: {
-    label: 'Teachers',
     color: '#f59e0b',
     bg: 'rgba(245, 158, 11, 0.08)',
     border: 'rgba(245, 158, 11, 0.25)',
   },
   Parents: {
-    label: 'Parents',
     color: '#8b5cf6',
     bg: 'rgba(139, 92, 246, 0.08)',
     border: 'rgba(139, 92, 246, 0.25)',
@@ -80,7 +76,17 @@ const AUDIENCE_CONFIG: Record<
 };
 
 export default function NoticesPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const getAudienceInfo = (audience?: string) => {
+    const aud = audience || 'All';
+    const styles = AUDIENCE_STYLES[aud] || AUDIENCE_STYLES.All;
+    let label = t('notices.everyone') || 'Everyone';
+    if (aud === 'Students') label = t('notices.students') || 'Students';
+    else if (aud === 'Teachers') label = t('notices.teachers') || 'Teachers';
+    else if (aud === 'Parents') label = t('notices.parents') || 'Parents';
+    return { ...styles, label };
+  };
 
   // Core Notices Data
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -164,7 +170,7 @@ export default function NoticesPage() {
   const fetchNotices = useCallback(async () => {
     const schoolId = getUserSchoolId();
     if (!schoolId) {
-      setError('School ID not found in session.');
+      setError(t('notices.schoolIdNotFound') || 'School ID not found in session.');
       return;
     }
 
@@ -185,15 +191,15 @@ export default function NoticesPage() {
         setNotices(list);
       } else {
         const errJson = await res.json().catch(() => ({}));
-        setError(errJson.message || 'Failed to fetch notice board.');
+        setError(errJson.message || t('notices.errorSaving') || 'Failed to fetch notice board.');
       }
     } catch (err) {
       console.error('Error fetching notices:', err);
-      setError('Network error while retrieving notices.');
+      setError(t('notices.networkErrorFetch') || 'Network error while retrieving notices.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Initial fetch on mount
   useEffect(() => {
@@ -209,7 +215,7 @@ export default function NoticesPage() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('en-US', {
+      return d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -226,7 +232,7 @@ export default function NoticesPage() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return '';
-      return d.toLocaleTimeString('en-US', {
+      return d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
@@ -353,13 +359,13 @@ export default function NoticesPage() {
   const handleSubmitNotice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.content.trim() || !formData.postedBy.trim()) {
-      setError('Please fill in Title, Message, and Author name.');
+      setError(t('notices.validationRequired') || 'Please fill in Title, Message, and Author name.');
       return;
     }
 
     const schoolId = getUserSchoolId();
     if (!schoolId) {
-      setError('School ID not found.');
+      setError(t('notices.schoolIdNotFound') || 'School ID not found.');
       return;
     }
 
@@ -388,18 +394,18 @@ export default function NoticesPage() {
       if (res.ok) {
         setSuccessToast(
           formMode === 'edit'
-            ? 'Notice updated successfully!'
-            : 'Notice published successfully!'
+            ? (t('notices.updatedSuccess') || 'Notice updated successfully!')
+            : (t('notices.publishedSuccess') || 'Notice published successfully!')
         );
         setFormModalOpen(false);
         fetchNotices();
       } else {
         const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Failed to save notice announcement.');
+        setError(json.message || t('notices.errorSaving') || 'Failed to save notice announcement.');
       }
     } catch (err) {
       console.error('Error saving notice:', err);
-      setError('Network error occurred while saving notice.');
+      setError(t('notices.networkErrorSave') || 'Network error occurred while saving notice.');
     } finally {
       setFormSubmitting(false);
     }
@@ -420,16 +426,16 @@ export default function NoticesPage() {
       });
 
       if (res.ok || res.status === 204) {
-        setSuccessToast('Notice announcement deleted.');
+        setSuccessToast(t('notices.deletedSuccess') || 'Notice announcement deleted.');
         setDeleteModal({ open: false, id: '', title: '' });
         setNotices(prev => prev.filter(n => n._id !== deleteModal.id));
       } else {
         const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Failed to delete notice.');
+        setError(json.message || t('notices.errorDeleting') || 'Failed to delete notice.');
       }
     } catch (err) {
       console.error('Delete error:', err);
-      setError('Network error occurred while deleting notice.');
+      setError(t('notices.networkErrorDelete') || 'Network error occurred while deleting notice.');
     } finally {
       setDeleteLoading(false);
     }
@@ -441,20 +447,20 @@ export default function NoticesPage() {
     setShowExportMenu(false);
 
     const headers = [
-      'Title',
-      'Target Audience',
-      'Priority',
-      'Posted By',
-      'Date',
-      'Time',
-      'Content',
+      t('notices.exportTitle') || 'Title',
+      t('notices.exportAudience') || 'Target Audience',
+      t('notices.exportPriority') || 'Priority',
+      t('notices.exportPostedBy') || 'Posted By',
+      t('notices.exportDate') || 'Date',
+      t('notices.exportTime') || 'Time',
+      t('notices.exportContent') || 'Content',
     ];
 
     const rows = filteredNotices.map(n => [
-      `"${(n.title || '').replace(/"/g, '""')}"`,
-      `"${n.targetAudience || 'Everyone'}"`,
-      `"${n.isImportent ? 'Important' : 'Standard'}"`,
-      `"${(n.postedBy || 'Admin').replace(/"/g, '""')}"`,
+      `"${(n.title || t('notices.untitledNotice') || '').replace(/"/g, '""')}"`,
+      `"${getAudienceInfo(n.targetAudience).label}"`,
+      `"${n.isImportent ? (t('notices.importantBadge') || 'Important') : (t('notices.standardBadge') || 'Standard')}"`,
+      `"${(n.postedBy || t('notices.administration') || 'Admin').replace(/"/g, '""')}"`,
       `"${formatDate(n.createdAt)}"`,
       `"${formatTime(n.createdAt)}"`,
       `"${(n.content || '').replace(/"/g, '""')}"`,
@@ -478,35 +484,43 @@ export default function NoticesPage() {
 
     doc.setFontSize(18);
     doc.setTextColor(30, 41, 59);
-    doc.text('Smart School – Official Notices & Announcements', 14, 16);
+    doc.text(t('notices.reportTitle') || 'Smart School – Official Notices & Announcements', 14, 16);
 
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    const dateGenerated = new Date().toLocaleDateString('en-US', {
+    const dateGenerated = new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
     doc.text(
-      `Generated on: ${dateGenerated} | Total Records: ${filteredNotices.length}`,
+      `${t('notices.generatedOn') || 'Generated on:'} ${dateGenerated} | ${t('notices.totalRecords') || 'Total Records:'} ${filteredNotices.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`,
       14,
       23
     );
 
     const tableRows = filteredNotices.map((n, idx) => [
-      idx + 1,
-      n.title || 'Untitled Notice',
-      n.targetAudience || 'Everyone',
-      n.isImportent ? 'Important' : 'Standard',
-      n.postedBy || 'Admin',
+      (idx + 1).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US'),
+      n.title || t('notices.untitledNotice') || 'Untitled Notice',
+      getAudienceInfo(n.targetAudience).label,
+      n.isImportent ? (t('notices.importantBadge') || 'Important') : (t('notices.standardBadge') || 'Standard'),
+      n.postedBy || t('notices.administration') || 'Admin',
       `${formatDate(n.createdAt)} ${formatTime(n.createdAt)}`,
       n.content ? (n.content.length > 90 ? `${n.content.slice(0, 90)}…` : n.content) : '—',
     ]);
 
     autoTable(doc, {
       startY: 28,
-      head: [['#', 'Notice Title', 'Audience', 'Priority', 'Posted By', 'Date & Time', 'Summary']],
+      head: [[
+        '#',
+        t('notices.thNoticeTitle') || 'Notice Title',
+        t('notices.thAudience') || 'Audience',
+        t('notices.thPriority') || 'Priority',
+        t('notices.thPostedBy') || 'Posted By',
+        t('notices.thDateTime') || 'Date & Time',
+        t('notices.thSummary') || 'Summary'
+      ]],
       body: tableRows,
       theme: 'grid',
       headStyles: {
@@ -533,6 +547,16 @@ export default function NoticesPage() {
       className="page-container animate-fade-in"
       style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}
     >
+      {/* Page Header */}
+      <div style={{ marginBottom: '1.75rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--foreground)', margin: 0, letterSpacing: '-0.02em' }}>
+          {t('notices.title')}
+        </h1>
+        <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', margin: '0.35rem 0 0' }}>
+          {t('notices.subtitle')}
+        </p>
+      </div>
+
       {/* Toast Feedback Banner */}
       {successToast && (
         <div
@@ -635,7 +659,7 @@ export default function NoticesPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Total Notices
+              {t('notices.totalNotices') || 'Total Notices'}
             </span>
             <div
               style={{
@@ -645,10 +669,10 @@ export default function NoticesPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.total}
+              {stats.total.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-              All published bulletins
+              {t('notices.allPublishedBulletins') || 'All published bulletins'}
             </span>
           </div>
           <div
@@ -692,7 +716,7 @@ export default function NoticesPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Important / Urgent
+                {t('notices.importantUrgent') || 'Important / Urgent'}
               </span>
               <span
                 style={{
@@ -712,7 +736,7 @@ export default function NoticesPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.important}
+              {stats.important.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -725,10 +749,10 @@ export default function NoticesPage() {
                   color: '#ef4444',
                 }}
               >
-                {stats.importantPct}%
+                {stats.importantPct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                High priority alerts
+                {t('notices.highPriorityAlerts') || 'High priority alerts'}
               </span>
             </div>
           </div>
@@ -772,7 +796,7 @@ export default function NoticesPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              For Students
+              {t('notices.forStudents') || 'For Students'}
             </span>
             <div
               style={{
@@ -782,7 +806,7 @@ export default function NoticesPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.students}
+              {stats.students.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -795,10 +819,10 @@ export default function NoticesPage() {
                   color: '#10b981',
                 }}
               >
-                {stats.studentsPct}%
+                {stats.studentsPct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Targeted or general
+                {t('notices.targetedOrGeneral') || 'Targeted or general'}
               </span>
             </div>
           </div>
@@ -842,7 +866,7 @@ export default function NoticesPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Staff & Parents
+              {t('notices.staffAndParents') || 'Staff & Parents'}
             </span>
             <div
               style={{
@@ -852,10 +876,10 @@ export default function NoticesPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.teachers}
+              {stats.teachers.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-              Faculty and guardian updates
+              {t('notices.facultyAndGuardianUpdates') || 'Faculty and guardian updates'}
             </span>
           </div>
           <div
@@ -920,7 +944,7 @@ export default function NoticesPage() {
             />
             <input
               type="text"
-              placeholder="Search notices by title, author, audience..."
+              placeholder={t('notices.searchPlaceholder') || 'Search notices by title, author, audience...'}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
@@ -983,7 +1007,7 @@ export default function NoticesPage() {
               }}
             >
               <Filter size={15} />
-              <span>Filters</span>
+              <span>{t('notices.filters') || 'Filters'}</span>
               {activeFiltersCount > 0 && (
                 <span
                   style={{
@@ -995,7 +1019,7 @@ export default function NoticesPage() {
                     fontWeight: 700,
                   }}
                 >
-                  {activeFiltersCount}
+                  {activeFiltersCount.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
                 </span>
               )}
             </button>
@@ -1013,7 +1037,7 @@ export default function NoticesPage() {
             >
               <button
                 onClick={() => setViewMode('cards')}
-                title="Cards View"
+                title={t('notices.cards') || 'Cards View'}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1029,11 +1053,11 @@ export default function NoticesPage() {
                 }}
               >
                 <LayoutGrid size={14} />
-                <span className="hidden sm:inline">Cards</span>
+                <span className="hidden sm:inline">{t('notices.cards') || 'Cards'}</span>
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                title="Table View"
+                title={t('notices.table') || 'Table View'}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1049,7 +1073,7 @@ export default function NoticesPage() {
                 }}
               >
                 <Layers size={14} />
-                <span className="hidden sm:inline">Table</span>
+                <span className="hidden sm:inline">{t('notices.table') || 'Table'}</span>
               </button>
             </div>
 
@@ -1072,7 +1096,7 @@ export default function NoticesPage() {
                 }}
               >
                 <Download size={15} />
-                <span>Export</span>
+                <span>{t('notices.export') || 'Export'}</span>
                 <ChevronDown size={14} />
               </button>
 
@@ -1112,7 +1136,7 @@ export default function NoticesPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileSpreadsheet size={16} style={{ color: '#10b981' }} />
-                    <span>Export to CSV</span>
+                    <span>{t('notices.exportCsv') || 'Export to CSV'}</span>
                   </button>
                   <button
                     onClick={handleExportPDF}
@@ -1135,7 +1159,7 @@ export default function NoticesPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileText size={16} style={{ color: '#ef4444' }} />
-                    <span>Export to PDF</span>
+                    <span>{t('notices.exportPdf') || 'Export to PDF'}</span>
                   </button>
                 </div>
               )}
@@ -1150,7 +1174,7 @@ export default function NoticesPage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Show:
+                {t('notices.show') || 'Show:'}
               </span>
               <select
                 value={limit}
@@ -1194,14 +1218,14 @@ export default function NoticesPage() {
               }}
             >
               <Plus size={16} />
-              <span>Post Notice</span>
+              <span>{t('notices.postNotice') || 'Post Notice'}</span>
             </button>
 
             {/* Refresh Button */}
             <button
               onClick={fetchNotices}
               disabled={loading}
-              title="Refresh notices"
+              title={t('notices.refreshNotices') || 'Refresh notices'}
               style={{
                 width: '38px',
                 height: '38px',
@@ -1249,7 +1273,7 @@ export default function NoticesPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Target Audience
+                {t('notices.targetAudience') || 'Target Audience'}
               </label>
               <select
                 value={filterAudience}
@@ -1269,10 +1293,10 @@ export default function NoticesPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="All">All Audiences</option>
-                <option value="Students">Students Only</option>
-                <option value="Teachers">Teachers Only</option>
-                <option value="Parents">Parents Only</option>
+                <option value="All">{t('notices.allAudiences') || 'All Audiences'}</option>
+                <option value="Students">{t('notices.studentsOnly') || 'Students Only'}</option>
+                <option value="Teachers">{t('notices.teachersOnly') || 'Teachers Only'}</option>
+                <option value="Parents">{t('notices.parentsOnly') || 'Parents Only'}</option>
               </select>
             </div>
 
@@ -1287,7 +1311,7 @@ export default function NoticesPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Priority
+                {t('notices.priority') || 'Priority'}
               </label>
               <select
                 value={filterPriority}
@@ -1307,9 +1331,9 @@ export default function NoticesPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="All">All Priorities</option>
-                <option value="Important">⚠ Important Only</option>
-                <option value="Standard">Standard Only</option>
+                <option value="All">{t('notices.allPriorities') || 'All Priorities'}</option>
+                <option value="Important">{t('notices.importantOnly') || '⚠ Important Only'}</option>
+                <option value="Standard">{t('notices.standardOnly') || 'Standard Only'}</option>
               </select>
             </div>
 
@@ -1324,7 +1348,7 @@ export default function NoticesPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Date Posted
+                {t('notices.datePosted') || 'Date Posted'}
               </label>
               <input
                 type="date"
@@ -1368,7 +1392,7 @@ export default function NoticesPage() {
                 }}
               >
                 <X size={14} />
-                <span>Reset</span>
+                <span>{t('notices.reset') || 'Reset'}</span>
               </button>
             )}
           </div>
@@ -1388,7 +1412,9 @@ export default function NoticesPage() {
             }}
           >
             <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
-            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Loading bulletin board...</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>
+              {t('notices.loadingNotices') || 'Loading bulletin board...'}
+            </span>
           </div>
         )}
 
@@ -1432,8 +1458,8 @@ export default function NoticesPage() {
                 }}
               >
                 {searchTerm || activeFiltersCount > 0
-                  ? 'No notice announcements match your current filters. Try resetting your search.'
-                  : 'No notices have been published to the bulletin board yet.'}
+                  ? (t('notices.noMatchingFilters') || 'No notice announcements match your current filters. Try resetting your search.')
+                  : (t('notices.noNoticesYet') || 'No notices have been published to the bulletin board yet.')}
               </p>
             </div>
             {searchTerm || activeFiltersCount > 0 ? (
@@ -1451,7 +1477,7 @@ export default function NoticesPage() {
                   padding: '0.55rem 1rem',
                 }}
               >
-                Clear all filters
+                {t('notices.clearAllFilters') || 'Clear all filters'}
               </button>
             ) : (
               <button
@@ -1467,7 +1493,7 @@ export default function NoticesPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Post First Notice</span>
+                <span>{t('notices.postFirstNotice') || 'Post First Notice'}</span>
               </button>
             )}
           </div>
@@ -1484,7 +1510,7 @@ export default function NoticesPage() {
             }}
           >
             {paginatedNotices.map((n, idx) => {
-              const aud = AUDIENCE_CONFIG[n.targetAudience] || AUDIENCE_CONFIG.All;
+              const aud = getAudienceInfo(n.targetAudience);
 
               return (
                 <div
@@ -1546,7 +1572,7 @@ export default function NoticesPage() {
                                 boxShadow: '0 0 6px #ef4444',
                               }}
                             />
-                            Important
+                            {t('notices.importantBadge') || 'Important'}
                           </span>
                         ) : (
                           <span
@@ -1561,7 +1587,7 @@ export default function NoticesPage() {
                               color: 'var(--muted-foreground)',
                             }}
                           >
-                            Standard
+                            {t('notices.standardBadge') || 'Standard'}
                           </span>
                         )}
 
@@ -1610,7 +1636,7 @@ export default function NoticesPage() {
                         lineHeight: 1.35,
                       }}
                     >
-                      {n.title || 'Untitled Notice'}
+                      {n.title || t('notices.untitledNotice') || 'Untitled Notice'}
                     </h3>
 
                     {/* Content Snippet */}
@@ -1670,10 +1696,12 @@ export default function NoticesPage() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {n.postedBy || 'Administration'}
+                          {n.postedBy || t('notices.administration') || 'Administration'}
                         </div>
                         <div style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
-                          {formatTime(n.createdAt) ? `Posted at ${formatTime(n.createdAt)}` : 'Official Broadcast'}
+                          {formatTime(n.createdAt)
+                            ? `${t('notices.postedAt') || 'Posted at'} ${formatTime(n.createdAt)}`
+                            : (t('notices.officialBroadcast') || 'Official Broadcast')}
                         </div>
                       </div>
                     </div>
@@ -1707,13 +1735,13 @@ export default function NoticesPage() {
                       }}
                     >
                       <Eye size={13} />
-                      <span>Read Notice</span>
+                      <span>{t('notices.readNotice') || 'Read Notice'}</span>
                     </button>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <button
                         onClick={() => handleOpenFormModal(n)}
-                        title="Edit notice"
+                        title={t('notices.editNoticeTooltip') || 'Edit notice'}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -1732,7 +1760,7 @@ export default function NoticesPage() {
 
                       <button
                         onClick={() => setDeleteModal({ open: true, id: n._id, title: n.title })}
-                        title="Delete notice"
+                        title={t('notices.deleteNoticeTooltip') || 'Delete notice'}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -1772,17 +1800,17 @@ export default function NoticesPage() {
                     color: 'var(--muted-foreground)',
                   }}
                 >
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Notice Details</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Target Audience</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Priority</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Posted By</th>
-                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Date Posted</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('notices.thNoticeDetails') || 'Notice Details'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('notices.thTargetAudience') || 'Target Audience'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('notices.thPriority') || 'Priority'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('notices.thPostedBy') || 'Posted By'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('notices.thDatePosted') || 'Date Posted'}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>{t('notices.thActions') || 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedNotices.map((n, idx) => {
-                  const aud = AUDIENCE_CONFIG[n.targetAudience] || AUDIENCE_CONFIG.All;
+                  const aud = getAudienceInfo(n.targetAudience);
 
                   return (
                     <tr
@@ -1825,7 +1853,7 @@ export default function NoticesPage() {
                               }}
                               title={n.title}
                             >
-                              {n.title || 'Untitled Notice'}
+                              {n.title || t('notices.untitledNotice') || 'Untitled Notice'}
                             </div>
                             <div
                               style={{
@@ -1882,7 +1910,7 @@ export default function NoticesPage() {
                             }}
                           >
                             <AlertCircle size={12} />
-                            Important
+                            {t('notices.importantBadge') || 'Important'}
                           </span>
                         ) : (
                           <span
@@ -1897,7 +1925,7 @@ export default function NoticesPage() {
                               color: 'var(--muted-foreground)',
                             }}
                           >
-                            Standard
+                            {t('notices.standardBadge') || 'Standard'}
                           </span>
                         )}
                       </td>
@@ -1923,7 +1951,7 @@ export default function NoticesPage() {
                             {getInitials(n.postedBy)}
                           </div>
                           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--foreground)' }}>
-                            {n.postedBy || 'Admin'}
+                            {n.postedBy || t('notices.administration') || 'Admin'}
                           </span>
                         </div>
                       </td>
@@ -1972,7 +2000,7 @@ export default function NoticesPage() {
                           {/* View */}
                           <button
                             onClick={() => setDetailsModal({ open: true, notice: n })}
-                            title="Read notice"
+                            title={t('notices.readNotice') || 'Read notice'}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -1992,7 +2020,7 @@ export default function NoticesPage() {
                           {/* Edit */}
                           <button
                             onClick={() => handleOpenFormModal(n)}
-                            title="Edit notice"
+                            title={t('notices.editNoticeTooltip') || 'Edit notice'}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2012,7 +2040,7 @@ export default function NoticesPage() {
                           {/* Delete */}
                           <button
                             onClick={() => setDeleteModal({ open: true, id: n._id, title: n.title })}
-                            title="Delete notice"
+                            title={t('notices.deleteNoticeTooltip') || 'Delete notice'}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2052,15 +2080,19 @@ export default function NoticesPage() {
             }}
           >
             <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              Showing{' '}
+              {t('notices.showing') || 'Showing'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min((page - 1) * limit + 1, filteredNotices.length)}
+                {Math.min((page - 1) * limit + 1, filteredNotices.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              to{' '}
+              {t('notices.to') || 'to'}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min(page * limit, filteredNotices.length)}
+                {Math.min(page * limit, filteredNotices.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              of <strong style={{ color: 'var(--foreground)' }}>{filteredNotices.length}</strong> notices
+              {t('notices.of') || 'of'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {filteredNotices.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
+              </strong>{' '}
+              {t('notices.noticesCount') || 'notices'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2083,7 +2115,7 @@ export default function NoticesPage() {
                 }}
               >
                 <ChevronLeft size={16} />
-                <span>Prev</span>
+                <span>{t('notices.prev') || 'Prev'}</span>
               </button>
 
               <div
@@ -2094,7 +2126,7 @@ export default function NoticesPage() {
                   padding: '0 0.5rem',
                 }}
               >
-                Page {page} of {totalPages}
+                {t('notices.page') || 'Page'} {page.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')} {t('notices.of') || 'of'} {totalPages.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </div>
 
               <button
@@ -2115,7 +2147,7 @@ export default function NoticesPage() {
                   opacity: page >= totalPages ? 0.6 : 1,
                 }}
               >
-                <span>Next</span>
+                <span>{t('notices.next') || 'Next'}</span>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -2167,12 +2199,14 @@ export default function NoticesPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    {formMode === 'edit' ? 'Edit Notice' : 'Post New Notice'}
+                    {formMode === 'edit'
+                      ? (t('notices.modalEditTitle') || 'Edit Notice')
+                      : (t('notices.modalCreateTitle') || 'Post New Notice')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: '0.15rem 0 0' }}>
                     {formMode === 'edit'
-                      ? 'Update notice information or priority'
-                      : 'Publish an announcement to students, teachers, or parents'}
+                      ? (t('notices.modalEditSubtitle') || 'Update notice information or priority')
+                      : (t('notices.modalCreateSubtitle') || 'Publish an announcement to students, teachers, or parents')}
                   </p>
                 </div>
               </div>
@@ -2197,12 +2231,12 @@ export default function NoticesPage() {
                 {/* Title */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Notice Title <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('notices.fieldTitle') || 'Notice Title'} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Annual Sports Day Schedule & Registration"
+                    placeholder={t('notices.placeholderTitle') || 'e.g. Annual Sports Day Schedule & Registration'}
                     value={formData.title}
                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                     style={{
@@ -2222,7 +2256,7 @@ export default function NoticesPage() {
                   {/* Target Audience */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Target Audience <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('notices.fieldTargetAudience') || 'Target Audience'} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <select
                       value={formData.targetAudience}
@@ -2238,17 +2272,17 @@ export default function NoticesPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="All">Everyone (School-wide)</option>
-                      <option value="Students">Students Only</option>
-                      <option value="Teachers">Teachers Only</option>
-                      <option value="Parents">Parents Only</option>
+                      <option value="All">{t('notices.audienceEveryone') || 'Everyone (School-wide)'}</option>
+                      <option value="Students">{t('notices.audienceStudents') || 'Students Only'}</option>
+                      <option value="Teachers">{t('notices.audienceTeachers') || 'Teachers Only'}</option>
+                      <option value="Parents">{t('notices.audienceParents') || 'Parents Only'}</option>
                     </select>
                   </div>
 
                   {/* Priority */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Priority Level
+                      {t('notices.fieldPriority') || 'Priority Level'}
                     </label>
                     <select
                       value={formData.isImportent ? 'true' : 'false'}
@@ -2265,8 +2299,8 @@ export default function NoticesPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="false">Standard Priority</option>
-                      <option value="true">⚠ Important / High Priority</option>
+                      <option value="false">{t('notices.priorityStandard') || 'Standard Priority'}</option>
+                      <option value="true">{t('notices.priorityImportant') || '⚠ Important / High Priority'}</option>
                     </select>
                   </div>
                 </div>
@@ -2274,12 +2308,12 @@ export default function NoticesPage() {
                 {/* Posted By */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Posted By <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('notices.fieldPostedBy') || 'Posted By'} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Principal's Office / Examination Board"
+                    placeholder={t('notices.placeholderPostedBy') || "e.g. Principal's Office / Examination Board"}
                     value={formData.postedBy}
                     onChange={e => setFormData({ ...formData, postedBy: e.target.value })}
                     style={{
@@ -2297,12 +2331,12 @@ export default function NoticesPage() {
                 {/* Message Content */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Announcement Message <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('notices.fieldMessage') || 'Announcement Message'} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <textarea
                     rows={5}
                     required
-                    placeholder="Write the full announcement, guidelines, dates, or detailed instructions..."
+                    placeholder={t('notices.placeholderMessage') || 'Write the full announcement, guidelines, dates, or detailed instructions...'}
                     value={formData.content}
                     onChange={e => setFormData({ ...formData, content: e.target.value })}
                     style={{
@@ -2336,7 +2370,7 @@ export default function NoticesPage() {
                     }}
                   >
                     <AlertCircle size={16} />
-                    <span>This announcement will be pinned with high-priority alert styling.</span>
+                    <span>{t('notices.importantWarning') || 'This announcement will be pinned with high-priority alert styling.'}</span>
                   </div>
                 )}
               </div>
@@ -2366,7 +2400,7 @@ export default function NoticesPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  {t('notices.cancel') || 'Cancel'}
                 </button>
                 <button
                   type="submit"
@@ -2387,12 +2421,12 @@ export default function NoticesPage() {
                   {formSubmitting ? (
                     <>
                       <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>Saving...</span>
+                      <span>{t('notices.saving') || 'Saving...'}</span>
                     </>
                   ) : (
                     <>
                       <Check size={16} />
-                      <span>{formMode === 'edit' ? 'Save Changes' : 'Publish Notice'}</span>
+                      <span>{formMode === 'edit' ? (t('notices.saveChanges') || 'Save Changes') : (t('notices.publishNotice') || 'Publish Notice')}</span>
                     </>
                   )}
                 </button>
@@ -2446,10 +2480,10 @@ export default function NoticesPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    Notice Bulletin
+                    {t('notices.bulletinTitle') || 'Notice Bulletin'}
                   </h2>
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    Full Announcement Details
+                    {t('notices.bulletinSubtitle') || 'Full Announcement Details'}
                   </span>
                 </div>
               </div>
@@ -2488,7 +2522,7 @@ export default function NoticesPage() {
                       }}
                     >
                       <AlertCircle size={12} />
-                      Important Notice
+                      {t('notices.importantNoticeBadge') || 'Important Notice'}
                     </span>
                   ) : (
                     <span
@@ -2501,23 +2535,28 @@ export default function NoticesPage() {
                         color: 'var(--muted-foreground)',
                       }}
                     >
-                      Standard Notice
+                      {t('notices.standardNoticeBadge') || 'Standard Notice'}
                     </span>
                   )}
 
-                  <span
-                    style={{
-                      fontSize: '0.725rem',
-                      fontWeight: 700,
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '9999px',
-                      background: AUDIENCE_CONFIG[detailsModal.notice.targetAudience]?.bg,
-                      color: AUDIENCE_CONFIG[detailsModal.notice.targetAudience]?.color,
-                      border: `1px solid ${AUDIENCE_CONFIG[detailsModal.notice.targetAudience]?.border}`,
-                    }}
-                  >
-                    {AUDIENCE_CONFIG[detailsModal.notice.targetAudience]?.label || 'Everyone'}
-                  </span>
+                  {(() => {
+                    const aud = getAudienceInfo(detailsModal.notice.targetAudience);
+                    return (
+                      <span
+                        style={{
+                          fontSize: '0.725rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '9999px',
+                          background: aud.bg,
+                          color: aud.color,
+                          border: `1px solid ${aud.border}`,
+                        }}
+                      >
+                        {aud.label}
+                      </span>
+                    );
+                  })()}
 
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap', marginLeft: 'auto' }}>
                     {formatDate(detailsModal.notice.createdAt)} {formatTime(detailsModal.notice.createdAt)}
@@ -2525,7 +2564,7 @@ export default function NoticesPage() {
                 </div>
 
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)', margin: 0, lineHeight: 1.35 }}>
-                  {detailsModal.notice.title}
+                  {detailsModal.notice.title || t('notices.untitledNotice') || 'Untitled Notice'}
                 </h3>
               </div>
 
@@ -2560,10 +2599,10 @@ export default function NoticesPage() {
                 </div>
                 <div>
                   <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    {detailsModal.notice.postedBy || 'School Administration'}
+                    {detailsModal.notice.postedBy || t('notices.schoolAdmin') || 'School Administration'}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                    Published Broadcast
+                    {t('notices.publishedBroadcast') || 'Published Broadcast'}
                   </div>
                 </div>
               </div>
@@ -2613,7 +2652,7 @@ export default function NoticesPage() {
                   cursor: 'pointer',
                 }}
               >
-                Close
+                {t('notices.close') || 'Close'}
               </button>
               <button
                 className="btn btn-primary"
@@ -2633,7 +2672,7 @@ export default function NoticesPage() {
                 }}
               >
                 <Edit3 size={15} />
-                <span>Edit Notice</span>
+                <span>{t('notices.editNoticeBtn') || 'Edit Notice'}</span>
               </button>
             </div>
           </div>
@@ -2672,18 +2711,18 @@ export default function NoticesPage() {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                  Delete Notice
+                  {t('notices.deleteModalTitle') || 'Delete Notice'}
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  This action cannot be undone
+                  {t('notices.cannotBeUndone') || 'This action cannot be undone'}
                 </span>
               </div>
             </div>
 
             <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '0 0 1.5rem' }}>
-              Are you sure you want to permanently delete{' '}
-              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>? This bulletin
-              will no longer appear for students, teachers, or parents.
+              {t('notices.deleteConfirmPre') || 'Are you sure you want to permanently delete'}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>?{' '}
+              {t('notices.deleteConfirmPost') || 'This bulletin will no longer appear for students, teachers, or parents.'}
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -2700,7 +2739,7 @@ export default function NoticesPage() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('notices.cancel') || 'Cancel'}
               </button>
               <button
                 onClick={handleDeleteNotice}
@@ -2724,7 +2763,7 @@ export default function NoticesPage() {
                 ) : (
                   <Trash2 size={16} />
                 )}
-                <span>{deleteLoading ? 'Deleting...' : 'Delete'}</span>
+                <span>{deleteLoading ? (t('notices.deleting') || 'Deleting...') : (t('notices.delete') || 'Delete')}</span>
               </button>
             </div>
           </div>

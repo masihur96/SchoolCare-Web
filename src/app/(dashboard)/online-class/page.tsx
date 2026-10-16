@@ -83,35 +83,40 @@ interface TeacherOption {
   email?: string;
 }
 
-const STATUS_CONFIG: Record<
+const STATUS_STYLES: Record<
   string,
-  { bg: string; color: string; border: string; dot: string; label: string }
+  { bg: string; color: string; border: string; dot: string }
 > = {
   Live: {
     bg: 'rgba(16, 185, 129, 0.1)',
     color: '#10b981',
     border: 'rgba(16, 185, 129, 0.25)',
     dot: '#10b981',
-    label: 'Live Now',
   },
   Upcoming: {
     bg: 'rgba(99, 102, 241, 0.1)',
     color: '#6366f1',
     border: 'rgba(99, 102, 241, 0.25)',
     dot: '#6366f1',
-    label: 'Upcoming',
   },
   Completed: {
     bg: 'rgba(100, 116, 139, 0.1)',
     color: '#64748b',
     border: 'rgba(100, 116, 139, 0.25)',
     dot: '#64748b',
-    label: 'Completed',
   },
 };
 
 export default function OnlineClassPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const getStatusInfo = useCallback((status: string) => {
+    const style = STATUS_STYLES[status] || STATUS_STYLES.Upcoming;
+    let label = t('onlineClass.statusUpcoming');
+    if (status === 'Live') label = t('onlineClass.statusLive');
+    else if (status === 'Completed') label = t('onlineClass.statusCompleted');
+    return { ...style, label };
+  }, [t]);
 
   // Core Data
   const [meetings, setMeetings] = useState<OnlineClass[]>([]);
@@ -352,15 +357,15 @@ export default function OnlineClassPage() {
         setMeetings(list);
       } else {
         const errJson = await res.json().catch(() => ({}));
-        setError(errJson.message || 'Failed to fetch online classes.');
+        setError(errJson.message || t('onlineClass.failedFetch'));
       }
     } catch (err) {
       console.error('Error fetching online classes:', err);
-      setError('Network error while retrieving online classes.');
+      setError(t('onlineClass.networkErrorFetch'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Mount fetch (deferred with setTimeout to prevent cascading render warning)
   useEffect(() => {
@@ -370,13 +375,19 @@ export default function OnlineClassPage() {
     return () => clearTimeout(timer);
   }, [fetchMeetings]);
 
+  // Helper to convert English digits to Bengali digits
+  const toBengaliDigits = useCallback((numStr: string) => {
+    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return numStr.replace(/\d/g, d => bnDigits[parseInt(d, 10)]);
+  }, []);
+
   // Date Formatting strictly in single line
-  const formatDate = (dateStr?: string) => {
+  const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '—';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('en-US', {
+      return d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -385,12 +396,14 @@ export default function OnlineClassPage() {
     } catch {
       return dateStr;
     }
-  };
+  }, [language]);
 
   // 12-Hour AM/PM Time Formatting
-  const format12HourTime = (timeStr?: string) => {
+  const format12HourTime = useCallback((timeStr?: string) => {
     if (!timeStr) return '—';
-    if (/am|pm/i.test(timeStr)) return timeStr;
+    if (/am|pm/i.test(timeStr)) {
+      return language === 'bn' ? toBengaliDigits(timeStr) : timeStr;
+    }
 
     const parts = timeStr.trim().split(':');
     if (parts.length >= 2) {
@@ -403,10 +416,11 @@ export default function OnlineClassPage() {
       if (hours === 0) hours = 12;
 
       const paddedHours = hours < 10 ? `0${hours}` : `${hours}`;
-      return `${paddedHours}:${minutes} ${ampm}`;
+      const res = `${paddedHours}:${minutes} ${ampm}`;
+      return language === 'bn' ? toBengaliDigits(res) : res;
     }
     return timeStr;
-  };
+  }, [language, toBengaliDigits]);
 
   // Status Classifier (Live, Upcoming, Completed)
   const resolveStatus = useCallback((m: OnlineClass) => {
@@ -615,7 +629,7 @@ export default function OnlineClassPage() {
   const handleSubmitSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.meetLink.trim() || !formData.date || !formData.startTime || !formData.endTime) {
-      setError('Please fill in Title, Meeting Link, Date, and Times.');
+      setError(t('onlineClass.validationRequired'));
       return;
     }
 
@@ -634,7 +648,7 @@ export default function OnlineClassPage() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         host: {
-          name: formData.hostName.trim() || 'Staff Host',
+          name: formData.hostName.trim() || t('onlineClass.staffHost'),
           avatar: null,
         },
         class: selectedClass ? { id: selectedClass.id, name: selectedClass.name } : null,
@@ -656,18 +670,18 @@ export default function OnlineClassPage() {
       if (res.ok) {
         setSuccessToast(
           modalMode === 'edit'
-            ? 'Online class updated successfully!'
-            : 'Online class scheduled successfully!'
+            ? t('onlineClass.updatedSuccess')
+            : t('onlineClass.scheduledSuccess')
         );
         setScheduleModalOpen(false);
         fetchMeetings();
       } else {
         const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Failed to save online class.');
+        setError(json.message || t('onlineClass.failedSave'));
       }
     } catch (err) {
       console.error('Error saving online class:', err);
-      setError('Network error occurred while saving online class.');
+      setError(t('onlineClass.networkErrorSave'));
     } finally {
       setSubmitting(false);
     }
@@ -687,16 +701,16 @@ export default function OnlineClassPage() {
       });
 
       if (res.ok) {
-        setSuccessToast('Online class session deleted.');
+        setSuccessToast(t('onlineClass.deletedSuccess'));
         setDeleteModal({ open: false, id: '', title: '' });
         setMeetings(prev => prev.filter(m => m.id !== deleteModal.id));
       } else {
         const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Failed to delete online class.');
+        setError(json.message || t('onlineClass.failedDelete'));
       }
     } catch (err) {
       console.error('Delete error:', err);
-      setError('Network error occurred while deleting online class.');
+      setError(t('onlineClass.networkErrorDelete'));
     } finally {
       setDeleteLoading(false);
     }
@@ -716,27 +730,27 @@ export default function OnlineClassPage() {
     setShowExportMenu(false);
 
     const headers = [
-      'Title',
-      'Class',
-      'Section',
-      'Subject',
-      'Host',
-      'Date',
-      'Time',
-      'Meeting Link',
-      'Status',
+      t('onlineClass.fieldTitle'),
+      t('onlineClass.class'),
+      t('onlineClass.section'),
+      t('onlineClass.subject'),
+      t('onlineClass.host'),
+      t('onlineClass.date'),
+      t('onlineClass.timeWindow'),
+      t('onlineClass.fieldMeetingLink'),
+      t('onlineClass.status'),
     ];
 
     const rows = filteredMeetings.map(m => [
-      `"${(m.title || '').replace(/"/g, '""')}"`,
-      `"${(m.class?.name || 'All').replace(/"/g, '""')}"`,
-      `"${(m.section?.name || 'All').replace(/"/g, '""')}"`,
-      `"${(m.subject?.name || '').replace(/"/g, '""')}"`,
-      `"${(m.host?.name || 'Staff Host').replace(/"/g, '""')}"`,
+      `"${(m.title || t('onlineClass.untitledMeeting')).replace(/"/g, '""')}"`,
+      `"${(m.class?.name || t('onlineClass.allClasses')).replace(/"/g, '""')}"`,
+      `"${(m.section?.name || t('onlineClass.allSections')).replace(/"/g, '""')}"`,
+      `"${(m.subject?.name || '—').replace(/"/g, '""')}"`,
+      `"${(m.host?.name || t('onlineClass.staffHost')).replace(/"/g, '""')}"`,
       `"${formatDate(m.date)}"`,
       `"${format12HourTime(m.startTime)} – ${format12HourTime(m.endTime)}"`,
       `"${(m.meetLink || '').replace(/"/g, '""')}"`,
-      `"${resolveStatus(m)}"`,
+      `"${getStatusInfo(resolveStatus(m)).label}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -757,37 +771,47 @@ export default function OnlineClassPage() {
 
     doc.setFontSize(18);
     doc.setTextColor(30, 41, 59);
-    doc.text('Smart School – Virtual Classes & Meetings', 14, 16);
+    doc.text(t('onlineClass.reportTitle'), 14, 16);
 
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    const dateGenerated = new Date().toLocaleDateString('en-US', {
+    const dateGenerated = new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
     doc.text(
-      `Generated on: ${dateGenerated} | Total Sessions: ${filteredMeetings.length}`,
+      `${t('onlineClass.generatedOn')} ${dateGenerated} | ${t('onlineClass.totalSessionsReport')} ${filteredMeetings.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}`,
       14,
       23
     );
 
     const tableRows = filteredMeetings.map((m, idx) => [
-      idx + 1,
-      m.title || 'Untitled Session',
-      m.class?.name || 'All Classes',
-      m.section?.name || 'All',
+      (idx + 1).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US'),
+      m.title || t('onlineClass.untitledMeeting'),
+      m.class?.name ? `${t('onlineClass.classPrefix')} ${m.class.name}` : t('onlineClass.allClasses'),
+      m.section?.name ? `${t('onlineClass.secPrefix')} ${m.section.name}` : t('onlineClass.allSections'),
       m.subject?.name || '—',
-      m.host?.name || 'Staff Host',
+      m.host?.name || t('onlineClass.staffHost'),
       formatDate(m.date),
       `${format12HourTime(m.startTime)} – ${format12HourTime(m.endTime)}`,
-      resolveStatus(m),
+      getStatusInfo(resolveStatus(m)).label,
     ]);
 
     autoTable(doc, {
       startY: 28,
-      head: [['#', 'Title', 'Class', 'Section', 'Subject', 'Host', 'Date', 'Time Window', 'Status']],
+      head: [[
+        '#',
+        t('onlineClass.fieldTitle'),
+        t('onlineClass.class'),
+        t('onlineClass.section'),
+        t('onlineClass.subject'),
+        t('onlineClass.host'),
+        t('onlineClass.date'),
+        t('onlineClass.timeWindow'),
+        t('onlineClass.status'),
+      ]],
       body: tableRows,
       theme: 'grid',
       headStyles: {
@@ -886,6 +910,16 @@ export default function OnlineClassPage() {
 
 
 
+      {/* Page Header */}
+      <div style={{ marginBottom: '1.75rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>
+          {t('onlineClass.title')}
+        </h1>
+        <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
+          {t('onlineClass.subtitle')}
+        </p>
+      </div>
+
       {/* 4-Stat Metric Strip */}
       <div
         style={{
@@ -918,7 +952,7 @@ export default function OnlineClassPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Total Sessions
+              {t('onlineClass.totalSessions')}
             </span>
             <div
               style={{
@@ -928,10 +962,10 @@ export default function OnlineClassPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.total}
+              {stats.total.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-              All virtual classrooms
+              {t('onlineClass.allVirtualClassrooms')}
             </span>
           </div>
           <div
@@ -975,7 +1009,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Live Now
+                {t('onlineClass.liveNow')}
               </span>
               <span
                 style={{
@@ -995,10 +1029,10 @@ export default function OnlineClassPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.live}
+              {stats.live.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-              {stats.live > 0 ? 'Active stream in progress' : 'No active sessions'}
+              {stats.live > 0 ? t('onlineClass.activeStreamInProgress') : t('onlineClass.noActiveSessions')}
             </span>
           </div>
           <div
@@ -1041,7 +1075,7 @@ export default function OnlineClassPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Upcoming
+              {t('onlineClass.upcoming')}
             </span>
             <div
               style={{
@@ -1051,7 +1085,7 @@ export default function OnlineClassPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.upcoming}
+              {stats.upcoming.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -1064,10 +1098,10 @@ export default function OnlineClassPage() {
                   color: '#6366f1',
                 }}
               >
-                {stats.upcomingPct}%
+                {stats.upcomingPct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Scheduled ahead
+                {t('onlineClass.scheduledAhead')}
               </span>
             </div>
           </div>
@@ -1111,7 +1145,7 @@ export default function OnlineClassPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              Completed
+              {t('onlineClass.completed')}
             </span>
             <div
               style={{
@@ -1121,7 +1155,7 @@ export default function OnlineClassPage() {
                 marginTop: '0.25rem',
               }}
             >
-              {stats.completed}
+              {stats.completed.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
               <span
@@ -1134,10 +1168,10 @@ export default function OnlineClassPage() {
                   color: '#64748b',
                 }}
               >
-                {stats.completedPct}%
+                {stats.completedPct.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}%
               </span>
               <span style={{ fontSize: '0.775rem', color: 'var(--muted-foreground)' }}>
-                Concluded sessions
+                {t('onlineClass.concludedSessions')}
               </span>
             </div>
           </div>
@@ -1203,7 +1237,7 @@ export default function OnlineClassPage() {
             />
             <input
               type="text"
-              placeholder="Search title, subject, class, host..."
+              placeholder={t('onlineClass.searchPlaceholder')}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
@@ -1266,7 +1300,7 @@ export default function OnlineClassPage() {
               }}
             >
               <Filter size={15} />
-              <span>Filters</span>
+              <span>{t('onlineClass.filters')}</span>
               {loadingMeta && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
               {activeFiltersCount > 0 && (
                 <span
@@ -1279,7 +1313,7 @@ export default function OnlineClassPage() {
                     fontWeight: 700,
                   }}
                 >
-                  {activeFiltersCount}
+                  {activeFiltersCount.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
                 </span>
               )}
             </button>
@@ -1297,7 +1331,7 @@ export default function OnlineClassPage() {
             >
               <button
                 onClick={() => setViewMode('cards')}
-                title="Cards View"
+                title={t('onlineClass.cards')}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1313,11 +1347,11 @@ export default function OnlineClassPage() {
                 }}
               >
                 <LayoutGrid size={14} />
-                <span className="hidden sm:inline">Cards</span>
+                <span className="hidden sm:inline">{t('onlineClass.cards')}</span>
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                title="Table View"
+                title={t('onlineClass.table')}
                 style={{
                   padding: '0.45rem 0.65rem',
                   borderRadius: '0.5rem',
@@ -1333,7 +1367,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <Layers size={14} />
-                <span className="hidden sm:inline">Table</span>
+                <span className="hidden sm:inline">{t('onlineClass.table')}</span>
               </button>
             </div>
 
@@ -1356,7 +1390,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <Download size={15} />
-                <span>Export</span>
+                <span>{t('onlineClass.export')}</span>
                 <ChevronDown size={14} />
               </button>
 
@@ -1396,7 +1430,7 @@ export default function OnlineClassPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileSpreadsheet size={16} style={{ color: '#10b981' }} />
-                    <span>Export to CSV</span>
+                    <span>{t('onlineClass.exportCsv')}</span>
                   </button>
                   <button
                     onClick={handleExportPDF}
@@ -1419,7 +1453,7 @@ export default function OnlineClassPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <FileText size={16} style={{ color: '#ef4444' }} />
-                    <span>Export to PDF</span>
+                    <span>{t('onlineClass.exportPdf')}</span>
                   </button>
                 </div>
               )}
@@ -1434,7 +1468,7 @@ export default function OnlineClassPage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Show:
+                {t('onlineClass.show')}
               </span>
               <select
                 value={limit}
@@ -1453,10 +1487,10 @@ export default function OnlineClassPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
+                <option value={10}>{Number(10).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}</option>
+                <option value={25}>{Number(25).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}</option>
+                <option value={50}>{Number(50).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}</option>
+                <option value={100}>{Number(100).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}</option>
               </select>
             </div>
             {/* Primary Action Button: Schedule Online Class */}
@@ -1480,14 +1514,14 @@ export default function OnlineClassPage() {
               }}
             >
               <Plus size={16} />
-              <span>Schedule Online Class</span>
+              <span>{t('onlineClass.scheduleOnlineClass')}</span>
             </button>
 
             {/* Refresh */}
             <button
               onClick={fetchMeetings}
               disabled={loading}
-              title="Refresh sessions"
+              title={t('onlineClass.refreshSessions')}
               style={{
                 width: '38px',
                 height: '38px',
@@ -1535,7 +1569,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Class
+                {t('onlineClass.class')}
               </label>
               <div style={{ position: 'relative' }}>
                 <School
@@ -1569,7 +1603,7 @@ export default function OnlineClassPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="">All Classes</option>
+                  <option value="">{t('onlineClass.allClasses')}</option>
                   {availableClasses.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -1590,7 +1624,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Section
+                {t('onlineClass.section')}
               </label>
               <select
                 value={selectedSectionId}
@@ -1612,7 +1646,7 @@ export default function OnlineClassPage() {
                   opacity: selectedClassId ? 1 : 0.6,
                 }}
               >
-                <option value="">All Sections</option>
+                <option value="">{t('onlineClass.allSections')}</option>
                 {activeClassSections.map(s => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -1632,7 +1666,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Subject
+                {t('onlineClass.subject')}
               </label>
               <div style={{ position: 'relative' }}>
                 <BookOpen
@@ -1665,7 +1699,7 @@ export default function OnlineClassPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="">All Subjects</option>
+                  <option value="">{t('onlineClass.allSubjects')}</option>
                   {availableSubjects.map(sub => (
                     <option key={sub.id} value={sub.id}>
                       {sub.name}
@@ -1687,7 +1721,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Status
+                {t('onlineClass.status')}
               </label>
               <select
                 value={selectedStatus}
@@ -1707,10 +1741,10 @@ export default function OnlineClassPage() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="">All Statuses</option>
-                <option value="Live">Live Now</option>
-                <option value="Upcoming">Upcoming</option>
-                <option value="Completed">Completed</option>
+                <option value="">{t('onlineClass.allStatuses')}</option>
+                <option value="Live">{t('onlineClass.statusLive')}</option>
+                <option value="Upcoming">{t('onlineClass.statusUpcoming')}</option>
+                <option value="Completed">{t('onlineClass.statusCompleted')}</option>
               </select>
             </div>
 
@@ -1725,7 +1759,7 @@ export default function OnlineClassPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Date
+                {t('onlineClass.date')}
               </label>
               <input
                 type="date"
@@ -1769,7 +1803,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <X size={14} />
-                <span>Reset</span>
+                <span>{t('onlineClass.reset')}</span>
               </button>
             )}
           </div>
@@ -1789,7 +1823,7 @@ export default function OnlineClassPage() {
             }}
           >
             <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#14b8a6' }} />
-            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Loading virtual classes...</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>{t('onlineClass.loadingVirtualClasses')}</span>
           </div>
         )}
 
@@ -1822,7 +1856,9 @@ export default function OnlineClassPage() {
             </div>
             <div>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                {t('onlineClass.noMeetings') || 'No online classes scheduled'}
+                {searchTerm || activeFiltersCount > 0
+                  ? t('onlineClass.noMatchingClasses')
+                  : t('onlineClass.noMeetings')}
               </h3>
               <p
                 style={{
@@ -1833,8 +1869,8 @@ export default function OnlineClassPage() {
                 }}
               >
                 {searchTerm || activeFiltersCount > 0
-                  ? 'No virtual meetings match your current filters. Try resetting your search filters.'
-                  : (t('onlineClass.noMeetingsDesc') || "You don't have any online classes or meetings scheduled at the moment.")}
+                  ? t('onlineClass.noMatchingDesc')
+                  : t('onlineClass.noMeetingsDesc')}
               </p>
             </div>
             {searchTerm || activeFiltersCount > 0 ? (
@@ -1852,7 +1888,7 @@ export default function OnlineClassPage() {
                   padding: '0.55rem 1rem',
                 }}
               >
-                Clear all filters
+                {t('onlineClass.clearAllFilters')}
               </button>
             ) : (
               <button
@@ -1871,7 +1907,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <Plus size={16} />
-                <span>Schedule Online Class</span>
+                <span>{t('onlineClass.scheduleOnlineClass')}</span>
               </button>
             )}
           </div>
@@ -1889,7 +1925,7 @@ export default function OnlineClassPage() {
           >
             {paginatedMeetings.map((m, idx) => {
               const statusKey = resolveStatus(m);
-              const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.Upcoming;
+              const st = getStatusInfo(statusKey);
               const isLive = statusKey === 'Live';
 
               return (
@@ -1979,7 +2015,7 @@ export default function OnlineClassPage() {
                         lineHeight: 1.35,
                       }}
                     >
-                      {m.title || 'Untitled Meeting'}
+                      {m.title || t('onlineClass.untitledMeeting')}
                     </h3>
 
                     {/* Description snippet */}
@@ -2041,12 +2077,12 @@ export default function OnlineClassPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <School size={13} style={{ color: '#14b8a6', flexShrink: 0 }} />
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
-                          {m.class ? `Class ${m.class.name}` : 'All Classes'}
+                          {m.class ? `${t('onlineClass.classPrefix')} ${m.class.name}` : t('onlineClass.allClasses')}
                         </span>
                         {m.section && (
                           <>
                             <span style={{ color: 'var(--muted-foreground)' }}>•</span>
-                            <span>Sec {m.section.name}</span>
+                            <span>{t('onlineClass.secPrefix')} {m.section.name}</span>
                           </>
                         )}
                         {m.subject && (
@@ -2060,9 +2096,9 @@ export default function OnlineClassPage() {
                       {/* Host */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                         <User size={13} style={{ color: '#10b981', flexShrink: 0 }} />
-                        <span>Host:</span>
+                        <span>{t('onlineClass.hostColon')}</span>
                         <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
-                          {m.host?.name || 'Staff Host'}
+                          {m.host?.name || t('onlineClass.staffHost')}
                         </span>
                       </div>
                     </div>
@@ -2104,7 +2140,7 @@ export default function OnlineClassPage() {
                       }}
                     >
                       <LinkIcon size={16} />
-                      <span>{t('onlineClass.joinMeeting') || 'Join Meeting'}</span>
+                      <span>{t('onlineClass.joinMeeting')}</span>
                     </a>
 
                     {/* Secondary Utility Controls */}
@@ -2132,13 +2168,13 @@ export default function OnlineClassPage() {
                         }}
                       >
                         <Eye size={13} />
-                        <span>Details</span>
+                        <span>{t('onlineClass.details')}</span>
                       </button>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <button
                           onClick={() => handleCopyLink(m.meetLink)}
-                          title="Copy meeting link"
+                          title={t('onlineClass.copyMeetingLink')}
                           style={{
                             width: '30px',
                             height: '30px',
@@ -2157,7 +2193,7 @@ export default function OnlineClassPage() {
 
                         <button
                           onClick={() => handleOpenScheduleModal(m)}
-                          title="Edit session"
+                          title={t('onlineClass.editSession')}
                           style={{
                             width: '30px',
                             height: '30px',
@@ -2176,7 +2212,7 @@ export default function OnlineClassPage() {
 
                         <button
                           onClick={() => setDeleteModal({ open: true, id: m.id, title: m.title })}
-                          title="Delete session"
+                          title={t('onlineClass.deleteSession')}
                           style={{
                             width: '30px',
                             height: '30px',
@@ -2217,20 +2253,20 @@ export default function OnlineClassPage() {
                     color: 'var(--muted-foreground)',
                   }}
                 >
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Session Details</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Class & Section</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Subject</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Host</th>
-                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Date</th>
-                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Time Window</th>
-                  <th style={{ padding: '0.9rem 1.25rem' }}>Status</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('onlineClass.sessionDetails')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('onlineClass.classAndSection')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('onlineClass.subject')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('onlineClass.host')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('onlineClass.date')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('onlineClass.timeWindow')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem' }}>{t('onlineClass.status')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>{t('onlineClass.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedMeetings.map((m, idx) => {
                   const statusKey = resolveStatus(m);
-                  const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.Upcoming;
+                  const st = getStatusInfo(statusKey);
                   const isLive = statusKey === 'Live';
 
                   return (
@@ -2274,7 +2310,7 @@ export default function OnlineClassPage() {
                               }}
                               title={m.title}
                             >
-                              {m.title || 'Untitled Meeting'}
+                              {m.title || t('onlineClass.untitledMeeting')}
                             </div>
                             {m.description && (
                               <div
@@ -2309,7 +2345,7 @@ export default function OnlineClassPage() {
                               border: '1px solid rgba(20, 184, 166, 0.2)',
                             }}
                           >
-                            {m.class?.name ? `Class ${m.class.name}` : 'All Classes'}
+                            {m.class?.name ? `${t('onlineClass.classPrefix')} ${m.class.name}` : t('onlineClass.allClasses')}
                           </span>
                           {m.section?.name && (
                             <span
@@ -2323,7 +2359,7 @@ export default function OnlineClassPage() {
                                 color: 'var(--muted-foreground)',
                               }}
                             >
-                              Sec {m.section.name}
+                              {t('onlineClass.secPrefix')} {m.section.name}
                             </span>
                           )}
                         </div>
@@ -2358,7 +2394,7 @@ export default function OnlineClassPage() {
                             <User size={13} />
                           </div>
                           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--foreground)' }}>
-                            {m.host?.name || 'Staff Host'}
+                            {m.host?.name || t('onlineClass.staffHost')}
                           </span>
                         </div>
                       </td>
@@ -2472,13 +2508,13 @@ export default function OnlineClassPage() {
                             }}
                           >
                             <ExternalLink size={13} />
-                            <span>Join</span>
+                            <span>{t('onlineClass.join')}</span>
                           </a>
 
                           {/* View Details */}
                           <button
                             onClick={() => setDetailsModal({ open: true, meeting: m })}
-                            title="View details"
+                            title={t('onlineClass.viewDetails')}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2498,7 +2534,7 @@ export default function OnlineClassPage() {
                           {/* Edit */}
                           <button
                             onClick={() => handleOpenScheduleModal(m)}
-                            title="Edit class"
+                            title={t('onlineClass.editClass')}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2518,7 +2554,7 @@ export default function OnlineClassPage() {
                           {/* Delete */}
                           <button
                             onClick={() => setDeleteModal({ open: true, id: m.id, title: m.title })}
-                            title="Delete class"
+                            title={t('onlineClass.deleteClass')}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -2558,16 +2594,19 @@ export default function OnlineClassPage() {
             }}
           >
             <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              Showing{' '}
+              {t('onlineClass.showing')}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min((page - 1) * limit + 1, filteredMeetings.length)}
+                {Math.min((page - 1) * limit + 1, filteredMeetings.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              to{' '}
+              {t('onlineClass.to')}{' '}
               <strong style={{ color: 'var(--foreground)' }}>
-                {Math.min(page * limit, filteredMeetings.length)}
+                {Math.min(page * limit, filteredMeetings.length).toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </strong>{' '}
-              of <strong style={{ color: 'var(--foreground)' }}>{filteredMeetings.length}</strong> online
-              classes
+              {t('onlineClass.of')}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>
+                {filteredMeetings.length.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
+              </strong>{' '}
+              {t('onlineClass.records')}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2590,7 +2629,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <ChevronLeft size={16} />
-                <span>Prev</span>
+                <span>{t('onlineClass.prev')}</span>
               </button>
 
               <div
@@ -2601,7 +2640,7 @@ export default function OnlineClassPage() {
                   padding: '0 0.5rem',
                 }}
               >
-                Page {page} of {totalPages}
+                {t('onlineClass.page')} {page.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')} {t('onlineClass.of')} {totalPages.toLocaleString(language === 'bn' ? 'bn-BD' : 'en-US')}
               </div>
 
               <button
@@ -2622,7 +2661,7 @@ export default function OnlineClassPage() {
                   opacity: page >= totalPages ? 0.6 : 1,
                 }}
               >
-                <span>Next</span>
+                <span>{t('onlineClass.next')}</span>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -2674,12 +2713,12 @@ export default function OnlineClassPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    {modalMode === 'edit' ? 'Edit Online Class' : 'Schedule Online Class'}
+                    {modalMode === 'edit' ? t('onlineClass.modalEditTitle') : t('onlineClass.modalScheduleTitle')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: '0.15rem 0 0' }}>
                     {modalMode === 'edit'
-                      ? 'Update meeting details and link'
-                      : 'Create a virtual classroom or webinar session'}
+                      ? t('onlineClass.modalEditSubtitle')
+                      : t('onlineClass.modalScheduleSubtitle')}
                   </p>
                 </div>
               </div>
@@ -2704,12 +2743,12 @@ export default function OnlineClassPage() {
                 {/* Title */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Session Title <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('onlineClass.fieldTitle')} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Mathematics: Differential Equations Live Workshop"
+                    placeholder={t('onlineClass.placeholderTitle')}
                     value={formData.title}
                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                     style={{
@@ -2727,7 +2766,7 @@ export default function OnlineClassPage() {
                 {/* Meeting Link */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Meeting URL / Link <span style={{ color: 'var(--destructive)' }}>*</span>
+                    {t('onlineClass.fieldMeetingLink')} <span style={{ color: 'var(--destructive)' }}>*</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <LinkIcon
@@ -2744,7 +2783,7 @@ export default function OnlineClassPage() {
                     <input
                       type="url"
                       required
-                      placeholder="https://meet.google.com/abc-defg-hij or Zoom link"
+                      placeholder={t('onlineClass.placeholderMeetingLink')}
                       value={formData.meetLink}
                       onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
                       style={{
@@ -2765,7 +2804,7 @@ export default function OnlineClassPage() {
                   {/* Date */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Date <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('onlineClass.fieldDate')} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <input
                       type="date"
@@ -2788,7 +2827,7 @@ export default function OnlineClassPage() {
                   {/* Start Time */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Start Time <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('onlineClass.fieldStartTime')} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <input
                       type="time"
@@ -2811,7 +2850,7 @@ export default function OnlineClassPage() {
                   {/* End Time */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      End Time <span style={{ color: 'var(--destructive)' }}>*</span>
+                      {t('onlineClass.fieldEndTime')} <span style={{ color: 'var(--destructive)' }}>*</span>
                     </label>
                     <input
                       type="time"
@@ -2837,7 +2876,7 @@ export default function OnlineClassPage() {
                   {/* Class */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Class (Optional)
+                      {t('onlineClass.fieldClass')}
                     </label>
                     <select
                       value={formData.classId}
@@ -2853,7 +2892,7 @@ export default function OnlineClassPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">All Classes</option>
+                      <option value="">{t('onlineClass.allClasses')}</option>
                       {availableClasses.map(c => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -2865,7 +2904,7 @@ export default function OnlineClassPage() {
                   {/* Section */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Section (Optional)
+                      {t('onlineClass.fieldSection')}
                     </label>
                     <select
                       value={formData.sectionId}
@@ -2882,7 +2921,7 @@ export default function OnlineClassPage() {
                         cursor: formData.classId ? 'pointer' : 'not-allowed',
                       }}
                     >
-                      <option value="">All Sections</option>
+                      <option value="">{t('onlineClass.allSections')}</option>
                       {scheduleClassSections.map(s => (
                         <option key={s.id} value={s.id}>
                           {s.name}
@@ -2897,7 +2936,7 @@ export default function OnlineClassPage() {
                   {/* Subject */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Subject (Optional)
+                      {t('onlineClass.fieldSubject')}
                     </label>
                     <select
                       value={formData.subjectId}
@@ -2913,7 +2952,7 @@ export default function OnlineClassPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">Select Subject</option>
+                      <option value="">{t('onlineClass.selectSubject')}</option>
                       {availableSubjects.map(sub => (
                         <option key={sub.id} value={sub.id}>
                           {sub.name}
@@ -2926,11 +2965,11 @@ export default function OnlineClassPage() {
                   {/* Host */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      Host / Teacher
+                      {t('onlineClass.fieldHost')}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Dr. Robert Davies"
+                      placeholder={t('onlineClass.placeholderHost')}
                       value={formData.hostName}
                       onChange={e => setFormData({ ...formData, hostName: e.target.value })}
                       style={{
@@ -2949,11 +2988,11 @@ export default function OnlineClassPage() {
                 {/* Description */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Description & Agenda
+                    {t('onlineClass.fieldDescription')}
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Enter meeting topics, preparation notes, or attendee instructions..."
+                    placeholder={t('onlineClass.placeholderDescription')}
                     value={formData.description}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                     style={{
@@ -2996,7 +3035,7 @@ export default function OnlineClassPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  {t('onlineClass.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -3020,12 +3059,12 @@ export default function OnlineClassPage() {
                   {submitting ? (
                     <>
                       <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>Saving...</span>
+                      <span>{t('onlineClass.saving')}</span>
                     </>
                   ) : (
                     <>
                       <Check size={16} />
-                      <span>{modalMode === 'edit' ? 'Save Changes' : 'Schedule Class'}</span>
+                      <span>{modalMode === 'edit' ? t('onlineClass.saveChanges') : t('onlineClass.scheduleClass')}</span>
                     </>
                   )}
                 </button>
@@ -3079,10 +3118,10 @@ export default function OnlineClassPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    Session Overview
+                    {t('onlineClass.detailsTitle')}
                   </h2>
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    Virtual Classroom Details
+                    {t('onlineClass.detailsSubtitle')}
                   </span>
                 </div>
               </div>
@@ -3111,19 +3150,19 @@ export default function OnlineClassPage() {
                       fontWeight: 700,
                       padding: '0.2rem 0.6rem',
                       borderRadius: '9999px',
-                      background: STATUS_CONFIG[resolveStatus(detailsModal.meeting)]?.bg,
-                      color: STATUS_CONFIG[resolveStatus(detailsModal.meeting)]?.color,
-                      border: `1px solid ${STATUS_CONFIG[resolveStatus(detailsModal.meeting)]?.border}`,
+                      background: getStatusInfo(resolveStatus(detailsModal.meeting)).bg,
+                      color: getStatusInfo(resolveStatus(detailsModal.meeting)).color,
+                      border: `1px solid ${getStatusInfo(resolveStatus(detailsModal.meeting)).border}`,
                     }}
                   >
-                    {STATUS_CONFIG[resolveStatus(detailsModal.meeting)]?.label}
+                    {getStatusInfo(resolveStatus(detailsModal.meeting)).label}
                   </span>
                   <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
                     {formatDate(detailsModal.meeting.date)}
                   </span>
                 </div>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>
-                  {detailsModal.meeting.title}
+                  {detailsModal.meeting.title || t('onlineClass.untitledMeeting')}
                 </h3>
               </div>
 
@@ -3151,7 +3190,7 @@ export default function OnlineClassPage() {
                       display: 'block',
                     }}
                   >
-                    Direct Meeting Link
+                    {t('onlineClass.directMeetingLink')}
                   </span>
                   <a
                     href={detailsModal.meeting.meetLink}
@@ -3169,13 +3208,13 @@ export default function OnlineClassPage() {
                       marginTop: '0.2rem',
                     }}
                   >
-                    {detailsModal.meeting.meetLink || 'No link configured'}
+                    {detailsModal.meeting.meetLink || t('onlineClass.noLinkConfigured')}
                   </a>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
                     onClick={() => handleCopyLink(detailsModal.meeting?.meetLink || '')}
-                    title="Copy meeting link"
+                    title={t('onlineClass.copyMeetingLink')}
                     style={{
                       padding: '0.5rem 0.75rem',
                       borderRadius: '0.5rem',
@@ -3191,7 +3230,7 @@ export default function OnlineClassPage() {
                     }}
                   >
                     {copiedLink ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-                    <span>{copiedLink ? 'Copied!' : 'Copy'}</span>
+                    <span>{copiedLink ? t('onlineClass.copied') : t('onlineClass.copy')}</span>
                   </button>
                   <a
                     href={detailsModal.meeting.meetLink || '#'}
@@ -3211,7 +3250,7 @@ export default function OnlineClassPage() {
                     }}
                   >
                     <ExternalLink size={14} />
-                    <span>Join</span>
+                    <span>{t('onlineClass.join')}</span>
                   </a>
                 </div>
               </div>
@@ -3237,7 +3276,7 @@ export default function OnlineClassPage() {
                       marginBottom: '0.35rem',
                     }}
                   >
-                    Agenda & Instructions
+                    {t('onlineClass.agendaAndInstructions')}
                   </span>
                   <p style={{ fontSize: '0.9rem', color: 'var(--foreground)', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                     {detailsModal.meeting.description}
@@ -3256,13 +3295,13 @@ export default function OnlineClassPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Class & Section
+                    {t('onlineClass.classAndSection')}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
-                    {detailsModal.meeting.class?.name ? `Class ${detailsModal.meeting.class.name}` : 'All Classes'}{' '}
+                    {detailsModal.meeting.class?.name ? `${t('onlineClass.classPrefix')} ${detailsModal.meeting.class.name}` : t('onlineClass.allClasses')}{' '}
                     {detailsModal.meeting.section?.name && (
                       <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
-                        (Sec {detailsModal.meeting.section.name})
+                        ({t('onlineClass.secPrefix')} {detailsModal.meeting.section.name})
                       </span>
                     )}
                   </div>
@@ -3277,10 +3316,10 @@ export default function OnlineClassPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Subject
+                    {t('onlineClass.subject')}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
-                    {detailsModal.meeting.subject?.name || 'General Academic'}
+                    {detailsModal.meeting.subject?.name || t('onlineClass.generalAcademic')}
                   </div>
                 </div>
 
@@ -3293,7 +3332,7 @@ export default function OnlineClassPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Time Window
+                    {t('onlineClass.timeWindow')}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
                     {format12HourTime(detailsModal.meeting.startTime)} – {format12HourTime(detailsModal.meeting.endTime)}
@@ -3309,10 +3348,10 @@ export default function OnlineClassPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.725rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', fontWeight: 700 }}>
-                    Host
+                    {t('onlineClass.host')}
                   </span>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.2rem' }}>
-                    {detailsModal.meeting.host?.name || 'Staff Host'}
+                    {detailsModal.meeting.host?.name || t('onlineClass.staffHost')}
                   </div>
                 </div>
               </div>
@@ -3340,7 +3379,7 @@ export default function OnlineClassPage() {
                   cursor: 'pointer',
                 }}
               >
-                Close
+                {t('onlineClass.close')}
               </button>
               <button
                 className="btn btn-primary"
@@ -3363,7 +3402,7 @@ export default function OnlineClassPage() {
                 }}
               >
                 <Edit3 size={15} />
-                <span>Edit Session</span>
+                <span>{t('onlineClass.editSessionBtn')}</span>
               </button>
             </div>
           </div>
@@ -3402,18 +3441,18 @@ export default function OnlineClassPage() {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                  Delete Online Class
+                  {t('onlineClass.deleteModalTitle')}
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  This action cannot be undone
+                  {t('onlineClass.cannotBeUndone')}
                 </span>
               </div>
             </div>
 
             <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '0 0 1.5rem' }}>
-              Are you sure you want to delete{' '}
-              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>? Students and
-              teachers will no longer see this meeting in their schedule.
+              {t('onlineClass.deleteConfirmPre')}{' '}
+              <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>
+              {t('onlineClass.deleteConfirmPost')}
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -3430,7 +3469,7 @@ export default function OnlineClassPage() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('onlineClass.cancel')}
               </button>
               <button
                 onClick={handleDeleteMeeting}
@@ -3454,7 +3493,7 @@ export default function OnlineClassPage() {
                 ) : (
                   <Trash2 size={16} />
                 )}
-                <span>{deleteLoading ? 'Deleting...' : 'Delete'}</span>
+                <span>{deleteLoading ? t('onlineClass.deleting') : t('onlineClass.delete')}</span>
               </button>
             </div>
           </div>
