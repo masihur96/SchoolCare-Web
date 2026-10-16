@@ -11,6 +11,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+import { useLanguage } from '@/components/language-provider';
+
 interface TeacherMapProps {
   data: any[];
 }
@@ -29,16 +31,17 @@ const BoundsWrapper = ({ data }: { data: any[] }) => {
 };
 
 const TeacherMap: React.FC<TeacherMapProps> = ({ data }) => {
+  const { language, t } = useLanguage();
   const validData = data.filter(d => d.lat && d.lon && !isNaN(parseFloat(d.lat)) && !isNaN(parseFloat(d.lon)));
 
   if (validData.length === 0) {
-    return <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '0.75rem' }}>No location data available</div>;
+    return <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: '0.75rem' }}>{t('common.noData')}</div>;
   }
 
   const center = [parseFloat(validData[0].lat), parseFloat(validData[0].lon)] as [number, number];
 
   return (
-    <div style={{ height: '320px', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+    <div style={{ height: '320px', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -56,19 +59,19 @@ const TeacherMap: React.FC<TeacherMapProps> = ({ data }) => {
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={marker.teacher.avatar} alt="Avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
                   ) : (
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#64748b' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--muted-foreground)' }}>
                       {marker.teacher?.name ? marker.teacher.name.charAt(0) : 'T'}
                     </div>
                   )}
                   <div>
-                    <p style={{ margin: 0, fontWeight: 'bold', color: '#0f172a' }}>{marker.teacher?.name || 'Unknown Teacher'}</p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>{marker.teacherId.substring(0,8)}</p>
+                    <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--foreground)' }}>{marker.teacher?.name || 'Unknown Teacher'}</p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>{marker.teacherId.substring(0,8)}</p>
                   </div>
                 </div>
-                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Status: <span style={{ textTransform: 'capitalize' }}>{marker.status}</span></p>
-                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Date: {new Date(marker.date).toLocaleDateString()}</p>
-                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Time: {new Date(marker.time).toLocaleTimeString()}</p>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#6366f1', fontWeight: 500 }}>Distance: {parseFloat(marker.distanceFromCenter).toFixed(2)}m</p>
+                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>{t('common.status')}: <span style={{ textTransform: 'capitalize' }}>{marker.status}</span></p>
+                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>{t('common.date')}: {new Date(marker.date).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US')}</p>
+                <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>{t('common.time')}: {new Date(marker.time).toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US')}</p>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#6366f1', fontWeight: 500 }}>{t('common.distance')}: {parseFloat(marker.distanceFromCenter).toFixed(2)}m</p>
               </div>
             </Popup>
           </Marker>

@@ -259,8 +259,8 @@ export function Sidebar() {
           z-index: 50;
           display: flex;
           flex-direction: column;
-          background: #ffffff;
-          border-right: 1px solid #f1f5f9;
+          background: var(--card);
+          border-right: 1px solid var(--border);
           transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           overflow-x: hidden;
         }
@@ -302,14 +302,14 @@ export function Sidebar() {
         .nd-logo-text {
           font-size: 1.15rem;
           font-weight: 800;
-          color: #1e293b;
+          color: var(--foreground);
           white-space: nowrap;
         }
         
         .nd-erp {
           font-size: 0.7rem;
-          background: #e2e8f0;
-          color: #64748b;
+          background: var(--muted);
+          color: var(--muted-foreground);
           padding: 2px 6px;
           border-radius: 4px;
           vertical-align: super;
@@ -328,7 +328,7 @@ export function Sidebar() {
         }
         
         .nd-sidebar-nav:hover {
-          scrollbar-color: #cbd5e1 transparent;
+          scrollbar-color: var(--border) transparent;
         }
 
         .nd-nav-item {
@@ -337,7 +337,7 @@ export function Sidebar() {
           gap: 0.85rem;
           padding: 0.65rem 0.75rem;
           border-radius: 10px;
-          color: #64748b;
+          color: var(--muted-foreground);
           font-weight: 500;
           text-decoration: none;
           transition: all 0.2s;
@@ -355,13 +355,13 @@ export function Sidebar() {
         }
 
         .nd-nav-item:hover {
-          color: #3b82f6;
-          background: #f8fafc;
+          color: var(--primary);
+          background: var(--muted);
         }
 
         .nd-nav-item.active {
-          background: #eef2ff;
-          color: #4f46e5;
+          background: rgba(99, 102, 241, 0.12);
+          color: var(--primary);
           font-weight: 600;
         }
 
@@ -383,30 +383,30 @@ export function Sidebar() {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          border-top: 1px solid #f1f5f9;
-          background: #ffffff;
+          border-top: 1px solid var(--border);
+          background: var(--card);
         }
 
         .nd-ai-banner {
-          background: #f8fafc;
+          background: var(--muted);
           border-radius: 12px;
           padding: 1.25rem;
           text-align: center;
           position: relative;
-          border: 1px solid #e2e8f0;
+          border: 1px solid var(--border);
           overflow: hidden;
         }
 
         .nd-ai-title {
           font-size: 0.9rem;
           font-weight: 700;
-          color: #1e293b;
+          color: var(--foreground);
           margin-bottom: 0.25rem;
         }
 
         .nd-ai-desc {
           font-size: 0.75rem;
-          color: #64748b;
+          color: var(--muted-foreground);
           margin-bottom: 1rem;
           line-height: 1.4;
         }
@@ -416,8 +416,8 @@ export function Sidebar() {
         }
 
         .nd-ai-btn {
-          background: #4f46e5;
-          color: white;
+          background: var(--primary);
+          color: var(--primary-foreground);
           border: none;
           border-radius: 8px;
           padding: 0.6rem 1rem;
@@ -425,11 +425,11 @@ export function Sidebar() {
           font-weight: 600;
           cursor: pointer;
           width: 100%;
-          transition: background 0.2s;
+          transition: opacity 0.2s;
         }
 
         .nd-ai-btn:hover {
-          background: #4338ca;
+          opacity: 0.9;
         }
 
         .nd-bottom-actions {
@@ -447,16 +447,16 @@ export function Sidebar() {
         
         .nd-logout-item:hover {
           color: #ef4444;
-          background: #fef2f2;
+          background: rgba(239, 68, 68, 0.1);
         }
 
         .nd-collapse-btn {
           width: 40px;
           height: 40px;
           border-radius: 10px;
-          background: #f1f5f9;
-          border: none;
-          color: #64748b;
+          background: var(--muted);
+          border: 1px solid var(--border);
+          color: var(--muted-foreground);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -466,8 +466,8 @@ export function Sidebar() {
         }
 
         .nd-collapse-btn:hover {
-          background: #e2e8f0;
-          color: #334155;
+          background: var(--border);
+          color: var(--foreground);
         }
 
         .nd-sidebar.collapsed .nd-collapse-btn {
@@ -486,7 +486,7 @@ export function Sidebar() {
           flex: 1;
         }
         .nd-sidebar-profile:hover {
-          background: #f8fafc;
+          background: var(--muted);
         }
         .nd-sidebar-profile.collapsed {
           justify-content: center;
@@ -496,7 +496,8 @@ export function Sidebar() {
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          background: #e2e8f0;
+          background: var(--muted);
+          border: 1px solid var(--border);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -517,14 +518,14 @@ export function Sidebar() {
         .nd-profile-name {
           font-size: 0.85rem;
           font-weight: 600;
-          color: #1e293b;
+          color: var(--foreground);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .nd-profile-role, .nd-profile-email {
           font-size: 0.75rem;
-          color: #64748b;
+          color: var(--muted-foreground);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -533,7 +534,7 @@ export function Sidebar() {
         .nd-profile-more-btn {
           background: none;
           border: none;
-          color: #94a3b8;
+          color: var(--muted-foreground);
           cursor: pointer;
           padding: 0.25rem;
           border-radius: 4px;
@@ -542,8 +543,8 @@ export function Sidebar() {
           justify-content: center;
         }
         .nd-profile-more-btn:hover {
-          background: #e2e8f0;
-          color: #475569;
+          background: var(--muted);
+          color: var(--foreground);
         }
         
         .nd-profile-popover {
@@ -551,10 +552,10 @@ export function Sidebar() {
           bottom: calc(100% + 0.5rem);
           left: 0;
           width: 240px;
-          background: white;
-          border: 1px solid #e2e8f0;
+          background: var(--card);
+          border: 1px solid var(--border);
           border-radius: 12px;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
           z-index: 100;
           overflow: hidden;
           animation: popover-up 0.2s ease-out;
@@ -573,7 +574,7 @@ export function Sidebar() {
         
         .nd-popover-divider {
           height: 1px;
-          background: #f1f5f9;
+          background: var(--border);
           width: 100%;
         }
         
@@ -590,7 +591,7 @@ export function Sidebar() {
           gap: 0.75rem;
           padding: 0.5rem 0.75rem;
           border-radius: 8px;
-          color: #475569;
+          color: var(--foreground);
           text-decoration: none;
           font-size: 0.85rem;
           font-weight: 500;
@@ -602,15 +603,15 @@ export function Sidebar() {
           text-align: left;
         }
         .nd-popover-item:hover {
-          background: #f8fafc;
-          color: #0f172a;
+          background: var(--muted);
+          color: var(--foreground);
         }
         .nd-popover-logout {
           color: #ef4444;
         }
         .nd-popover-logout:hover {
-          background: #fef2f2;
-          color: #dc2626;
+          background: rgba(239, 68, 68, 0.15);
+          color: #ef4444;
         }
 
         /* Mobile specific */

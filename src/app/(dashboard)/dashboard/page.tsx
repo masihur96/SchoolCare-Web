@@ -17,7 +17,7 @@ import { useLanguage } from '@/components/language-provider';
 
 const TeacherMap = dynamic(() => import('@/components/TeacherMap'), {
   ssr: false,
-  loading: () => <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '0.75rem' }}>Loading map...</div>
+  loading: () => <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: '0.75rem' }}>Loading map...</div>
 });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,9 +69,11 @@ function getToken() {
   return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
 }
 
-function getGreeting(name: string) {
+function getGreeting(name: string, t?: (k: string) => string) {
   const h = new Date().getHours();
-  const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const g = t 
+    ? (h < 12 ? t('dashboard.goodMorning') : h < 17 ? t('dashboard.goodAfternoon') : t('dashboard.goodEvening'))
+    : (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening');
   const emoji = h < 12 ? '☀️' : h < 17 ? '👋' : '🌙';
   return { greeting: g, emoji, name: name.split(' ')[0] };
 }
@@ -108,7 +110,10 @@ function isRoutineActiveNow(startTime?: string, endTime?: string) {
   return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
 }
 
-function getMonthName(m: number) {
+function getMonthName(m: number, lang: string = 'en') {
+  if (lang === 'bn') {
+    return ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'][m];
+  }
   return ['January','February','March','April','May','June','July','August','September','October','November','December'][m];
 }
 
@@ -137,7 +142,7 @@ function DonutChart({ pct, color, size = 100 }: { pct: number; color: string; si
   const cx = size / 2; const cy = size / 2;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth="10" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
       <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="10"
         strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
         transform={`rotate(-90 ${cx} ${cy})`} style={{ transition: 'stroke-dashoffset 1s ease' }} />
@@ -164,7 +169,7 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
   const padX = 30;
   const padY = 40;
 
-  if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>{t('common.noData')}</div>;
+  if (!data || data.length === 0) return <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted-foreground)' }}>{t('common.noData')}</div>;
 
   const maxVal = 100;
   const getX = (i: number) => padX + (i / (data.length - 1 || 1)) * (w - padX * 2);
@@ -199,8 +204,8 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
           const y = getY(pct * 100);
           return (
             <g key={pct}>
-              <text x={padX - 5} y={y + 4} fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">{pct * 100}%</text>
-              <line x1={padX + 5} y1={y} x2={Math.max(w, data.length * 40) - padX} y2={y} stroke="#f1f5f9" strokeDasharray="4 4" />
+              <text x={padX - 5} y={y + 4} fontSize="10" fill="var(--muted-foreground)" textAnchor="end" fontWeight="600">{pct * 100}%</text>
+              <line x1={padX + 5} y1={y} x2={Math.max(w, data.length * 40) - padX} y2={y} stroke="var(--border)" strokeDasharray="4 4" />
             </g>
           );
         })}
@@ -224,21 +229,21 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
               {/* Invisible interactive area */}
               <rect x={x - 20} y={0} width={40} height={h} fill="transparent" />
               
-              <circle cx={x} cy={y} r={isHovered ? 7 : 5} fill="#fff" stroke="#a855f7" strokeWidth={isHovered ? 3 : 2} style={{ transition: 'all 0.2s' }} />
+              <circle cx={x} cy={y} r={isHovered ? 7 : 5} fill="var(--card)" stroke="#a855f7" strokeWidth={isHovered ? 3 : 2} style={{ transition: 'all 0.2s' }} />
               {dayNum ? (
                 <>
-                  <text x={x} y={h - 22} fontSize="10" fill={isHovered ? "#64748b" : "#94a3b8"} textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>{dayName}</text>
-                  <text x={x} y={h - 10} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                  <text x={x} y={h - 22} fontSize="10" fill={isHovered ? "var(--muted-foreground)" : "var(--muted-foreground)"} textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>{dayName}</text>
+                  <text x={x} y={h - 10} fontSize="11" fill={isHovered ? "var(--foreground)" : "var(--muted-foreground)"} textAnchor="middle" fontWeight="bold">
                     {dayNum}
                   </text>
                 </>
               ) : (
-                <text x={x} y={h - 15} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                <text x={x} y={h - 15} fontSize="11" fill={isHovered ? "var(--foreground)" : "var(--muted-foreground)"} textAnchor="middle" fontWeight="bold">
                   {d.label}
                 </text>
               )}
               {d.subLabel && (
-                <text x={x} y={h - 0} fontSize="10" fill={d.subColor || '#94a3b8'} textAnchor="middle" fontWeight="bold">
+                <text x={x} y={h - 0} fontSize="10" fill={d.subColor || 'var(--muted-foreground)'} textAnchor="middle" fontWeight="bold">
                   {d.subLabel}
                 </text>
               )}
@@ -252,30 +257,30 @@ function AreaChart({ data, height = 320 }: { data: { label: string, value: numbe
           position: 'absolute',
           left: Math.min(getX(hoverIndex) + 15, Math.max(w, data.length * 40) - 150),
           top: Math.max(10, getY(data[hoverIndex].value) - 80),
-          background: '#fff',
-          border: '1px solid #e2e8f0',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
           borderRadius: '0.75rem',
           padding: '0.75rem',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
           pointerEvents: 'none',
           zIndex: 10,
           minWidth: '130px'
         }}>
-          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.25rem' }}>
             {data[hoverIndex].label.replace(' ', ', ')} - {data[hoverIndex].value}%
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', fontSize: '0.75rem' }}>
             <span style={{ color: '#10b981' }}>{t('common.present')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.present / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.present})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.present / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.present})</span>
             
             <span style={{ color: '#ef4444' }}>{t('common.absent')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.absent / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.absent})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.absent / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.absent})</span>
             
             <span style={{ color: '#f59e0b' }}>{t('common.leave')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.leave / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.leave})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.leave / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.leave})</span>
             
             <span style={{ color: '#8b5cf6' }}>{t('common.late')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.late / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.late})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.late / data[hoverIndex].stats.total) * 100)}% ({data[hoverIndex].stats.late})</span>
           </div>
         </div>
       )}
@@ -341,8 +346,8 @@ function BarChart({ data, height = 320 }: { data: { label: string, value: number
           const y = getY(pct * 100);
           return (
             <g key={pct}>
-              <text x={padX - 8} y={y + 4} fontSize="10" fill="#94a3b8" textAnchor="end" fontWeight="600">{pct * 100}%</text>
-              <line x1={padX} y1={y} x2={dynamicW - 15} y2={y} stroke="#f1f5f9" strokeDasharray="4 4" />
+              <text x={padX - 8} y={y + 4} fontSize="10" fill="var(--muted-foreground)" textAnchor="end" fontWeight="600">{pct * 100}%</text>
+              <line x1={padX} y1={y} x2={dynamicW - 15} y2={y} stroke="var(--border)" strokeDasharray="4 4" />
             </g>
           );
         })}
@@ -373,8 +378,8 @@ function BarChart({ data, height = 320 }: { data: { label: string, value: number
                 height={chartHeight}
                 rx={barWidth / 3.5}
                 ry={barWidth / 3.5}
-                fill="#f8fafc"
-                stroke="#e2e8f0"
+                fill="var(--muted)"
+                stroke="var(--border)"
                 strokeWidth="1"
               />
 
@@ -402,7 +407,7 @@ function BarChart({ data, height = 320 }: { data: { label: string, value: number
                   y={Math.max(16, y - 6)}
                   fontSize="9.5"
                   fontWeight="700"
-                  fill={isHovered ? "#7c3aed" : "#64748b"}
+                  fill={isHovered ? "#a855f7" : "var(--muted-foreground)"}
                   textAnchor="middle"
                 >
                   {d.value}%
@@ -412,15 +417,15 @@ function BarChart({ data, height = 320 }: { data: { label: string, value: number
               {/* Bottom Day / Month Labels */}
               {dayNum ? (
                 <>
-                  <text x={x + barWidth / 2} y={h - 22} fontSize="10" fill={isHovered ? "#64748b" : "#94a3b8"} textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>
+                  <text x={x + barWidth / 2} y={h - 22} fontSize="10" fill="var(--muted-foreground)" textAnchor="middle" fontWeight={isHovered ? "bold" : "normal"}>
                     {dayName}
                   </text>
-                  <text x={x + barWidth / 2} y={h - 10} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                  <text x={x + barWidth / 2} y={h - 10} fontSize="11" fill={isHovered ? "var(--foreground)" : "var(--muted-foreground)"} textAnchor="middle" fontWeight="bold">
                     {dayNum}
                   </text>
                 </>
               ) : (
-                <text x={x + barWidth / 2} y={h - 15} fontSize="11" fill={isHovered ? "#0f172a" : "#64748b"} textAnchor="middle" fontWeight="bold">
+                <text x={x + barWidth / 2} y={h - 15} fontSize="11" fill={isHovered ? "var(--foreground)" : "var(--muted-foreground)"} textAnchor="middle" fontWeight="bold">
                   {d.label}
                 </text>
               )}
@@ -435,36 +440,36 @@ function BarChart({ data, height = 320 }: { data: { label: string, value: number
           position: 'absolute',
           left: Math.min(getBarX(hoverIndex) + 20, dynamicW - 160),
           top: Math.max(10, getY(data[hoverIndex].value) - 80),
-          background: '#fff',
-          border: '1px solid #e2e8f0',
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
           borderRadius: '0.75rem',
           padding: '0.75rem',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
           pointerEvents: 'none',
           zIndex: 10,
           minWidth: '140px'
         }}>
-          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.25rem' }}>
             {data[hoverIndex].label.replace(' ', ', ')} - {data[hoverIndex].value}%
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', fontSize: '0.75rem' }}>
             <span style={{ color: '#10b981' }}>{t('common.present')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.present / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.present})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.present / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.present})</span>
             
             <span style={{ color: '#ef4444' }}>{t('common.absent')}:</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>{Math.round((data[hoverIndex].stats.absent / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.absent})</span>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{Math.round((data[hoverIndex].stats.absent / (data[hoverIndex].stats.total || 1)) * 100)}% ({data[hoverIndex].stats.absent})</span>
             
             {data[hoverIndex].stats.leave > 0 && (
               <>
                 <span style={{ color: '#f59e0b' }}>{t('common.leave')}:</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{data[hoverIndex].stats.leave}</span>
+                <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{data[hoverIndex].stats.leave}</span>
               </>
             )}
             
             {data[hoverIndex].stats.late > 0 && (
               <>
                 <span style={{ color: '#8b5cf6' }}>{t('common.late')}:</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{data[hoverIndex].stats.late}</span>
+                <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{data[hoverIndex].stats.late}</span>
               </>
             )}
           </div>
@@ -480,8 +485,8 @@ function MiniBarChart({ data }: { data: { label: string; avg: number; top: numbe
     <div style={{ position: 'relative', paddingBottom: '20px' }}>
       {/* Y-axis guide lines */}
       {[0, 25, 50, 75, 100].map(v => (
-        <div key={v} style={{ position: 'absolute', left: 0, right: 0, bottom: `${20 + (v / 100) * 70}px`, borderTop: '1px dashed #e2e8f0', display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: '9px', color: '#94a3b8', position: 'absolute', left: 0, transform: 'translateY(-50%)' }}>{v}</span>
+        <div key={v} style={{ position: 'absolute', left: 0, right: 0, bottom: `${20 + (v / 100) * 70}px`, borderTop: '1px dashed var(--border)', display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontSize: '9px', color: 'var(--muted-foreground)', position: 'absolute', left: 0, transform: 'translateY(-50%)' }}>{v}</span>
         </div>
       ))}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '90px', paddingLeft: '20px' }}>
@@ -489,9 +494,9 @@ function MiniBarChart({ data }: { data: { label: string; avg: number; top: numbe
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
             <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: '70px' }}>
               <div style={{ width: '10px', background: '#6366f1', borderRadius: '3px 3px 0 0', height: `${(d.avg / 100) * 70}px`, transition: 'height 0.7s ease' }} />
-              <div style={{ width: '10px', background: '#c7d2fe', borderRadius: '3px 3px 0 0', height: `${(d.top / 100) * 70}px`, transition: 'height 0.7s ease' }} />
+              <div style={{ width: '10px', background: 'rgba(99, 102, 241, 0.35)', borderRadius: '3px 3px 0 0', height: `${(d.top / 100) * 70}px`, transition: 'height 0.7s ease' }} />
             </div>
-            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>{d.label}</span>
+            <span style={{ fontSize: '10px', color: 'var(--muted-foreground)', fontWeight: 600 }}>{d.label}</span>
           </div>
         ))}
       </div>
@@ -501,6 +506,7 @@ function MiniBarChart({ data }: { data: { label: string; avg: number; top: numbe
 
 // ─── Calendar Widget ──────────────────────────────────────────────────────────
 function CalendarWidget({ today }: { today: Date }) {
+  const { language } = useLanguage();
   const [viewDate, setViewDate] = useState(today);
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -516,11 +522,11 @@ function CalendarWidget({ today }: { today: Date }) {
     <div>
       <div className="nd-cal-header">
         <button className="nd-cal-nav" onClick={prev}><ChevronLeft size={14} /></button>
-        <span className="nd-cal-title">{getMonthName(month)} {year}</span>
+        <span className="nd-cal-title">{getMonthName(month, language)} {year}</span>
         <button className="nd-cal-nav" onClick={next}><ChevronRight size={14} /></button>
       </div>
       <div className="nd-cal-grid">
-        {['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d => (
+        {(language === 'bn' ? ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'] : ['SUN','MON','TUE','WED','THU','FRI','SAT']).map(d => (
           <div key={d} className="nd-cal-dow">{d}</div>
         ))}
         {days.map((day, i) => {
@@ -538,7 +544,7 @@ function CalendarWidget({ today }: { today: Date }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -711,7 +717,7 @@ export default function DashboardPage() {
   };
 
   const d = data || dummy;
-  const { greeting, emoji, name } = getGreeting(userProfile?.name || 'Admin');
+  const { greeting, emoji, name } = getGreeting(userProfile?.name || 'Admin', t);
 
   // Static supporting data
   const upcomingActivities = [
@@ -807,7 +813,7 @@ export default function DashboardPage() {
       let reply = `Here to assist ${schoolName} with SchoolCare!`;
       const lower = text.toLowerCase();
       if (lower.includes('schedule') || lower.includes('routine')) {
-        reply = `For today at ${schoolName}, you have ${filteredTodayRoutines.length} classes scheduled. Check the {t('dashboard.todaySchedule')} section on the dashboard for details!`;
+        reply = `For today at ${schoolName}, you have ${filteredTodayRoutines.length} classes scheduled. Check the ${t('dashboard.todaySchedule')} section on the dashboard for details!`;
       } else if (lower.includes('lesson') || lower.includes('plan')) {
         reply = `Nova AI Lesson Tip for ${schoolName}: Structure your upcoming session with: 1) 5-min recap, 2) 15-min core topic teaching, 3) 15-min interactive student activity, and 4) 5-min wrap-up & homework briefing.`;
       } else if (lower.includes('attendance')) {
@@ -864,7 +870,7 @@ export default function DashboardPage() {
         absent: d.attendTeacher?.absent || 0,
       };
 
-  const getDayName = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' });
+  const getDayName = (dateStr: string) => new Date(dateStr).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short' });
   const _dailyData = ((d.attendStudent as any)?.dailyAttendance || (d.attendStudent as any)?.data || [])
     .filter((record: any) => record.hasData !== false && record.recorded !== false)
     .map((record: any) => {
@@ -884,7 +890,7 @@ export default function DashboardPage() {
     return Array.from({ length: daysInMonth }).map((_, i) => {
       const dd = new Date(today.getFullYear(), today.getMonth(), i + 1);
       return {
-        label: `${dd.toLocaleDateString('en-US', { weekday: 'short' })} ${dd.getDate()}`,
+        label: `${dd.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short' })} ${dd.getDate()}`,
         value: 0,
         subLabel: '-',
         subColor: '#94a3b8'
@@ -899,11 +905,15 @@ export default function DashboardPage() {
     return { present, absent, leave: 0, late: 0, total };
   };
 
+  const monthLabels = language === 'bn'
+    ? ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
   const dummyYearlyData = [
-    { label: 'Jan', value: 0 }, { label: 'Feb', value: 0 }, { label: 'Mar', value: 0 },
-    { label: 'Apr', value: 0 }, { label: 'May', value: 48 }, { label: 'Jun', value: 74 },
-    { label: 'Jul', value: 46 }, { label: 'Aug', value: 82 }, { label: 'Sep', value: 85 },
-    { label: 'Oct', value: 78 }, { label: 'Nov', value: 0 }, { label: 'Dec', value: 0 }
+    { label: monthLabels[0], value: 0 }, { label: monthLabels[1], value: 0 }, { label: monthLabels[2], value: 0 },
+    { label: monthLabels[3], value: 0 }, { label: monthLabels[4], value: 48 }, { label: monthLabels[5], value: 74 },
+    { label: monthLabels[6], value: 46 }, { label: monthLabels[7], value: 82 }, { label: monthLabels[8], value: 85 },
+    { label: monthLabels[9], value: 78 }, { label: monthLabels[10], value: 0 }, { label: monthLabels[11], value: 0 }
   ].map(d => ({ ...d, subLabel: d.value > 0 ? `${d.value}%` : '-', subColor: d.value >= 80 ? '#10b981' : d.value >= 60 ? '#f59e0b' : '#ef4444', stats: generateDummyYearlyStats(d.value) }));
 
   const _dailyTeacherData = ((d.attendTeacher as any)?.dailyAttendance || (d.attendTeacher as any)?.data || (d.attendTeacher as any)?.recentRecords || [])
@@ -953,8 +963,7 @@ export default function DashboardPage() {
 
   let computedYearlyTeacherData: any[] = [];
   if (teacherAttendanceData && teacherAttendanceView === 'year') {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    computedYearlyTeacherData = months.map((monthName, index) => {
+    computedYearlyTeacherData = monthLabels.map((monthName, index) => {
       const mm = (index + 1).toString().padStart(2, '0');
       const recordsInMonth = (teacherAttendanceData || []).filter(curr => curr.date && curr.date.startsWith(`${today.getFullYear()}-${mm}`));
       
@@ -1014,17 +1023,17 @@ export default function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.25rem' }}>
             
             {/* {t('dashboard.studentAttendance')} Chart Card */}
-            <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
+            <div className="nd-section-card" style={{ padding: '1.5rem', borderRadius: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ background: '#f3e8ff', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                  <div style={{ background: 'rgba(168, 85, 247, 0.15)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                     <BarChart3 size={24} color="#a855f7" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {studentAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {studentAttendanceView === 'month' ? `${getMonthName(today.getMonth(), language)} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
                     </h3>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
                       {t('dashboard.studentAttendance')}
                     </p>
                   </div>
@@ -1032,9 +1041,9 @@ export default function DashboardPage() {
                 
                 <button 
                   onClick={() => setStudentAttendanceView(studentAttendanceView === 'month' ? 'year' : 'month')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--muted-foreground)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                 >
-                  <ArrowLeftRight size={14} /> {studentAttendanceView === 'month' ? 'Monthly' : 'Daily'}
+                  <ArrowLeftRight size={14} /> {studentAttendanceView === 'month' ? t('dashboard.monthly') : t('dashboard.daily')}
                 </button>
               </div>
 
@@ -1042,23 +1051,23 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendStudent as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendStudent as any)?.monthlySummary?.daysInMonth || 31}d</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('dashboard.recorded')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('dashboard.recorded')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendStudent as any)?.monthlySummary?.totalPresent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.present')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.present')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendStudent as any)?.monthlySummary?.totalAbsent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.absent')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.absent')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendStudent as any)?.monthlySummary?.totalLeave || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.leave')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.leave')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendStudent as any)?.monthlySummary?.totalLate || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.late')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.late')}</p>
                   </div>
                 </div>
               )}
@@ -1069,17 +1078,17 @@ export default function DashboardPage() {
             </div>
 
             {/* {t('dashboard.teacherAttendance')} Chart Card */}
-            <div className="nd-section-card" style={{ padding: '1.5rem', background: '#fff', borderRadius: '1.25rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none' }}>
+            <div className="nd-section-card" style={{ padding: '1.5rem', borderRadius: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ background: '#f3e8ff', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                  <div style={{ background: 'rgba(168, 85, 247, 0.15)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                     <BarChart3 size={24} color="#a855f7" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                      {teacherAttendanceView === 'month' ? `${getMonthName(today.getMonth())} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {teacherAttendanceView === 'month' ? `${getMonthName(today.getMonth(), language)} ${today.getFullYear()}` : t('dashboard.monthlyOverview')}
                     </h3>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
                       {t('dashboard.teacherAttendance')}
                     </p>
                   </div>
@@ -1088,15 +1097,15 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
                   <button 
                     onClick={() => setShowTeacherMap(!showTeacherMap)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: showTeacherMap ? '#a855f7' : '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: showTeacherMap ? '#a855f7' : 'var(--muted-foreground)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                   >
-                    <MapPin size={14} /> {showTeacherMap ? t('dashboard.hideMap') : 'Map'}
+                    <MapPin size={14} /> {showTeacherMap ? t('dashboard.hideMap') : t('dashboard.map')}
                   </button>
                   <button 
                     onClick={() => setTeacherAttendanceView(teacherAttendanceView === 'month' ? 'year' : 'month')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--muted-foreground)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                   >
-                    <ArrowLeftRight size={14} /> {teacherAttendanceView === 'month' ? 'Monthly' : 'Daily'}
+                    <ArrowLeftRight size={14} /> {teacherAttendanceView === 'month' ? t('dashboard.monthly') : t('dashboard.daily')}
                   </button>
                 </div>
               </div>
@@ -1105,23 +1114,23 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7' }}>{(d.attendTeacher as any)?.monthlySummary?.daysRecorded || 0}/{(d.attendTeacher as any)?.monthlySummary?.daysInMonth || 31}d</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('dashboard.recorded')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('dashboard.recorded')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{(d.attendTeacher as any)?.monthlySummary?.totalPresent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.present')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.present')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ef4444' }}>{(d.attendTeacher as any)?.monthlySummary?.totalAbsent || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.absent')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.absent')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLeave || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.leave')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.leave')}</p>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#8b5cf6' }}>{(d.attendTeacher as any)?.monthlySummary?.totalLate || 0}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('common.late')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('common.late')}</p>
                   </div>
                 </div>
               )}
@@ -1147,7 +1156,7 @@ export default function DashboardPage() {
               </div>
               <div style={{ marginBottom: '1rem' }}>
                 <div className="nd-progress-labels">
-                  <span>Present: {d.attendTeacher?.present ?? 0} / {d.attendTeacher?.totalTeachers ?? 0}</span>
+                  <span>{t('common.present')}: {d.attendTeacher?.present ?? 0} / {d.attendTeacher?.totalTeachers ?? 0}</span>
                   <span>{d.attendTeacher?.attendanceRate ?? 0}%</span>
                 </div>
                 <div className="nd-progress-container">
@@ -1200,7 +1209,7 @@ export default function DashboardPage() {
                         ) : (
                           <div className="nd-avatar-circle" style={{ background: '#10b981' }}>{t.name?.charAt(0) || 'T'}</div>
                         )}
-                        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: '#10b981', border: '2px solid white' }} />
+                        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: '#10b981', border: '2px solid var(--card)' }} />
                       </div>
                       <span className="nd-avatar-name">{t.name}</span>
                     </div>
@@ -1215,9 +1224,9 @@ export default function DashboardPage() {
                     top: hoveredTeacher.y,
                     left: hoveredTeacher.x,
                     transform: hoveredTeacher.fitsAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
                     padding: '0.75rem',
                     borderRadius: '0.6rem',
                     width: '200px',
@@ -1238,8 +1247,8 @@ export default function DashboardPage() {
                       borderWidth: '6px',
                       borderStyle: 'solid',
                       borderColor: hoveredTeacher.fitsAbove
-                        ? '#ffffff transparent transparent transparent'
-                        : 'transparent transparent #ffffff transparent',
+                        ? 'var(--card) transparent transparent transparent'
+                        : 'transparent transparent var(--card) transparent',
                     }}
                   />
                   {hoveredTeacher.data.teacher?.avatar ? (
@@ -1249,23 +1258,23 @@ export default function DashboardPage() {
                       {hoveredTeacher.data.teacher?.name?.charAt(0) || 'T'}
                     </div>
                   )}
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b', textAlign: 'center' }}>{hoveredTeacher.data.teacher?.name}</span>
-                  <div style={{ width: '100%', fontSize: '0.68rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--foreground)', textAlign: 'center' }}>{hoveredTeacher.data.teacher?.name}</span>
+                  <div style={{ width: '100%', fontSize: '0.68rem', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     {hoveredTeacher.data.status && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.status')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.status')}</span>
                         <span style={{ textTransform: 'capitalize' }}>{hoveredTeacher.data.status}</span>
                       </div>
                     )}
                     {hoveredTeacher.data.teacher?.phone && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.phone')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.phone')}</span>
                         <span>{hoveredTeacher.data.teacher.phone}</span>
                       </div>
                     )}
                     {hoveredTeacher.data.teacher?.email && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.email')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.email')}</span>
                         <span>{hoveredTeacher.data.teacher.email}</span>
                       </div>
                     )}
@@ -1280,23 +1289,23 @@ export default function DashboardPage() {
                 <h3>{t('dashboard.studentAttendance')}</h3>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <select className="nd-hw-filter" value={studentClassFilter} onChange={(e) => setStudentClassFilter(e.target.value)}>
-                    <option value="All">All Classes</option>
+                    <option value="All">{t('common.allClasses')}</option>
                     {Array.from(new Set(d.attendStudent?.data?.map((s: any) => s.class?.name).filter(Boolean))).map((cls: any, i: number) => (
                       <option key={i} value={cls}>{cls}</option>
                     ))}
                   </select>
                   <select className="nd-hw-filter" value={studentStatusFilter} onChange={(e) => setStudentStatusFilter(e.target.value)}>
-                    <option value="All">All Status</option>
-                    <option value="present">Attend</option>
-                    <option value="absent">Absent</option>
-                    <option value="late">Late</option>
-                    <option value="leave">Leave</option>
+                    <option value="All">{t('dashboard.allStatus')}</option>
+                    <option value="present">{t('common.present')}</option>
+                    <option value="absent">{t('common.absent')}</option>
+                    <option value="late">{t('common.late')}</option>
+                    <option value="leave">{t('common.leave')}</option>
                   </select>
                 </div>
               </div>
               <div style={{ marginBottom: '1rem' }}>
                 <div className="nd-progress-labels">
-                  <span>Present: {d.attendStudent?.present ?? 0} / {d.attendStudent?.totalStudents ?? 0}</span>
+                  <span>{t('common.present')}: {d.attendStudent?.present ?? 0} / {d.attendStudent?.totalStudents ?? 0}</span>
                   <span>{d.attendStudent?.attendanceRate ?? 0}%</span>
                 </div>
                 <div className="nd-progress-container">
@@ -1356,7 +1365,7 @@ export default function DashboardPage() {
                           ) : (
                             <div className="nd-avatar-circle" style={{ background: '#6366f1' }}>{st.name?.charAt(0) || 'S'}</div>
                           )}
-                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: statusColor, border: '2px solid white' }} />
+                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: statusColor, border: '2px solid var(--card)' }} />
                         </div>
                         <span className="nd-avatar-name">{st.name}</span>
                       </div>
@@ -1371,9 +1380,9 @@ export default function DashboardPage() {
                     top: hoveredStudent.y,
                     left: hoveredStudent.x,
                     transform: hoveredStudent.fitsAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
                     padding: '0.75rem',
                     borderRadius: '0.6rem',
                     width: '200px',
@@ -1394,8 +1403,8 @@ export default function DashboardPage() {
                       borderWidth: '6px',
                       borderStyle: 'solid',
                       borderColor: hoveredStudent.fitsAbove
-                        ? '#ffffff transparent transparent transparent'
-                        : 'transparent transparent #ffffff transparent',
+                        ? 'var(--card) transparent transparent transparent'
+                        : 'transparent transparent var(--card) transparent',
                     }}
                   />
                   {hoveredStudent.data.student?.avatar ? (
@@ -1405,41 +1414,41 @@ export default function DashboardPage() {
                       {hoveredStudent.data.student?.name?.charAt(0) || 'S'}
                     </div>
                   )}
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b', textAlign: 'center' }}>{hoveredStudent.data.student?.name}</span>
-                  <div style={{ width: '100%', fontSize: '0.68rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--foreground)', textAlign: 'center' }}>{hoveredStudent.data.student?.name}</span>
+                  <div style={{ width: '100%', fontSize: '0.68rem', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     {hoveredStudent.data.class?.name && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Class</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.class')}</span>
                         <span>{hoveredStudent.data.class.name}</span>
                       </div>
                     )}
                     {hoveredStudent.data.section?.name && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Section</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.section')}</span>
                         <span>{hoveredStudent.data.section.name}</span>
                       </div>
                     )}
                     {hoveredStudent.data.subject?.name && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Subject</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.subject')}</span>
                         <span>{hoveredStudent.data.subject.name}</span>
                       </div>
                     )}
                     {hoveredStudent.data.status && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.status')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.status')}</span>
                         <span style={{ textTransform: 'capitalize' }}>{hoveredStudent.data.status}</span>
                       </div>
                     )}
                     {hoveredStudent.data.student?.phone && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.phone')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.phone')}</span>
                         <span>{hoveredStudent.data.student.phone}</span>
                       </div>
                     )}
                     {hoveredStudent.data.student?.email && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>{t('common.email')}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t('common.email')}</span>
                         <span>{hoveredStudent.data.student.email}</span>
                       </div>
                     )}
@@ -1457,7 +1466,7 @@ export default function DashboardPage() {
                   value={hwFilterClass} 
                   onChange={(e) => setHwFilterClass(e.target.value)}
                 >
-                  <option value="All">All Classes</option>
+                  <option value="All">{t('common.allClasses')}</option>
                   {Array.from(new Set(d.recentHomework?.map(h => h.classInfo?.name).filter(Boolean))).map((cls, i) => (
                     <option key={i} value={cls}>{cls}</option>
                   ))}
@@ -1465,7 +1474,7 @@ export default function DashboardPage() {
               </div>
               <div style={{ marginBottom: '1rem' }}>
                 <div className="nd-progress-labels">
-                  <span>Submitted: {hwStats.submitted} / {hwStats.total}</span>
+                  <span>{t('dashboard.submitted')}: {hwStats.submitted} / {hwStats.total}</span>
                   <span>{hwPct}%</span>
                 </div>
                 <div className="nd-progress-container">
@@ -1484,7 +1493,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 {(!d.recentHomework || d.recentHomework.length === 0) && (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1rem 0' }}>{t('dashboard.noHomeworkToday')}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '1rem 0' }}>{t('dashboard.noHomeworkToday')}</p>
                 )}
               </div>
             </div>
@@ -1496,12 +1505,12 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={18} color="#6366f1" />
                 <h3 style={{ fontSize: '1.05rem', margin: 0 }}>{t('dashboard.todaySchedule')}</h3>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '999px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '999px' }}>
                   {filteredTodayRoutines.length}
                 </span>
               </div>
               <Link href="/routine" className="nd-text-btn" style={{ fontSize: '0.78rem' }}>
-                <Calendar size={14} /> View Timetable
+                <Calendar size={14} /> {t('dashboard.viewTimetable')}
               </Link>
             </div>
 
@@ -1516,7 +1525,7 @@ export default function DashboardPage() {
                   setSchedSectionFilter('All');
                 }}
               >
-                <option value="All">All Classes</option>
+                <option value="All">{t('common.allClasses')}</option>
                 {availableClasses.map((c, i) => (
                   <option key={i} value={c}>{c}</option>
                 ))}
@@ -1528,7 +1537,7 @@ export default function DashboardPage() {
                 value={schedSectionFilter}
                 onChange={(e) => setSchedSectionFilter(e.target.value)}
               >
-                <option value="All">All Sections</option>
+                <option value="All">{t('common.allSections')}</option>
                 {availableSections.map((s, i) => (
                   <option key={i} value={s}>{s}</option>
                 ))}
@@ -1540,7 +1549,7 @@ export default function DashboardPage() {
                 value={schedTeacherFilter}
                 onChange={(e) => setSchedTeacherFilter(e.target.value)}
               >
-                <option value="All">All Teachers</option>
+                <option value="All">{t('common.allTeachers')}</option>
                 {availableTeachers.map((t, i) => (
                   <option key={i} value={t}>{t}</option>
                 ))}
@@ -1552,7 +1561,7 @@ export default function DashboardPage() {
                 value={schedSubjectFilter}
                 onChange={(e) => setSchedSubjectFilter(e.target.value)}
               >
-                <option value="All">All Subjects</option>
+                <option value="All">{t('common.allSubjects')}</option>
                 {availableSubjects.map((sub, i) => (
                   <option key={i} value={sub}>{sub}</option>
                 ))}
@@ -1577,7 +1586,7 @@ export default function DashboardPage() {
                     fontWeight: 600
                   }}
                 >
-                  Reset filters ({filteredTodayRoutines.length} of {todayRoutines.length})
+                  {t('dashboard.resetFilters')} ({filteredTodayRoutines.length} / {todayRoutines.length})
                 </button>
               )}
             </div>
@@ -1591,10 +1600,10 @@ export default function DashboardPage() {
                     <div
                       key={r.id || i}
                       style={{
-                        border: isActive ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                        border: isActive ? '1.5px solid #6366f1' : '1px solid var(--border)',
                         borderRadius: '0.65rem',
                         padding: '0.75rem 0.85rem',
-                        background: isActive ? '#f5f3ff' : '#ffffff',
+                        background: isActive ? 'rgba(99, 102, 241, 0.12)' : 'var(--card)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.4rem',
@@ -1604,33 +1613,33 @@ export default function DashboardPage() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--foreground)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.subjectEntity?.name || 'Class'}
                           </h4>
-                          <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <p style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.classEntity?.name || 'Class'}{r.sectionEntity?.name ? ` (${r.sectionEntity.name})` : ''}
                           </p>
                         </div>
                         {isActive ? (
                           <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#6366f1', color: '#ffffff', padding: '2px 6px', borderRadius: '999px', flexShrink: 0 }}>
-                            Now
+                            {t('dashboard.now')}
                           </span>
                         ) : r.roomNumber ? (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 600, background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
                             {r.roomNumber}
                           </span>
                         ) : null}
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: 'var(--muted-foreground)', paddingTop: '4px', borderTop: '1px dashed var(--border)', marginTop: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Clock size={12} color={isActive ? '#6366f1' : '#94a3b8'} />
-                          <span style={{ fontWeight: isActive ? 600 : 500, color: isActive ? '#6366f1' : '#475569' }}>
+                          <span style={{ fontWeight: isActive ? 600 : 500, color: isActive ? '#6366f1' : 'var(--muted-foreground)' }}>
                             {formatRoutineTime(r.startTime)} – {formatRoutineTime(r.endTime)}
                           </span>
                         </div>
                         {r.teacherEntity?.name && (
-                          <span style={{ color: '#334155', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'var(--foreground)', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.teacherEntity.name}
                           </span>
                         )}
@@ -1639,8 +1648,8 @@ export default function DashboardPage() {
                   );
                 })
               ) : (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b', fontSize: '0.8rem' }}>
-                  {todayRoutines.length === 0 ? `No classes scheduled for today (${todayDayName}).` : 'No classes match the selected filters.'}
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: 'var(--muted-foreground)', fontSize: '0.8rem' }}>
+                  {todayRoutines.length === 0 ? t('dashboard.noClassesToday') : t('dashboard.noMatchingFilters')}
                 </div>
               )}
             </div>
@@ -1653,7 +1662,7 @@ export default function DashboardPage() {
             <div className="nd-section-card">
               <div className="nd-section-head">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Video size={16} color="#0f766e" /> Upcoming Meetings
+                  <Video size={16} color="#0f766e" /> {t('dashboard.onlineMeetings')}
                 </h3>
                 <Link href="/online-class" className="nd-text-btn">{t('dashboard.viewAll')}</Link>
               </div>
@@ -1662,14 +1671,14 @@ export default function DashboardPage() {
                   ((d.upcomingMeeting && d.upcomingMeeting.length > 0) ? d.upcomingMeeting : meetings).map((m: any, i: number) => {
                     const dStr = m.date ? new Date(m.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
                     return (
-                      <div key={m.id || i} style={{ border: '1px solid #e2e8f0', borderRadius: '0.65rem', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      <div key={m.id || i} style={{ border: '1px solid var(--border)', borderRadius: '0.65rem', padding: '0.85rem', background: 'var(--card)', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {m.title || 'Online Session'}
                             </h4>
                             {m.class && (
-                              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                              <p style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginTop: '2px' }}>
                                 Class {m.class.name} {m.section ? `(${m.section.name})` : ''} {m.subject ? `· ${m.subject.name}` : ''}
                               </p>
                             )}
@@ -1683,9 +1692,9 @@ export default function DashboardPage() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                background: '#f0fdfa',
-                                color: '#0f766e',
-                                border: '1px solid #ccfbf1',
+                                background: 'rgba(15, 118, 110, 0.12)',
+                                color: '#0d9488',
+                                border: '1px solid rgba(15, 118, 110, 0.25)',
                                 borderRadius: '6px',
                                 padding: '0.3rem 0.65rem',
                                 fontSize: '0.72rem',
@@ -1695,12 +1704,12 @@ export default function DashboardPage() {
                               }}
                             >
                               <LinkIcon size={12} />
-                              Join
+                              {t('dashboard.joinMeeting')}
                             </a>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.7rem', color: '#64748b', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.7rem', color: 'var(--muted-foreground)', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Calendar size={13} color="#94a3b8" />
                             <span>{dStr}</span>
@@ -1714,22 +1723,22 @@ export default function DashboardPage() {
                         </div>
 
                         {m.host && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '4px', borderTop: '1px dashed #e2e8f0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '4px', borderTop: '1px dashed var(--border)' }}>
                             {m.host.avatar ? (
                               <img src={m.host.avatar} alt="Host" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} />
                             ) : (
-                              <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#ccfbf1', color: '#0f766e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700 }}>
+                              <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(15, 118, 110, 0.15)', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700 }}>
                                 {m.host.name?.charAt(0) || 'H'}
                               </div>
                             )}
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Host: <strong style={{ color: '#334155' }}>{m.host.name}</strong></span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>{t('dashboard.host')}: <strong style={{ color: 'var(--foreground)' }}>{m.host.name}</strong></span>
                           </div>
                         )}
                       </div>
                     );
                   })
                 ) : (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noMeetings')}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noMeetings')}</p>
                 )}
               </div>
             </div>
@@ -1748,23 +1757,23 @@ export default function DashboardPage() {
                     const start = exam.start_date ? new Date(exam.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
                     const end = exam.end_date ? new Date(exam.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                     return (
-                      <div key={exam.id || i} style={{ border: '1px solid #e2e8f0', borderRadius: '0.65rem', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      <div key={exam.id || i} style={{ border: '1px solid var(--border)', borderRadius: '0.65rem', padding: '0.85rem', background: 'var(--card)', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                           <div>
-                            <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                            <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
                               {exam.exam_name}
                             </h4>
-                            <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginTop: '2px' }}>
                               {start} – {end}
                             </p>
                           </div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '999px', background: '#e0e7ff', color: '#4338ca', flexShrink: 0 }}>
-                            {exam.assignments?.length ? `${exam.assignments.length} Papers` : 'Upcoming'}
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '999px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', flexShrink: 0 }}>
+                            {exam.assignments?.length ? `${exam.assignments.length} ${t('dashboard.papers')}` : t('dashboard.upcoming')}
                           </span>
                         </div>
 
                         {exam.description && (
-                          <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                          <p style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.4 }}>
                             {exam.description}
                           </p>
                         )}
@@ -1772,13 +1781,13 @@ export default function DashboardPage() {
                         {exam.assignments && exam.assignments.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '2px' }}>
                             {exam.assignments.slice(0, 4).map((a, ai) => (
-                              <span key={ai} style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 6px', color: '#64748b' }}>
+                              <span key={ai} style={{ fontSize: '0.65rem', background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px', color: 'var(--foreground)' }}>
                                 {a.class?.name ? `${a.class.name}: ` : ''}{a.subject?.name}
                               </span>
                             ))}
                             {exam.assignments.length > 4 && (
                               <span style={{ fontSize: '0.65rem', color: '#6366f1', alignSelf: 'center', fontWeight: 600 }}>
-                                +{exam.assignments.length - 4} more
+                                +{exam.assignments.length - 4} {t('common.more')}
                               </span>
                             )}
                           </div>
@@ -1787,7 +1796,7 @@ export default function DashboardPage() {
                     );
                   })
                 ) : (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noUpcomingExams')}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '2rem 0' }}>{t('dashboard.noUpcomingExams')}</p>
                 )}
               </div>
             </div>
@@ -1800,7 +1809,7 @@ export default function DashboardPage() {
 
           {/* Calendar */}
           <div className="nd-section-card">
-            <p className="nd-rp-section-title">Calendar</p>
+            <p className="nd-rp-section-title">{t('dashboard.calendar')}</p>
             <CalendarWidget today={today} />
           </div>
 
@@ -1809,10 +1818,10 @@ export default function DashboardPage() {
           <div className="nd-section-card">
             <div className="nd-section-head" style={{ marginBottom: '0.5rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
-                <GraduationCap size={15} color="#6366f1" /> Student Performance
+                <GraduationCap size={15} color="#6366f1" /> {t('dashboard.studentPerformance')}
               </h3>
               <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
-                {getMonthName(today.getMonth())} {today.getFullYear()}
+                {getMonthName(today.getMonth(), language)} {today.getFullYear()}
               </span>
             </div>
             {perfLoading ? (
@@ -1820,7 +1829,7 @@ export default function DashboardPage() {
                 <Loader2 size={20} style={{ animation: 'nd-spin 1s linear infinite', color: '#6366f1' }} />
               </div>
             ) : studentPerf.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>No student data</p>
+              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>{t('dashboard.noStudentData')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
                 {[...studentPerf]
@@ -1842,8 +1851,8 @@ export default function DashboardPage() {
                         onMouseEnter={() => setHoveredPerfStudent(i)}
                         onMouseLeave={() => setHoveredPerfStudent(null)}
                         style={{
-                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? '#eef2ff' : '#f8fafc',
-                          border: `1px solid ${isHovered ? '#c7d2fe' : '#e2e8f0'}`, cursor: 'pointer',
+                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? 'var(--muted)' : 'var(--card)',
+                          border: `1px solid ${isHovered ? 'var(--primary)' : 'var(--border)'}`, cursor: 'pointer',
                           transition: 'all 0.2s', position: 'relative',
                         }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
@@ -1854,10 +1863,10 @@ export default function DashboardPage() {
                             fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
                           }}>{initials}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {s.name || 'Student'}
                             </div>
-                            <div style={{ fontSize: '0.64rem', color: '#94a3b8' }}>
+                            <div style={{ fontSize: '0.64rem', color: 'var(--muted-foreground)' }}>
                               {s.class?.name || ''}{s.section?.name ? ` · ${s.section.name}` : ''}{s.rollNumber ? ` · Roll ${s.rollNumber}` : ''}
                             </div>
                           </div>
@@ -1869,13 +1878,13 @@ export default function DashboardPage() {
                         </div>
                         {/* Mini bars */}
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          {[['Att', att], ['Exam', exam], ['HW', hw]].map(([label, val]) => (
+                          {[[t('common.attShort'), att], [t('common.examShort'), exam], [t('common.hwShort'), hw]].map(([label, val]) => (
                             <div key={label as string} style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{label}</span>
+                                <span style={{ fontSize: '0.6rem', color: 'var(--muted-foreground)' }}>{label}</span>
                                 <span style={{ fontSize: '0.6rem', fontWeight: 700, color: clr(val as number) }}>{Math.round(val as number)}%</span>
                               </div>
-                              <div style={{ height: '3.5px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                              <div style={{ height: '3.5px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${Math.min(val as number, 100)}%`, background: clr(val as number), borderRadius: '2px', transition: 'width 0.5s' }} />
                               </div>
                             </div>
@@ -1885,22 +1894,22 @@ export default function DashboardPage() {
                         {isHovered && (
                           <div style={{
                             position: 'absolute', left: 0, right: 0, top: '100%', marginTop: '4px', zIndex: 50,
-                            background: '#fff', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
-                            border: '1px solid #e2e8f0',
+                            background: 'var(--card)', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                            border: '1px solid var(--border)',
                           }}>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.4rem' }}>
-                              {s.name} — Details
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '0.4rem' }}>
+                              {s.name} — {t('dashboard.details')}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
-                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Attendance</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>{t('dashboard.attendance')}</div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(att), textAlign: 'right' }}>
                                 {s.attendance?.presentDays ?? '–'}/{s.attendance?.totalWorkingDays ?? '–'} days ({Math.round(att)}%)
                               </div>
-                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Exams</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>{t('dashboard.exams')}</div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(exam), textAlign: 'right' }}>
                                 {s.exams?.totalMarksObtained ?? '–'}/{s.exams?.totalMaximumMarks ?? '–'} ({Math.round(exam)}%)
                               </div>
-                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Homework</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>{t('dashboard.homework')}</div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(hw), textAlign: 'right' }}>
                                 {s.homework?.totalDone ?? '–'}/{s.homework?.totalAssigned ?? '–'} done ({Math.round(hw)}%)
                               </div>
@@ -1918,10 +1927,10 @@ export default function DashboardPage() {
           <div className="nd-section-card">
             <div className="nd-section-head" style={{ marginBottom: '0.5rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
-                <Award size={15} color="#10b981" /> Teacher Performance
+                <Award size={15} color="#10b981" /> {t('dashboard.teacherPerformance')}
               </h3>
               <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
-                {getMonthName(today.getMonth())} {today.getFullYear()}
+                {getMonthName(today.getMonth(), language)} {today.getFullYear()}
               </span>
             </div>
             {perfLoading ? (
@@ -1929,7 +1938,7 @@ export default function DashboardPage() {
                 <Loader2 size={20} style={{ animation: 'nd-spin 1s linear infinite', color: '#10b981' }} />
               </div>
             ) : teacherPerf.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>No teacher data</p>
+              <p style={{ textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.8rem', padding: '1rem' }}>{t('dashboard.noTeacherData')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto' }}>
                 {[...teacherPerf]
@@ -1938,20 +1947,20 @@ export default function DashboardPage() {
                     const avgB = ((b.attendance?.percentage ?? 0) + (b.homework?.percentage ?? 0)) / 2;
                     return avgB - avgA;
                   })
-                  .map((t: any, i: number) => {
-                    const att = t.attendance?.percentage ?? 0;
-                    const hw = t.homework?.percentage ?? 0;
+                  .map((tItem: any, i: number) => {
+                    const att = tItem.attendance?.percentage ?? 0;
+                    const hw = tItem.homework?.percentage ?? 0;
                     const avg = Math.round((att + hw) / 2);
                     const clr = (v: number) => v >= 80 ? '#10b981' : v >= 60 ? '#f59e0b' : '#ef4444';
-                    const initials = (t.name || 'T').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                    const initials = (tItem.name || 'T').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
                     const isHovered = hoveredPerfTeacher === i;
                     return (
                       <div key={i}
                         onMouseEnter={() => setHoveredPerfTeacher(i)}
                         onMouseLeave={() => setHoveredPerfTeacher(null)}
                         style={{
-                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? '#ecfdf5' : '#f8fafc',
-                          border: `1px solid ${isHovered ? '#a7f3d0' : '#e2e8f0'}`, cursor: 'pointer',
+                          padding: '0.5rem 0.55rem', borderRadius: '10px', background: isHovered ? 'var(--muted)' : 'var(--card)',
+                          border: `1px solid ${isHovered ? 'var(--primary)' : 'var(--border)'}`, cursor: 'pointer',
                           transition: 'all 0.2s', position: 'relative',
                         }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
@@ -1962,12 +1971,12 @@ export default function DashboardPage() {
                             fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
                           }}>{initials}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {t.name || 'Teacher'}
+                            <div style={{ fontWeight: 600, fontSize: '0.76rem', color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {tItem.name || 'Teacher'}
                             </div>
-                            {t.designation && (
-                              <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
-                                {t.designation}
+                            {tItem.designation && (
+                              <div style={{ fontSize: '0.62rem', color: 'var(--muted-foreground)' }}>
+                                {tItem.designation}
                               </div>
                             )}
                           </div>
@@ -1979,13 +1988,13 @@ export default function DashboardPage() {
                         </div>
                         {/* Mini bars */}
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          {[['Attendance', att], ['Homework', hw]].map(([label, val]) => (
+                          {[[t('dashboard.attendance'), att], [t('dashboard.homework'), hw]].map(([label, val]) => (
                             <div key={label as string} style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{label}</span>
+                                <span style={{ fontSize: '0.6rem', color: 'var(--muted-foreground)' }}>{label}</span>
                                 <span style={{ fontSize: '0.6rem', fontWeight: 700, color: clr(val as number) }}>{Math.round(val as number)}%</span>
                               </div>
-                              <div style={{ height: '3.5px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                              <div style={{ height: '3.5px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${Math.min(val as number, 100)}%`, background: clr(val as number), borderRadius: '2px', transition: 'width 0.5s' }} />
                               </div>
                             </div>
@@ -1995,20 +2004,20 @@ export default function DashboardPage() {
                         {isHovered && (
                           <div style={{
                             position: 'absolute', left: 0, right: 0, top: '100%', marginTop: '4px', zIndex: 50,
-                            background: '#fff', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
-                            border: '1px solid #e2e8f0',
+                            background: 'var(--card)', borderRadius: '10px', padding: '0.65rem', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                            border: '1px solid var(--border)',
                           }}>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.4rem' }}>
-                              {t.name} — Details
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '0.4rem' }}>
+                              {tItem.name} — {t('dashboard.details')}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
-                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Attendance</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>{t('dashboard.attendance')}</div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(att), textAlign: 'right' }}>
-                                {t.attendance?.presentDays ?? '–'}/{t.attendance?.totalWorkingDays ?? '–'} days ({Math.round(att)}%)
+                                {tItem.attendance?.presentDays ?? '–'}/{tItem.attendance?.totalWorkingDays ?? '–'} days ({Math.round(att)}%)
                               </div>
-                              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Homework Given</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>{t('dashboard.homeworkGiven')}</div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 600, color: clr(hw), textAlign: 'right' }}>
-                                {t.homework?.totalProvided ?? '–'}/{t.homework?.target ?? '–'} target ({Math.round(hw)}%)
+                                {tItem.homework?.totalProvided ?? '–'}/{tItem.homework?.target ?? '–'} target ({Math.round(hw)}%)
                               </div>
                             </div>
                           </div>
@@ -2038,29 +2047,29 @@ export default function DashboardPage() {
                     <div
                       key={n.id || i}
                       style={{
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid var(--border)',
                         borderRadius: '0.65rem',
                         padding: '0.75rem',
-                        background: '#f8fafc',
+                        background: 'var(--card)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.35rem'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.4rem' }}>
-                        <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', margin: 0, lineHeight: 1.3 }}>
+                        <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', margin: 0, lineHeight: 1.3 }}>
                           {n.title}
                         </h4>
                         {(n.isImportent || (n as any).isImportant) && (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
-                            Important
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                            {t('dashboard.important')}
                           </span>
                         )}
                       </div>
                       {n.content && (
                         <p style={{
                           fontSize: '0.72rem',
-                          color: '#475569',
+                          color: 'var(--muted-foreground)',
                           margin: 0,
                           lineHeight: 1.45,
                           whiteSpace: 'pre-line',
@@ -2072,15 +2081,15 @@ export default function DashboardPage() {
                           {n.content}
                         </p>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', color: '#94a3b8', paddingTop: '4px', borderTop: '1px dashed #e2e8f0', marginTop: '2px' }}>
-                        <span>By {n.postedBy || 'Admin'}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', color: 'var(--muted-foreground)', paddingTop: '4px', borderTop: '1px dashed var(--border)', marginTop: '2px' }}>
+                        <span>{t('dashboard.by')} {n.postedBy || 'Admin'}</span>
                         {dStr && <span>{dStr}</span>}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '1.5rem 0' }}>{t('dashboard.noRecentNotices')}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '1.5rem 0' }}>{t('dashboard.noRecentNotices')}</p>
               )}
             </div>
             <Link
@@ -2088,7 +2097,7 @@ export default function DashboardPage() {
               className="nd-outline-btn"
               style={{ marginTop: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}
             >
-              {t('dashboard.viewAll')} Notices
+              {t('dashboard.viewAll')}
             </Link>
           </div>
         </div>
@@ -2104,9 +2113,9 @@ export default function DashboardPage() {
                 maxWidth: 'calc(100vw - 32px)',
                 height: '520px',
                 maxHeight: 'calc(100vh - 110px)',
-                background: '#ffffff',
+                background: 'var(--card)',
                 borderRadius: '16px',
-                boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.08)',
+                boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
@@ -2162,7 +2171,7 @@ export default function DashboardPage() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.75rem',
-                background: '#f8fafc',
+                background: 'var(--background)',
               }}>
                 {novaMessages.map((msg, i) => (
                   <div
@@ -2178,18 +2187,18 @@ export default function DashboardPage() {
                         maxWidth: '82%',
                         padding: '0.65rem 0.85rem',
                         borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                        background: msg.role === 'user' ? '#4f46e5' : '#ffffff',
-                        color: msg.role === 'user' ? '#ffffff' : '#1e293b',
+                        background: msg.role === 'user' ? '#4f46e5' : 'var(--card)',
+                        color: msg.role === 'user' ? '#ffffff' : 'var(--foreground)',
                         fontSize: '0.78rem',
                         lineHeight: 1.45,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                        border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
+                        border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
                         whiteSpace: 'pre-wrap',
                       }}
                     >
                       {msg.text}
                     </div>
-                    <span style={{ fontSize: '0.6rem', color: '#94a3b8', marginTop: '2px', padding: '0 4px' }}>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--muted-foreground)', marginTop: '2px', padding: '0 4px' }}>
                       {msg.time}
                     </span>
                   </div>
@@ -2206,18 +2215,18 @@ export default function DashboardPage() {
               {/* Quick Prompts */}
               <div style={{
                 padding: '0.4rem 0.75rem',
-                background: '#ffffff',
-                borderTop: '1px solid #f1f5f9',
+                background: 'var(--card)',
+                borderTop: '1px solid var(--border)',
                 display: 'flex',
                 gap: '0.4rem',
                 overflowX: 'auto',
                 scrollbarWidth: 'none',
               }}>
                 {[
-                  "📅 {t('dashboard.todaySchedule')}",
-                  "📝 Lesson Plan",
-                  "📊 Attendance",
-                  "💡 Homework Idea"
+                  `📅 ${t('dashboard.todaySchedule')}`,
+                  `📝 ${t('dashboard.lessonPlan')}`,
+                  `📊 ${t('dashboard.attendance')}`,
+                  `💡 ${t('dashboard.homeworkIdea')}`
                 ].map((prompt, idx) => (
                   <button
                     key={idx}
@@ -2227,9 +2236,9 @@ export default function DashboardPage() {
                       fontSize: '0.66rem',
                       padding: '3px 8px',
                       borderRadius: '999px',
-                      background: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
-                      color: '#475569',
+                      background: 'var(--muted)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--foreground)',
                       cursor: 'pointer',
                       fontWeight: 500
                     }}
@@ -2247,8 +2256,8 @@ export default function DashboardPage() {
                 }}
                 style={{
                   padding: '0.65rem 0.75rem',
-                  background: '#ffffff',
-                  borderTop: '1px solid #e2e8f0',
+                  background: 'var(--card)',
+                  borderTop: '1px solid var(--border)',
                   display: 'flex',
                   gap: '0.5rem',
                   alignItems: 'center',
@@ -2258,14 +2267,16 @@ export default function DashboardPage() {
                   type="text"
                   value={novaInput}
                   onChange={(e) => setNovaInput(e.target.value)}
-                  placeholder="Ask Nova AI anything..."
+                  placeholder={t('dashboard.askAi')}
                   style={{
                     flex: 1,
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '0.5rem 0.75rem',
                     fontSize: '0.78rem',
                     outline: 'none',
+                    background: 'var(--background)',
+                    color: 'var(--foreground)',
                   }}
                 />
                 <button
@@ -2318,17 +2329,17 @@ export default function DashboardPage() {
               }}
             >
               <Sparkles size={16} />
-              <span>Meet Nova AI • {schoolName}</span>
+              <span>{t('dashboard.meetNova')} • {schoolName}</span>
             </button>
           ) : (
             <div
               style={{
                 width: '300px',
                 maxWidth: 'calc(100vw - 32px)',
-                background: 'linear-gradient(145deg, #ffffff 0%, #f5f7ff 100%)',
-                border: '1px solid #c7d2fe',
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
                 borderRadius: '16px',
-                boxShadow: '0 16px 40px -6px rgba(79, 70, 229, 0.28), 0 4px 12px rgba(0,0,0,0.08)',
+                boxShadow: '0 16px 40px -6px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
                 overflow: 'hidden',
                 padding: '1rem',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -2346,34 +2357,34 @@ export default function DashboardPage() {
                     <Sparkles size={16} color="#ffffff" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0, color: '#1e293b' }}>
-                      Meet Nova AI
+                    <h3 style={{ fontSize: '0.92rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
+                      {t('dashboard.meetNova')}
                     </h3>
                     <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: 600 }}>
-                      SchoolCare Assistant
+                      {t('dashboard.assistant')}
                     </span>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{
-                    fontSize: '0.62rem', fontWeight: 700, background: '#e0e7ff',
-                    color: '#4338ca', padding: '2px 7px', borderRadius: '999px',
-                    border: '1px solid #c7d2fe'
+                    fontSize: '0.62rem', fontWeight: 700, background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#818cf8', padding: '2px 7px', borderRadius: '999px',
+                    border: '1px solid rgba(99, 102, 241, 0.25)'
                   }}>
-                    Online
+                    {t('dashboard.online')}
                   </span>
                   <button
                     onClick={() => setIsNovaCardMinimized(true)}
                     title="Minimize"
                     style={{
-                      background: 'rgba(0,0,0,0.04)',
+                      background: 'var(--muted)',
                       border: 'none',
                       borderRadius: '4px',
                       width: 22, height: 22,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: 'pointer',
-                      color: '#64748b',
+                      color: 'var(--muted-foreground)',
                     }}
                   >
                     <ChevronDown size={14} />
@@ -2383,26 +2394,26 @@ export default function DashboardPage() {
 
               {/* Description */}
               <p style={{
-                fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
+                fontSize: '0.74rem', color: 'var(--muted-foreground)', lineHeight: 1.45,
                 margin: '0 0 0.85rem'
               }}>
-                Your AI Teaching Assistant for <strong style={{ color: '#1e293b' }}>{schoolName}</strong>, powered by <strong style={{ color: '#4f46e5' }}>SchoolCare</strong> for smarter & faster teaching.
+                Your AI Teaching Assistant for <strong style={{ color: 'var(--foreground)' }}>{schoolName}</strong>, powered by <strong style={{ color: '#6366f1' }}>SchoolCare</strong> for smarter & faster teaching.
               </p>
 
               {/* Bot Icon */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.85rem' }}>
                 <div style={{
                   width: 46, height: 46, borderRadius: '50%',
-                  background: '#ffffff',
-                  border: '2px solid #e0e7ff',
+                  background: 'var(--card)',
+                  border: '2px solid var(--border)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 4px 12px rgba(99, 102, 241, 0.12)',
                   position: 'relative'
                 }}>
-                  <MessageCircle size={24} color="#6366f1" fill="#eef2ff" />
+                  <MessageCircle size={24} color="#6366f1" fill="rgba(99, 102, 241, 0.15)" />
                   <span style={{
                     position: 'absolute', bottom: 1, right: 1, width: 10, height: 10,
-                    borderRadius: '50%', background: '#10b981', border: '2px solid white'
+                    borderRadius: '50%', background: '#10b981', border: '2px solid var(--card)'
                   }} />
                 </div>
               </div>
@@ -2430,7 +2441,7 @@ export default function DashboardPage() {
                 onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
               >
-                <Sparkles size={14} /> Chat with Nova AI
+                <Sparkles size={14} /> {t('dashboard.chatWithAi')}
               </button>
             </div>
           )}
@@ -2454,19 +2465,20 @@ export default function DashboardPage() {
         .nd-section-head h3 { font-size: 0.9rem; font-weight: 700; color: var(--foreground); }
         .nd-rp-section-title { font-size: 0.9rem; font-weight: 700; color: var(--foreground); margin-bottom: 1rem; }
         .nd-text-btn { background: none; border: none; cursor: pointer; font-size: 0.75rem; color: #6366f1; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; padding: 0.2rem 0.5rem; border-radius: 6px; transition: background 0.15s; font-family: inherit; }
-        .nd-text-btn:hover { background: #eef2ff; }
-        .nd-outline-btn { width: 100%; border: 1px solid var(--border); background: none; border-radius: 0.6rem; padding: 0.5rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #64748b; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; transition: background 0.15s; font-family: inherit; }
+        .nd-text-btn:hover { background: var(--muted); }
+        .nd-outline-btn { width: 100%; border: 1px solid var(--border); background: none; border-radius: 0.6rem; padding: 0.5rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--muted-foreground); display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; transition: background 0.15s; font-family: inherit; }
         .nd-outline-btn:hover { background: var(--muted); }
 
         /* ── Hero ── */
         .nd-hero { background: linear-gradient(135deg, #eef2ff 0%, #fdf4ff 55%, #fff1f5 100%); border-radius: 1.25rem; padding: 1.75rem; display: flex; gap: 1.5rem; align-items: stretch; border: 1px solid #e0e7ff; position: relative; overflow: hidden; }
+        [data-theme='dark'] .nd-hero, .dark .nd-hero { background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(168, 85, 247, 0.1) 55%, rgba(236, 72, 153, 0.08) 100%); border-color: var(--border); }
         .nd-hero::before { content: ''; position: absolute; top: -60px; left: 50%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%); border-radius: 50%; }
         .nd-hero-left { display: flex; gap: 1.25rem; align-items: center; flex: 1; min-width: 0; }
-        .nd-hero-avatar { width: 86px; height: 86px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 20px rgba(99,102,241,0.18); border: 3px solid white; }
+        .nd-hero-avatar { width: 86px; height: 86px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 20px rgba(99,102,241,0.18); border: 3px solid var(--border); }
         .nd-hero-text { min-width: 0; }
-        .nd-hero-greeting { font-size: 1.4rem; font-weight: 800; color: #1e1b4b; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .nd-hero-sub { color: #64748b; font-size: 0.88rem; margin-bottom: 0.4rem; }
-        .nd-hero-info { font-size: 0.85rem; color: #475569; margin-bottom: 0.9rem; }
+        .nd-hero-greeting { font-size: 1.4rem; font-weight: 800; color: var(--foreground); margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nd-hero-sub { color: var(--muted-foreground); font-size: 0.88rem; margin-bottom: 0.4rem; }
+        .nd-hero-info { font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 0.9rem; }
         .nd-hero-link { color: #6366f1; font-weight: 700; text-decoration: none; }
         .nd-hero-link:hover { text-decoration: underline; }
         .nd-hero-btn { display: inline-flex; align-items: center; gap: 0.4rem; background: #6366f1; color: white; border: none; border-radius: 0.6rem; padding: 0.5rem 1.1rem; font-size: 0.83rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.2s, transform 0.15s; font-family: inherit; }
@@ -2476,10 +2488,10 @@ export default function DashboardPage() {
         @media (max-width: 580px) { .nd-hero-right { flex-direction: column; } .nd-hero-left { flex-direction: column; align-items: flex-start; } }
 
         /* AI Cards */
-        .nd-ai-card { background: white; border-radius: 0.85rem; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid #e0e7ff; flex: 1; box-shadow: 0 1px 5px rgba(99,102,241,0.07); }
+        .nd-ai-card { background: var(--card); border-radius: 0.85rem; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--border); flex: 1; box-shadow: 0 1px 5px rgba(0,0,0,0.04); }
         .nd-ai-icon-wrap { width: 34px; height: 34px; border-radius: 0.55rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .nd-ai-title { font-size: 0.82rem; font-weight: 700; color: var(--foreground); }
-        .nd-ai-sub { font-size: 0.72rem; color: #64748b; line-height: 1.4; }
+        .nd-ai-sub { font-size: 0.72rem; color: var(--muted-foreground); line-height: 1.4; }
         .nd-ai-btn { align-self: flex-start; background: none; border: 1px solid; border-radius: 6px; padding: 0.28rem 0.7rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; transition: opacity 0.15s; font-family: inherit; }
         .nd-ai-btn:hover { opacity: 0.7; }
 
@@ -2490,18 +2502,18 @@ export default function DashboardPage() {
         .nd-stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 1rem 1.1rem 0.85rem; box-shadow: 0 1px 6px rgba(0,0,0,0.04); transition: transform 0.2s, box-shadow 0.2s; }
         .nd-stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(0,0,0,0.08); }
         .nd-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
-        .nd-stat-label { font-size: 0.7rem; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
+        .nd-stat-label { font-size: 0.7rem; color: var(--muted-foreground); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
         .nd-stat-value { font-size: 1.8rem; font-weight: 800; line-height: 1; margin-bottom: 0.15rem; color: var(--foreground); }
-        .nd-stat-sub { font-size: 0.68rem; color: #94a3b8; }
+        .nd-stat-sub { font-size: 0.68rem; color: var(--muted-foreground); }
         .nd-stat-icon { width: 42px; height: 42px; border-radius: 0.7rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* ── Quick Links ── */
         .nd-ql-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem; }
-        .nd-ql-item-modern { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; color: var(--foreground); font-size: 0.8rem; font-weight: 600; padding: 0.6rem 0.8rem; border: 1px solid var(--border, #e2e8f0); border-radius: 0.5rem; background: var(--card); transition: all 0.2s ease; }
-        .nd-ql-item-modern:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.03); transform: translateY(-1px); }
+        .nd-ql-item-modern { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; color: var(--foreground); font-size: 0.8rem; font-weight: 600; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--card); transition: all 0.2s ease; }
+        .nd-ql-item-modern:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
         .nd-ql-icon-modern { width: 32px; height: 32px; border-radius: 0.4rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .nd-ql-label-modern { flex: 1; }
-        .nd-ql-chevron { color: #94a3b8; opacity: 0; transform: translateX(-4px); transition: all 0.2s ease; }
+        .nd-ql-chevron { color: var(--muted-foreground); opacity: 0; transform: translateX(-4px); transition: all 0.2s ease; }
         .nd-ql-item-modern:hover .nd-ql-chevron { opacity: 1; transform: translateX(0); }
 
         /* ── 3-col ── */
@@ -2510,26 +2522,26 @@ export default function DashboardPage() {
         @media (max-width: 580px) { .nd-3col { grid-template-columns: 1fr; } }
 
         /* Linear Progress & Avatars */
-        .nd-progress-container { width: 100%; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-bottom: 1rem; }
+        .nd-progress-container { width: 100%; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; margin-bottom: 1rem; }
         .nd-progress-bar { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
-        .nd-progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.4rem; }
+        .nd-progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); margin-bottom: 0.4rem; }
         .nd-avatar-row { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
         .nd-avatar-row::-webkit-scrollbar { display: none; }
         .nd-avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 0.8rem 0.5rem; max-height: 220px; overflow-y: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
         .nd-avatar-grid::-webkit-scrollbar { display: none; }
         .nd-avatar-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 48px; position: relative; cursor: pointer; }
         .nd-avatar-circle { width: 40px; height: 40px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 600; flex-shrink: 0; }
-        .nd-avatar-name { font-size: 0.65rem; color: #64748b; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .nd-avatar-name { font-size: 0.65rem; color: var(--muted-foreground); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
         
         /* Homework List */
-        .nd-hw-filter { padding: 0.2rem 0.4rem; border-radius: 0.4rem; border: 1px solid #e2e8f0; font-size: 0.7rem; color: #64748b; background: white; outline: none; }
+        .nd-hw-filter { padding: 0.2rem 0.4rem; border-radius: 0.4rem; border: 1px solid var(--border); font-size: 0.7rem; color: var(--foreground); background: var(--card); outline: none; }
         .nd-hw-list { display: flex; flex-direction: column; gap: 0.6rem; max-height: 200px; overflow-y: auto; scrollbar-width: none; }
         .nd-hw-list::-webkit-scrollbar { display: none; }
-        .nd-hw-item { padding: 0.6rem; border: 1px solid #f1f5f9; border-radius: 0.5rem; background: #fafaf9; }
-        .nd-hw-title { font-size: 0.8rem; font-weight: 600; color: #1e293b; margin-bottom: 0.2rem; }
-        .nd-hw-desc { font-size: 0.7rem; color: #64748b; margin-bottom: 0.4rem; line-height: 1.3; }
+        .nd-hw-item { padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--muted); }
+        .nd-hw-title { font-size: 0.8rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.2rem; }
+        .nd-hw-desc { font-size: 0.7rem; color: var(--muted-foreground); margin-bottom: 0.4rem; line-height: 1.3; }
         .nd-hw-meta { display: flex; gap: 0.4rem; font-size: 0.65rem; font-weight: 500; }
-        .nd-hw-badge { background: #e2e8f0; color: #475569; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+        .nd-hw-badge { background: var(--card); color: var(--muted-foreground); border: 1px solid var(--border); padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
         .nd-legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
         /* ── 2-col ── */
@@ -2541,7 +2553,7 @@ export default function DashboardPage() {
         .nd-risk-item { display: flex; align-items: center; gap: 0.75rem; }
         .nd-risk-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; }
         .nd-risk-name { font-size: 0.8rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.1rem; }
-        .nd-risk-reason { font-size: 0.7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nd-risk-reason { font-size: 0.7rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .nd-risk-badge { font-size: 0.68rem; font-weight: 700; padding: 0.22rem 0.6rem; border-radius: 999px; white-space: nowrap; }
 
         /* Notifications */
@@ -2549,8 +2561,8 @@ export default function DashboardPage() {
         .nd-notif-item { display: flex; align-items: flex-start; gap: 0.75rem; }
         .nd-notif-icon { width: 34px; height: 34px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .nd-notif-title { font-size: 0.8rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.1rem; }
-        .nd-notif-sub { font-size: 0.7rem; color: #94a3b8; }
-        .nd-notif-time { font-size: 0.65rem; color: #94a3b8; white-space: nowrap; }
+        .nd-notif-sub { font-size: 0.7rem; color: var(--muted-foreground); }
+        .nd-notif-time { font-size: 0.65rem; color: var(--muted-foreground); white-space: nowrap; }
         .nd-notif-dot { width: 7px; height: 7px; border-radius: 50%; background: #6366f1; }
 
         /* ── Right Panel ── */
@@ -2562,10 +2574,10 @@ export default function DashboardPage() {
         /* Calendar */
         .nd-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
         .nd-cal-title { font-size: 0.85rem; font-weight: 700; color: var(--foreground); }
-        .nd-cal-nav { background: none; border: 1px solid var(--border); border-radius: 0.4rem; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: background 0.15s; }
+        .nd-cal-nav { background: none; border: 1px solid var(--border); border-radius: 0.4rem; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); transition: background 0.15s; }
         .nd-cal-nav:hover { background: var(--muted); }
         .nd-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
-        .nd-cal-dow { font-size: 0.58rem; font-weight: 700; color: #94a3b8; text-align: center; padding: 0.2rem 0; }
+        .nd-cal-dow { font-size: 0.58rem; font-weight: 700; color: var(--muted-foreground); text-align: center; padding: 0.2rem 0; }
         .nd-cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 500; color: var(--foreground); border-radius: 50%; cursor: default; transition: background 0.15s; }
         .nd-cal-day:not(.empty):hover { background: var(--muted); }
         .nd-cal-day.empty { color: transparent; cursor: default; }
@@ -2574,12 +2586,12 @@ export default function DashboardPage() {
         /* Schedule */
         .nd-sch-list { display: flex; flex-direction: column; gap: 0.6rem; }
         .nd-sch-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.7rem; border-radius: 0.65rem; border: 1px solid var(--border); transition: border-color 0.15s; }
-        .nd-sch-item.active { border-color: #6366f1; background: #eef2ff; }
-        .nd-sch-time { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.63rem; color: #94a3b8; min-width: 50px; line-height: 1.6; }
+        .nd-sch-item.active { border-color: #6366f1; background: rgba(99, 102, 241, 0.12); }
+        .nd-sch-time { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.63rem; color: var(--muted-foreground); min-width: 50px; line-height: 1.6; }
         .nd-sch-item.active .nd-sch-time { color: #6366f1; }
         .nd-sch-bar { width: 3px; height: 32px; border-radius: 3px; flex-shrink: 0; }
         .nd-sch-subj { font-size: 0.77rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.1rem; }
-        .nd-sch-room { font-size: 0.68rem; color: #94a3b8; }
+        .nd-sch-room { font-size: 0.68rem; color: var(--muted-foreground); }
         .nd-sch-now { font-size: 0.62rem; font-weight: 700; background: #6366f1; color: white; padding: 0.18rem 0.45rem; border-radius: 999px; }
 
         /* Reminders */
@@ -2588,7 +2600,7 @@ export default function DashboardPage() {
         .nd-rem-item:hover .nd-rem-title { color: #6366f1; }
         .nd-rem-icon { width: 34px; height: 34px; border-radius: 0.6rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .nd-rem-title { font-size: 0.8rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.1rem; transition: color 0.15s; }
-        .nd-rem-sub { font-size: 0.7rem; color: #94a3b8; }
+        .nd-rem-sub { font-size: 0.7rem; color: var(--muted-foreground); }
       `}</style>
     </div>
   );

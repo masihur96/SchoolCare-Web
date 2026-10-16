@@ -30,7 +30,7 @@
   --glass-border-strong: rgba(0, 0, 0, 0.15);
 }
 
-[data-theme='dark'] {
+[data-theme='dark'], .dark {
   --background: #09090b;
   --foreground: #fafafa;
   --card: #18181b;
@@ -59,6 +59,14 @@
   --glass-bg: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-border-strong: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme='dark'] .leaflet-popup-content-wrapper,
+[data-theme='dark'] .leaflet-popup-tip,
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-popup-tip {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
 }
 
 * {

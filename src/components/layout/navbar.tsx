@@ -247,7 +247,7 @@ const KIND_LABEL: Record<string, string> = {
 // ─── Main Navbar ──────────────────────────────────────────────────────────────
 export function Navbar() {
   const { t } = useLanguage();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -521,7 +521,10 @@ export function Navbar() {
           <LanguageToggle />
           <button
             className="icon-btn glass-card"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={() => {
+              const current = resolvedTheme || theme;
+              setTheme(current === 'dark' ? 'light' : 'dark');
+            }}
             aria-label="Toggle Theme"
           >
             <Sun size={20} className="sun-icon" />
