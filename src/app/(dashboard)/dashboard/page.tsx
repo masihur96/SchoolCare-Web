@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Users, GraduationCap, BookOpen, ClipboardList,
-  Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown,
+  Calendar, CalendarDays, Clock, ChevronRight, ChevronLeft, ChevronDown,
   FileText, Megaphone, Loader2, BarChart2, Brain,
   Sparkles, UserCheck, ArrowLeftRight, BarChart3, CheckCircle, AlertCircle, Settings2,
   AlertTriangle, ArrowRight, Award,
@@ -504,40 +504,834 @@ function MiniBarChart({ data }: { data: { label: string; avg: number; top: numbe
   );
 }
 
+// ─── Academic Calendar Types & Config ─────────────────────────────────────────
+export interface CalendarEvent {
+  id: string;
+  schoolId?: string;
+  title: string;
+  description?: string;
+  category: string; // "VACATION" | "HOLIDAY" | "EXAM" | "EVENT" | "ACADEMIC" | "OTHER"
+  startDate: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  isAllDay?: boolean;
+  isHoliday?: boolean;
+  targetAudience?: string;
+  classIds?: string[];
+  classes?: { id: string; name: string }[];
+  color?: string;
+  location?: string;
+  attachmentUrl?: string | null;
+  academicYear?: string;
+  term?: string;
+}
+
+const CALENDAR_CATEGORY_CONFIG: Record<
+  string,
+  { label: string; defaultColor: string; bg: string; border: string; text: string; icon: string }
+> = {
+  VACATION: {
+    label: 'Vacation',
+    defaultColor: '#E53935',
+    bg: 'rgba(229, 57, 53, 0.1)',
+    border: 'rgba(229, 57, 53, 0.3)',
+    text: '#E53935',
+    icon: '🏖️',
+  },
+  HOLIDAY: {
+    label: 'Holiday',
+    defaultColor: '#F59E0B',
+    bg: 'rgba(245, 158, 11, 0.1)',
+    border: 'rgba(245, 158, 11, 0.3)',
+    text: '#D97706',
+    icon: '🎉',
+  },
+  EXAM: {
+    label: 'Exam & Result',
+    defaultColor: '#8B5CF6',
+    bg: 'rgba(139, 92, 246, 0.1)',
+    border: 'rgba(139, 92, 246, 0.3)',
+    text: '#7C3AED',
+    icon: '📝',
+  },
+  EVENT: {
+    label: 'School Event',
+    defaultColor: '#3B82F6',
+    bg: 'rgba(59, 130, 246, 0.1)',
+    border: 'rgba(59, 130, 246, 0.3)',
+    text: '#2563EB',
+    icon: '🏆',
+  },
+  ACADEMIC: {
+    label: 'Academic Schedule',
+    defaultColor: '#10B981',
+    bg: 'rgba(16, 185, 129, 0.1)',
+    border: 'rgba(16, 185, 129, 0.3)',
+    text: '#059669',
+    icon: '📚',
+  },
+  OTHER: {
+    label: 'Other',
+    defaultColor: '#6B7280',
+    bg: 'rgba(107, 114, 128, 0.1)',
+    border: 'rgba(107, 114, 128, 0.3)',
+    text: '#4B5563',
+    icon: '📌',
+  },
+};
+
+const FALLBACK_ACADEMIC_EVENTS: CalendarEvent[] = [
+  {
+    id: 'demo-1',
+    title: 'World Teachers’ Day Celebration',
+    description: 'Special morning assembly and appreciation ceremony organized by the student council.',
+    category: 'EVENT',
+    startDate: '2026-10-05T00:00:00.000Z',
+    endDate: '2026-10-05T00:00:00.000Z',
+    startTime: '09:00',
+    endTime: '12:00',
+    isAllDay: false,
+    isHoliday: false,
+    targetAudience: 'ALL',
+    color: '#3B82F6',
+    location: 'Main Auditorium',
+  },
+  {
+    id: 'demo-2',
+    title: 'Science Fair & Tech Exhibition',
+    description: 'Inter-class science model competition and robotics demonstrations for students.',
+    category: 'EVENT',
+    startDate: '2026-10-12T00:00:00.000Z',
+    endDate: '2026-10-13T00:00:00.000Z',
+    startTime: '10:00',
+    endTime: '15:30',
+    isAllDay: false,
+    isHoliday: false,
+    targetAudience: 'ALL',
+    color: '#3B82F6',
+    location: 'Science Complex',
+  },
+  {
+    id: 'demo-3',
+    title: 'Parent-Teacher Meeting (PTM)',
+    description: 'Review of student attendance, coursework, and quarterly examination preparedness.',
+    category: 'ACADEMIC',
+    startDate: '2026-10-16T00:00:00.000Z',
+    endDate: '2026-10-16T00:00:00.000Z',
+    startTime: '14:00',
+    endTime: '17:00',
+    isAllDay: false,
+    isHoliday: false,
+    targetAudience: 'PARENT',
+    color: '#10B981',
+    location: 'Respective Classrooms',
+  },
+  {
+    id: 'demo-4',
+    title: 'Durga Puja & Autumn Vacation',
+    description: 'School closed for autumn vacation. Administrative inquiries remain open via email.',
+    category: 'VACATION',
+    startDate: '2026-10-19T00:00:00.000Z',
+    endDate: '2026-10-23T00:00:00.000Z',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    isHoliday: true,
+    targetAudience: 'ALL',
+    color: '#E53935',
+    location: 'Campus Wide',
+  },
+  {
+    id: 'demo-5',
+    title: 'Mid-Term Examination 2026',
+    description: 'Comprehensive mid-term exams across all core subjects. Admit cards required for entry.',
+    category: 'EXAM',
+    startDate: '2026-10-26T00:00:00.000Z',
+    endDate: '2026-10-31T00:00:00.000Z',
+    startTime: '09:00',
+    endTime: '13:00',
+    isAllDay: false,
+    isHoliday: false,
+    targetAudience: 'STUDENT',
+    color: '#8B5CF6',
+    location: 'Examination Halls',
+  },
+  {
+    id: 'demo-6',
+    title: 'Class Assessment & Revision Week',
+    description: 'Subject-wise revision, syllabus check, and personalized student feedback.',
+    category: 'ACADEMIC',
+    startDate: '2026-11-08T00:00:00.000Z',
+    endDate: '2026-11-12T00:00:00.000Z',
+    startTime: '08:30',
+    endTime: '14:00',
+    isAllDay: true,
+    isHoliday: false,
+    targetAudience: 'ALL',
+    color: '#10B981',
+    location: 'All Classes',
+  },
+  {
+    id: 'demo-7',
+    title: 'Annual Sports Meet 2026',
+    description: 'Track and field events, house competitions, and trophy presentation ceremony.',
+    category: 'EVENT',
+    startDate: '2026-11-18T00:00:00.000Z',
+    endDate: '2026-11-20T00:00:00.000Z',
+    startTime: '08:00',
+    endTime: '16:00',
+    isAllDay: false,
+    isHoliday: false,
+    targetAudience: 'ALL',
+    color: '#3B82F6',
+    location: 'Main Sports Stadium',
+  },
+  {
+    id: 'demo-8',
+    title: 'Victory Day (National Holiday)',
+    description: 'National holiday in honor of Victory Day. School morning flag-raising ceremony.',
+    category: 'HOLIDAY',
+    startDate: '2026-12-16T00:00:00.000Z',
+    endDate: '2026-12-16T00:00:00.000Z',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    isHoliday: true,
+    targetAudience: 'ALL',
+    color: '#F59E0B',
+    location: 'Campus Flag Plaza',
+  },
+  {
+    id: 'demo-9',
+    title: 'Winter Vacation',
+    description: 'Annual winter recess for students and faculty. Classes resume in January.',
+    category: 'VACATION',
+    startDate: '2026-12-20T00:00:00.000Z',
+    endDate: '2026-12-31T00:00:00.000Z',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    isHoliday: true,
+    targetAudience: 'ALL',
+    color: '#E53935',
+    location: 'Campus Wide',
+  },
+  {
+    id: 'demo-10',
+    title: 'Summer Vacation 2026',
+    description: 'Annual summer break for all grades.',
+    category: 'VACATION',
+    startDate: '2026-06-01T00:00:00.000Z',
+    endDate: '2026-06-15T00:00:00.000Z',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    isHoliday: true,
+    targetAudience: 'ALL',
+    color: '#E53935',
+  },
+  {
+    id: 'demo-11',
+    title: 'Eid-ul-Adha Holiday',
+    description: 'Holy celebration of Eid-ul-Adha.',
+    category: 'HOLIDAY',
+    startDate: '2026-06-17T00:00:00.000Z',
+    endDate: '2026-06-22T00:00:00.000Z',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    isHoliday: true,
+    targetAudience: 'ALL',
+    color: '#F59E0B',
+  },
+];
+
+function formatEventDateRange(startStr?: string, endStr?: string, lang: string = 'en') {
+  if (!startStr) return '';
+  try {
+    const s = new Date(startStr);
+    const e = endStr ? new Date(endStr) : s;
+    const opt: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    const locale = lang === 'bn' ? 'bn-BD' : 'en-US';
+    if (s.toDateString() === e.toDateString()) {
+      return s.toLocaleDateString(locale, { ...opt, year: 'numeric' });
+    }
+    const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysLabel = lang === 'bn' ? `${diffDays} দিন` : `${diffDays} days`;
+    return `${s.toLocaleDateString(locale, opt)} – ${e.toLocaleDateString(locale, { ...opt, year: 'numeric' })} (${daysLabel})`;
+  } catch {
+    return `${startStr} - ${endStr}`;
+  }
+}
+
+function formatHoverDate(dateStr: string, lang: string = 'en') {
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const locale = lang === 'bn' ? 'bn-BD' : 'en-US';
+    return date.toLocaleDateString(locale, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 // ─── Calendar Widget ──────────────────────────────────────────────────────────
 function CalendarWidget({ today }: { today: Date }) {
   const { language } = useLanguage();
   const [viewDate, setViewDate] = useState(today);
+  const [events, setEvents] = useState<CalendarEvent[]>(FALLBACK_ACADEMIC_EVENTS);
+  const [loading, setLoading] = useState(false);
+  const [hoveredDate, setHoveredDate] = useState<{
+    day: number;
+    dateString: string;
+    events: CalendarEvent[];
+    rect: DOMRect;
+  } | null>(null);
+
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Fetch academic calendar events from API
+  useEffect(() => {
+    let ignore = false;
+    async function loadEvents() {
+      setLoading(true);
+      try {
+        const token = getToken();
+        const res = await fetch('https://smart-school-backend-production.up.railway.app/admin/academic-calendar', {
+          headers: {
+            accept: '*/*',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const list: CalendarEvent[] = Array.isArray(json) ? json : json.data || [];
+          if (!ignore) {
+            if (list.length > 0) {
+              setEvents(list);
+            } else {
+              setEvents(FALLBACK_ACADEMIC_EVENTS);
+            }
+          }
+        }
+      } catch {
+        // Fallback already populated
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadEvents();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
   const prev = () => setViewDate(new Date(year, month - 1, 1));
   const next = () => setViewDate(new Date(year, month + 1, 1));
+  const goToToday = () => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  const isCurrentMonthView = viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear();
+
+  // Events occurring in current view month
+  const monthEvents = useMemo(() => {
+    const mmStr = String(month + 1).padStart(2, '0');
+    const startM = `${year}-${mmStr}-01`;
+    const endM = `${year}-${mmStr}-${daysInMonth.toString().padStart(2, '0')}`;
+    return events.filter((ev) => {
+      if (!ev.startDate) return false;
+      const s = ev.startDate.split('T')[0];
+      const e = (ev.endDate || ev.startDate).split('T')[0];
+      return s <= endM && e >= startM;
+    }).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  }, [events, year, month, daysInMonth]);
+
+  const holidaysCount = useMemo(() => {
+    return monthEvents.filter((e) => e.isHoliday || e.category === 'HOLIDAY' || e.category === 'VACATION').length;
+  }, [monthEvents]);
 
   return (
     <div>
-      <div className="nd-cal-header">
-        <button className="nd-cal-nav" onClick={prev}><ChevronLeft size={14} /></button>
-        <span className="nd-cal-title">{getMonthName(month, language)} {year}</span>
-        <button className="nd-cal-nav" onClick={next}><ChevronRight size={14} /></button>
+      {/* Month Navigation & Today button */}
+      <div className="nd-cal-header" style={{ marginBottom: '0.6rem' }}>
+        <button
+          className="nd-cal-nav"
+          onClick={prev}
+          title={language === 'bn' ? 'পূর্ববর্তী মাস' : 'Previous Month'}
+          type="button"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="nd-cal-title">
+            {getMonthName(month, language)} {year}
+          </span>
+          {loading && (
+            <Loader2 size={12} style={{ animation: 'nd-spin 1s linear infinite', color: '#6366f1' }} />
+          )}
+          {!isCurrentMonthView && (
+            <button
+              onClick={goToToday}
+              type="button"
+              style={{
+                fontSize: '0.62rem',
+                fontWeight: 700,
+                color: '#6366f1',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '4px',
+                padding: '1px 5px',
+                cursor: 'pointer',
+              }}
+              title={language === 'bn' ? 'চলতি মাসে যান' : 'Go to current month'}
+            >
+              {language === 'bn' ? 'আজ' : 'Today'}
+            </button>
+          )}
+        </div>
+        <button
+          className="nd-cal-nav"
+          onClick={next}
+          title={language === 'bn' ? 'পরবর্তী মাস' : 'Next Month'}
+          type="button"
+        >
+          <ChevronRight size={14} />
+        </button>
       </div>
+
+      {/* Month summary pill */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', padding: '0 2px' }}>
+        <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>
+          {monthEvents.length} {language === 'bn' ? 'টি ইভেন্ট' : monthEvents.length === 1 ? 'event' : 'events'}
+          {holidaysCount > 0 && ` · ${holidaysCount} ${language === 'bn' ? 'ছুটি' : holidaysCount === 1 ? 'holiday' : 'holidays'}`}
+        </span>
+        <span style={{ fontSize: '0.62rem', color: 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />
+          {language === 'bn' ? 'হোভার করুন' : 'Hover for details'}
+        </span>
+      </div>
+
+      {/* Calendar Grid */}
       <div className="nd-cal-grid">
-        {(language === 'bn' ? ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'] : ['SUN','MON','TUE','WED','THU','FRI','SAT']).map(d => (
+        {(language === 'bn' ? ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'] : ['SUN','MON','TUE','WED','THU','FRI','SAT']).map((d) => (
           <div key={d} className="nd-cal-dow">{d}</div>
         ))}
         {days.map((day, i) => {
+          if (day === null) {
+            return <div key={`empty-${i}`} className="nd-cal-day empty" />;
+          }
+
           const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const matchingEvents = events.filter((ev) => {
+            if (!ev.startDate) return false;
+            const s = ev.startDate.split('T')[0];
+            const e = (ev.endDate || ev.startDate).split('T')[0];
+            return ds >= s && ds <= e;
+          });
+          const hasEvents = matchingEvents.length > 0;
+          const isHolidayDay = matchingEvents.some((e) => e.isHoliday || e.category === 'HOLIDAY' || e.category === 'VACATION');
+
           return (
-            <div key={i} className={`nd-cal-day${day === null ? ' empty' : ''}${isToday ? ' today' : ''}`}>
-              {day}
+            <div
+              key={`day-${day}`}
+              className={`nd-cal-day${isToday ? ' today' : ''}${hasEvents ? ' has-events' : ''}${isHolidayDay ? ' holiday-day' : ''}`}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHoveredDate({ day, dateString: ds, events: matchingEvents, rect });
+              }}
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHoveredDate({ day, dateString: ds, events: matchingEvents, rect });
+              }}
+              onMouseLeave={() => setHoveredDate(null)}
+              style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2px 0',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.15s ease',
+                ...(!isToday && isHolidayDay ? {
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px dashed rgba(239, 68, 68, 0.35)',
+                } : !isToday && hasEvents ? {
+                  background: 'rgba(99, 102, 241, 0.07)',
+                  border: '1px solid rgba(99, 102, 241, 0.22)',
+                } : {}),
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: isToday ? 800 : hasEvents ? 600 : 500,
+                  color: isToday ? '#fff' : isHolidayDay ? '#ef4444' : 'var(--foreground)',
+                  lineHeight: 1.1,
+                }}
+              >
+                {day}
+              </span>
+
+              {/* Event category indicator dots */}
+              {hasEvents && (
+                <div style={{ display: 'flex', gap: '2px', alignItems: 'center', justifyContent: 'center', marginTop: '2px' }}>
+                  {matchingEvents.slice(0, 3).map((ev, dotIdx) => {
+                    const cfg = CALENDAR_CATEGORY_CONFIG[ev.category] || CALENDAR_CATEGORY_CONFIG.OTHER;
+                    const dotColor = isToday ? '#ffffff' : (ev.color || cfg.defaultColor);
+                    return (
+                      <span
+                        key={dotIdx}
+                        style={{
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          backgroundColor: dotColor,
+                          boxShadow: isToday ? '0 0 2px rgba(0,0,0,0.4)' : 'none',
+                        }}
+                      />
+                    );
+                  })}
+                  {matchingEvents.length > 3 && (
+                    <span style={{ fontSize: '7px', fontWeight: 700, color: isToday ? '#fff' : 'var(--muted-foreground)', lineHeight: 1 }}>
+                      +
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* Floating Hover Details Popover via Portal */}
+      {hoveredDate && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: Math.max(12, Math.min(window.innerWidth - 312, hoveredDate.rect.left + hoveredDate.rect.width / 2 - 150)),
+            top: hoveredDate.rect.top > 270
+              ? hoveredDate.rect.top - 8
+              : hoveredDate.rect.bottom + 8,
+            transform: hoveredDate.rect.top > 270 ? 'translateY(-100%)' : 'none',
+            width: '300px',
+            maxWidth: 'calc(100vw - 24px)',
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            borderRadius: '0.85rem',
+            padding: '0.85rem',
+            boxShadow: '0 20px 40px -8px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border)',
+            pointerEvents: 'none',
+            zIndex: 99999,
+          }}
+        >
+          {/* Arrow */}
+          <div
+            style={{
+              position: 'absolute',
+              [hoveredDate.rect.top > 270 ? 'bottom' : 'top']: '-6px',
+              left: Math.max(
+                16,
+                Math.min(
+                  270,
+                  hoveredDate.rect.left + hoveredDate.rect.width / 2 - Math.max(12, Math.min(window.innerWidth - 312, hoveredDate.rect.left + hoveredDate.rect.width / 2 - 150))
+                )
+              ),
+              transform: 'translateX(-50%) rotate(45deg)',
+              width: '12px',
+              height: '12px',
+              background: 'var(--card)',
+              borderRight: hoveredDate.rect.top > 270 ? '1px solid var(--border)' : 'none',
+              borderBottom: hoveredDate.rect.top > 270 ? '1px solid var(--border)' : 'none',
+              borderLeft: hoveredDate.rect.top > 270 ? 'none' : '1px solid var(--border)',
+              borderTop: hoveredDate.rect.top > 270 ? 'none' : '1px solid var(--border)',
+            }}
+          />
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.55rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.45rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CalendarDays size={14} color="#6366f1" />
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                {formatHoverDate(hoveredDate.dateString, language)}
+              </span>
+            </div>
+            {hoveredDate.events.length > 0 ? (
+              <span style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: '999px',
+                background: hoveredDate.events.some((e) => e.isHoliday) ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                color: hoveredDate.events.some((e) => e.isHoliday) ? '#ef4444' : '#6366f1',
+                border: hoveredDate.events.some((e) => e.isHoliday) ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)',
+              }}>
+                {hoveredDate.events.length} {language === 'bn' ? 'টি ইভেন্ট' : hoveredDate.events.length === 1 ? 'Event' : 'Events'}
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>
+                {language === 'bn' ? 'স্বাভাবিক দিন' : 'Regular Day'}
+              </span>
+            )}
+          </div>
+
+          {/* Events or Empty */}
+          {hoveredDate.events.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '250px', overflowY: 'auto' }}>
+              {hoveredDate.events.map((ev, idx) => {
+                const cfg = CALENDAR_CATEGORY_CONFIG[ev.category] || CALENDAR_CATEGORY_CONFIG.OTHER;
+                const color = ev.color || cfg.defaultColor;
+                return (
+                  <div
+                    key={ev.id || idx}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '3px',
+                      padding: '0.5rem 0.6rem',
+                      borderRadius: '8px',
+                      background: `${color}0D`,
+                      border: `1px solid ${color}33`,
+                      borderLeft: `3px solid ${color}`,
+                    }}
+                  >
+                    {/* Category + Holiday Tag */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        color: color,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <span>{cfg.icon}</span>
+                        <span>{cfg.label}</span>
+                      </span>
+                      {ev.isHoliday && (
+                        <span style={{
+                          fontSize: '0.6rem',
+                          fontWeight: 700,
+                          color: '#ef4444',
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                        }}>
+                          {language === 'bn' ? 'বিদ্যালয় বন্ধ' : 'School Closed'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.3 }}>
+                      {ev.title}
+                    </div>
+
+                    {/* Multi-day date range */}
+                    {ev.startDate && ev.endDate && ev.startDate.split('T')[0] !== ev.endDate.split('T')[0] && (
+                      <div style={{ fontSize: '0.66rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={11} color={color} />
+                        <span>{formatEventDateRange(ev.startDate, ev.endDate, language)}</span>
+                      </div>
+                    )}
+
+                    {/* Timing */}
+                    <div style={{ fontSize: '0.66rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={11} color={color} />
+                      <span>
+                        {ev.isAllDay
+                          ? (language === 'bn' ? 'সারাদিন' : 'All Day')
+                          : `${formatRoutineTime(ev.startTime)} - ${formatRoutineTime(ev.endTime)}`}
+                      </span>
+                    </div>
+
+                    {/* Location */}
+                    {ev.location && (
+                      <div style={{ fontSize: '0.66rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <MapPin size={11} color={color} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.location}</span>
+                      </div>
+                    )}
+
+                    {/* Target Audience */}
+                    {ev.targetAudience && ev.targetAudience !== 'ALL' && (
+                      <div style={{ fontSize: '0.66rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Users size={11} color={color} />
+                        <span>{ev.targetAudience}</span>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {ev.description && (
+                      <div style={{
+                        fontSize: '0.65rem',
+                        color: 'var(--muted-foreground)',
+                        marginTop: '2px',
+                        lineHeight: 1.35,
+                        maxHeight: '40px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}>
+                        {ev.description}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '0.35rem 0.2rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', margin: 0 }}>
+                {language === 'bn'
+                  ? 'এই তারিখে কোনো নির্ধারিত একাডেমিক ইভেন্ট বা ছুটি নেই।'
+                  : 'No academic events or holidays scheduled for this date.'}
+              </p>
+              <span style={{ fontSize: '0.64rem', color: '#10b981', fontWeight: 600, display: 'inline-block', marginTop: '4px' }}>
+                ✓ {language === 'bn' ? 'স্বাভাবিক ক্লাসের সময়সূচি' : 'Regular academic schedule'}
+              </span>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Category Legend */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '6px 10px',
+        justifyContent: 'center',
+        marginTop: '0.75rem',
+        paddingTop: '0.6rem',
+        borderTop: '1px solid var(--border)'
+      }}>
+        {Object.entries(CALENDAR_CATEGORY_CONFIG).slice(0, 5).map(([key, cfg]) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.63rem', color: 'var(--muted-foreground)' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cfg.defaultColor }} />
+            <span>{cfg.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Month Highlights List (if any) */}
+      {monthEvents.length > 0 && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {language === 'bn' ? 'এই মাসের ইভেন্টসমূহ' : 'Events This Month'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '140px', overflowY: 'auto' }}>
+            {monthEvents.slice(0, 3).map((ev, idx) => {
+              const cfg = CALENDAR_CATEGORY_CONFIG[ev.category] || CALENDAR_CATEGORY_CONFIG.OTHER;
+              const color = ev.color || cfg.defaultColor;
+              const sDate = ev.startDate?.split('T')[0] || '';
+              const eDate = ev.endDate?.split('T')[0] || sDate;
+              const [, sm, sd] = sDate.split('-');
+              const [, em, ed] = eDate.split('-');
+              const startMonthName = getMonthName(parseInt(sm, 10) - 1, language).slice(0, 3);
+              const endMonthName = getMonthName(parseInt(em, 10) - 1, language).slice(0, 3);
+              const datePill = sDate === eDate
+                ? `${sd} ${startMonthName}`
+                : sm === em
+                  ? `${sd}-${ed} ${startMonthName}`
+                  : `${sd} ${startMonthName} - ${ed} ${endMonthName}`;
+
+              return (
+                <div
+                  key={ev.id || idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.35rem 0.5rem',
+                    borderRadius: '6px',
+                    background: 'var(--muted)',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  <span style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    color: color,
+                    background: `${color}1A`,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {datePill}
+                  </span>
+                  <span style={{
+                    fontWeight: 600,
+                    color: 'var(--foreground)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1
+                  }}>
+                    {ev.title}
+                  </span>
+                  {ev.isHoliday && (
+                    <span style={{
+                      fontSize: '0.58rem',
+                      fontWeight: 700,
+                      color: '#ef4444',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {language === 'bn' ? 'ছুটি' : 'Holiday'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Link to full academic calendar */}
+      <Link
+        href="/academic-calendar"
+        style={{
+          marginTop: '0.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          padding: '0.45rem',
+          borderRadius: '0.5rem',
+          background: 'var(--muted)',
+          color: 'var(--foreground)',
+          fontSize: '0.72rem',
+          fontWeight: 600,
+          textDecoration: 'none',
+          border: '1px solid var(--border)',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <CalendarDays size={13} color="#6366f1" />
+        <span>{language === 'bn' ? 'সম্পূর্ণ একাডেমিক ক্যালেন্ডার দেখুন' : 'Open Academic Calendar'}</span>
+        <ChevronRight size={13} />
+      </Link>
     </div>
   );
 }
@@ -1809,7 +2603,27 @@ export default function DashboardPage() {
 
           {/* Calendar */}
           <div className="nd-section-card">
-            <p className="nd-rp-section-title">{t('dashboard.calendar')}</p>
+            <div className="nd-section-head" style={{ marginBottom: '0.65rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                <CalendarDays size={15} color="#6366f1" />
+                {language === 'bn' ? 'একাডেমিক ক্যালেন্ডার' : 'Academic Calendar'}
+              </h3>
+              <Link
+                href="/academic-calendar"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#6366f1',
+                  textDecoration: 'none',
+                }}
+              >
+                <span>{language === 'bn' ? 'সব দেখুন' : 'View All'}</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
             <CalendarWidget today={today} />
           </div>
 
@@ -2572,16 +3386,17 @@ export default function DashboardPage() {
         @media (max-width: 640px) { .nd-right-panel { grid-template-columns: 1fr; } }
 
         /* Calendar */
-        .nd-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
+        .nd-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
         .nd-cal-title { font-size: 0.85rem; font-weight: 700; color: var(--foreground); }
-        .nd-cal-nav { background: none; border: 1px solid var(--border); border-radius: 0.4rem; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); transition: background 0.15s; }
-        .nd-cal-nav:hover { background: var(--muted); }
-        .nd-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+        .nd-cal-nav { background: none; border: 1px solid var(--border); border-radius: 0.4rem; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); transition: all 0.15s; }
+        .nd-cal-nav:hover { background: var(--muted); color: var(--foreground); }
+        .nd-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
         .nd-cal-dow { font-size: 0.58rem; font-weight: 700; color: var(--muted-foreground); text-align: center; padding: 0.2rem 0; }
-        .nd-cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 500; color: var(--foreground); border-radius: 50%; cursor: default; transition: background 0.15s; }
-        .nd-cal-day:not(.empty):hover { background: var(--muted); }
+        .nd-cal-day { min-height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 500; color: var(--foreground); border-radius: 8px; cursor: pointer; transition: all 0.15s ease; border: 1px solid transparent; }
+        .nd-cal-day:not(.empty):hover { background: var(--muted); border-color: var(--primary); transform: scale(1.08); z-index: 2; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); }
         .nd-cal-day.empty { color: transparent; cursor: default; }
-        .nd-cal-day.today { background: #6366f1; color: white !important; font-weight: 700; }
+        .nd-cal-day.today { background: #6366f1 !important; color: white !important; font-weight: 700; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4); }
+        @keyframes nd-fade-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Schedule */
         .nd-sch-list { display: flex; flex-direction: column; gap: 0.6rem; }
