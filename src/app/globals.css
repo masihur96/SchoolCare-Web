@@ -4141,9 +4141,9 @@ html[lang="bn"] select {
   position: sticky; top: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 2rem; height: 72px;
-  background: var(--background);
-  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
 }
 .lp-brand {
   display: flex; align-items: center; gap: 0.6rem;
@@ -4197,13 +4197,19 @@ html[lang="bn"] select {
   padding: 0.4rem 1rem; border-radius: 99px; margin-bottom: 2rem;
 }
 .lp-hero-title {
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
-  font-weight: 800; line-height: 1.1; letter-spacing: -1.5px;
-  color: var(--foreground); margin-bottom: 1.5rem;
+  font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.2rem;
 }
 .lp-highlight {
-  background: linear-gradient(135deg, #60a5fa, #c084fc);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline;
 }
 .lp-hero-sub {
   font-size: 1.15rem; color: var(--muted-foreground); line-height: 1.6;
@@ -4341,25 +4347,173 @@ html[lang="bn"] select {
   .lp-footer-copy { margin-left: 0; display: block; margin-top: 0.5rem; }
 }
 
-/* Additional Professional Landing Page Enhancements */
-.lp-hero-title {
-  background: linear-gradient(135deg, var(--foreground) 0%, var(--muted-foreground) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: fade-in 1s ease-out forwards;
+/* Desktop Navigation Links */
+.lp-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.lp-nav-link-item {
+  color: var(--muted-foreground);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.lp-nav-link-item:hover {
+  color: var(--foreground);
 }
 
-.lp-highlight {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: inline-block;
-  transform: scale(1);
-  transition: transform 0.3s ease;
+/* Dashboard Mockup Component */
+.lp-mockup-wrapper {
+  margin: 3.5rem auto 0;
+  max-width: 1100px;
+  position: relative;
+  z-index: 5;
+  width: 100%;
+}
+.lp-mockup-frame {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+[data-theme="dark"] .lp-mockup-frame {
+  box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.lp-mockup-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.lp-mockup-dots {
+  display: flex;
+  gap: 6px;
+}
+.lp-mockup-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.lp-mockup-url {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  background: var(--background);
+  padding: 0.25rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-family: monospace;
+}
+.lp-mockup-body {
+  padding: 1.5rem;
+}
+.lp-mockup-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.lp-mockup-school-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.lp-mockup-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.lp-mockup-stat-card {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.lp-mockup-content-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr;
+  gap: 1.25rem;
+}
+@media (max-width: 860px) {
+  .lp-mockup-content-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.lp-highlight:hover {
-  transform: scale(1.05);
+/* FAQ Styles */
+.lp-faq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+@media (max-width: 860px) {
+  .lp-faq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.lp-faq-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.25s ease;
+}
+.lp-faq-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+.lp-faq-question {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--foreground);
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+.lp-faq-answer {
+  margin-top: 0.85rem;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* Why SchoolCare Grid */
+.lp-why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.75rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.lp-why-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.25rem 1.75rem;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+.lp-why-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-5px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
 }
 
 .lp-feature-card {
