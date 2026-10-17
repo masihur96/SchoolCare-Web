@@ -8,7 +8,7 @@ import {
   Settings, Menu, X, GraduationCap, LogOut, UserCheck,
   Activity, Clock, MessageSquare, Book,
   BookMarked, PieChart, ChevronLeft, ChevronRight, MessageCircle,
-  MoreVertical, User, Key, Video, Send
+  MoreVertical, User, Key, Video, Send, CalendarDays
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -73,6 +73,7 @@ export function Sidebar() {
     { name: t('nav.teacherAttendance'), href: '/teacher-attendance', icon: UserCheck },
     { name: t('nav.classAndSections'), href: '/classes', icon: BookOpen },
     { name: t('nav.classRoutine'), href: '/routine', icon: Calendar },
+    { name: t('nav.academicCalendar'), href: '/academic-calendar', icon: CalendarDays },
     { name: t('nav.examAndResult'), href: '/exams', icon: Activity },
     { name: t('nav.homework'), href: '/homework', icon: Clock },
     { name: t('nav.onlineClass'), href: '/online-class', icon: Video },

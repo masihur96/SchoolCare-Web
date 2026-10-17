@@ -8,7 +8,7 @@ import {
   Bell, Search, Sun, Moon, X, CheckCheck, RefreshCw,
   Info, AlertTriangle, BookOpen, GraduationCap, Megaphone,
   LayoutDashboard, Users, Calendar, CheckCircle, FileText,
-  BellRing, Settings, UserCheck, Loader2, Clock, Mail, Phone,
+  BellRing, Settings, UserCheck, Loader2, Clock, Mail, Phone, CalendarDays,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { LanguageToggle } from '@/components/language-toggle';
@@ -104,6 +104,7 @@ const PAGES: SearchResult[] = [
   { id: 'p-attendance',        kind: 'page', title: 'Attendance',          subtitle: 'Student attendance records', href: '/attendance',         icon: CheckCircle,     color: '#06b6d4' },
   { id: 'p-teacher-attendance',kind: 'page', title: 'Teacher Attendance',  subtitle: 'Faculty attendance records', href: '/teacher-attendance', icon: UserCheck,       color: '#ec4899' },
   { id: 'p-routine',           kind: 'page', title: 'Routine',             subtitle: 'Class schedule & timetable', href: '/routine',            icon: Calendar,        color: '#f97316' },
+  { id: 'p-academic-calendar', kind: 'page', title: 'Academic Calendar',    subtitle: 'Holidays, vacations & events', href: '/academic-calendar',   icon: CalendarDays,    color: '#0ea5e9' },
   { id: 'p-exams',             kind: 'page', title: 'Exams',               subtitle: 'Exam schedule & results',    href: '/exams',              icon: FileText,        color: '#ef4444' },
   { id: 'p-notices',           kind: 'page', title: 'Notices',             subtitle: 'School announcements',       href: '/notices',            icon: BellRing,        color: '#f59e0b' },
   { id: 'p-settings',          kind: 'page', title: 'Settings',            subtitle: 'Account & school settings',  href: '/settings',           icon: Settings,        color: '#6b7280' },
