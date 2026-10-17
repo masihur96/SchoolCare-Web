@@ -10,8 +10,7 @@ import {
 import CreateExamModal from '@/components/CreateExamModal';
 import ExamRoutineModal from '@/components/ExamRoutineModal';
 import { useLanguage } from '@/components/language-provider';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -395,9 +394,10 @@ export default function ExamsPage() {
   };
 
   // Export PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (filteredExams.length === 0) return;
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
     const schoolName = schoolInfo?.name || 'Smart School Management System';
     const schoolAddress = schoolInfo?.address || '';

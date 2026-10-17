@@ -11,8 +11,7 @@ import AttendanceModal from '@/components/AttendanceModal';
 import HomeworkModal from '@/components/HomeworkModal';
 import CreateRoutineModal from '@/components/CreateRoutineModal';
 import { useLanguage } from '@/components/language-provider';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -389,9 +388,10 @@ export default function RoutinePage() {
   };
 
   // Export PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (filteredRoutines.length === 0) return;
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
     const schoolName = schoolInfo?.name || 'Smart School Management System';
     const schoolAddress = schoolInfo?.address || '';

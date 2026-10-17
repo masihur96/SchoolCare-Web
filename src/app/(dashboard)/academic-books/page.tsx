@@ -9,8 +9,7 @@ import {
   FileSpreadsheet, FileText, ChevronDown, ExternalLink, Calendar,
   User, Tag, GraduationCap, BookMarked, Maximize2, Minimize2
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -588,10 +587,11 @@ export default function AcademicBooksPage() {
   };
 
   // Export current list to PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (sortedBooks.length === 0) return;
 
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('portrait');
 
     // Header

@@ -9,8 +9,7 @@ import {
   AlertTriangle, X, Check, School, Layers, LayoutGrid, RefreshCw,
   Radio, Copy, ExternalLink, CheckCircle2, AlertCircle
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -763,10 +762,11 @@ export default function OnlineClassPage() {
   };
 
   // PDF Export
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (filteredMeetings.length === 0) return;
     setShowExportMenu(false);
 
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     doc.setFontSize(18);

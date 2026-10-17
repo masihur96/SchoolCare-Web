@@ -7,8 +7,7 @@ import {
   UserPlus, UserCog, Users, Download, ChevronDown, ChevronLeft, ChevronRight,
   RefreshCw, FileSpreadsheet, FileText, Filter, Check, GraduationCap
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -339,9 +338,10 @@ export default function ClassesPage() {
   };
 
   // Export PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (filteredAndSortedClasses.length === 0) return;
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
     const schoolName = schoolInfo?.name || 'Smart School Management System';
     const schoolAddress = schoolInfo?.address || '';

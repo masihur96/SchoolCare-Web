@@ -10,8 +10,7 @@ import {
   Layers, LayoutGrid, FileSpreadsheet, ChevronDown, ChevronLeft,
   ChevronRight, X, Download, CheckCircle2, Eye, RotateCcw
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 interface SMSCampaign {
   id: string;
@@ -476,10 +475,11 @@ export default function BulkSMSPage() {
   };
 
   // Export to PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (filteredCampaigns.length === 0) return;
 
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
 
     doc.setFontSize(16);
@@ -523,7 +523,8 @@ export default function BulkSMSPage() {
   };
 
   // Download single campaign voucher / delivery report
-  const handleDownloadCampaignPDF = (c: SMSCampaign) => {
+  const handleDownloadCampaignPDF = async (c: SMSCampaign) => {
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('portrait');
 
     doc.setFillColor(79, 70, 229);

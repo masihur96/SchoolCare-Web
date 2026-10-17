@@ -10,8 +10,7 @@ import {
   Edit3, Trash2, Eye, AlertTriangle, Printer,
   Receipt
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -572,10 +571,11 @@ export default function ExpenseTrackingPage() {
   };
 
   // Export current view to PDF report
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (transactions.length === 0) return;
 
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
 
     doc.setFontSize(16);
@@ -631,7 +631,8 @@ export default function ExpenseTrackingPage() {
   };
 
   // Download printable voucher PDF for a single transaction
-  const handleDownloadVoucher = (tx: Transaction) => {
+  const handleDownloadVoucher = async (tx: Transaction) => {
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('portrait');
     const isExpense = tx.type === 'EXPENSE';
 

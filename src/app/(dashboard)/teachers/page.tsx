@@ -8,8 +8,7 @@ import {
   Download, Phone, BookOpen, Layers, CheckCircle2, Users,
   MapPin, FileSpreadsheet, FileText, ChevronDown
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -387,10 +386,11 @@ export default function TeachersPage() {
   };
 
   // Export PDF
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setExportDropdownOpen(false);
     if (sortedTeachers.length === 0) return;
 
+    const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('portrait');
 
     // Header

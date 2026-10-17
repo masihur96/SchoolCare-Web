@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, FileText, Users, Loader2, Download } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { getPdfTools } from '@/lib/pdf';
+import type { jsPDF } from 'jspdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const getApiToken = () => {
@@ -417,6 +417,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       const isPassed = overallPct !== null && overallPct >= 33;
 
       // Create Portrait A4 PDF
+      const { jsPDF, autoTable } = await getPdfTools();
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const W   = doc.internal.pageSize.width;   // 210mm
       const H   = doc.internal.pageSize.height;  // 297mm
@@ -797,6 +798,7 @@ export default function ExamRoutineModal({ exam, onClose }: ExamRoutineModalProp
       const passRate   = withMarks.length ? (passCount / withMarks.length) * 100 : 0;
 
       // ── Choose page format dynamically (A3 when many subjects) ─────────────
+      const { jsPDF, autoTable } = await getPdfTools();
       const useA3 = activeRelevantCols.length > 9;
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: useA3 ? 'a3' : 'a4' });
       const W   = doc.internal.pageSize.width;
