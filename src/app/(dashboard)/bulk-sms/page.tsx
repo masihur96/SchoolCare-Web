@@ -165,11 +165,55 @@ const DYNAMIC_TAGS = [
 ];
 
 export default function BulkSMSPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [campaigns, setCampaigns] = useState<SMSCampaign[]>(INITIAL_CAMPAIGNS);
   const [activeTab, setActiveTab] = useState<'campaigns' | 'templates' | 'gateway'>('campaigns');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
+
+  // Helper for Bengali number conversion
+  const formatNumber = (num: number | string) => {
+    if (num === null || num === undefined || num === '') return '';
+    const numStr = typeof num === 'number' ? num.toLocaleString('en-US') : num.toString();
+    if (language !== 'bn') return numStr;
+    const banglaDigits: { [key: string]: string } = {
+      '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+      '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯'
+    };
+    return numStr.replace(/[0-9]/g, (w) => banglaDigits[w] || w);
+  };
+
+  const getStatusLabel = (status: SMSCampaign['status']) => {
+    switch (status) {
+      case 'delivered':
+        return t('bulkSms.statusDelivered') || 'Delivered';
+      case 'scheduled':
+        return t('bulkSms.statusScheduled') || 'Scheduled';
+      case 'processing':
+        return t('bulkSms.statusProcessing') || 'Processing';
+      case 'failed':
+        return t('bulkSms.statusFailed') || 'Failed';
+      default:
+        return status;
+    }
+  };
+
+  const getCategoryLabel = (category: SMSTemplate['category']) => {
+    switch (category) {
+      case 'Attendance':
+        return t('bulkSms.categoryAttendance') || 'Attendance';
+      case 'Fees':
+        return t('bulkSms.categoryFees') || 'Fees';
+      case 'Examination':
+        return t('bulkSms.categoryExamination') || 'Examination';
+      case 'Emergency':
+        return t('bulkSms.categoryEmergency') || 'Emergency';
+      case 'General':
+        return t('bulkSms.categoryGeneral') || 'General';
+      default:
+        return category;
+    }
+  };
 
   // Balance & KPIs
   const [creditsBalance, setCreditsBalance] = useState(8450);
@@ -264,12 +308,12 @@ export default function BulkSMSPage() {
     if (!dateString) return '—';
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return dateString;
-    const datePart = d.toLocaleDateString('en-US', {
+    const datePart = d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-    const timePart = d.toLocaleTimeString('en-US', {
+    const timePart = d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
@@ -301,12 +345,15 @@ export default function BulkSMSPage() {
     setBroadcastError(null);
 
     if (!message.trim()) {
-      setBroadcastError('Please enter message content to broadcast.');
+      setBroadcastError(t('bulkSms.alertEmptyMessage') || 'Please enter message content to broadcast.');
       return;
     }
 
     if (totalCreditsRequired > creditsBalance) {
-      setBroadcastError(`Insufficient SMS credits. Required: ${totalCreditsRequired}, Available: ${creditsBalance}. Please recharge.`);
+      const errMsg = (t('bulkSms.alertInsufficientCredits') || 'Insufficient SMS credits. Required: {required}, Available: {available}. Please recharge.')
+        .replace('{required}', formatNumber(totalCreditsRequired))
+        .replace('{available}', formatNumber(creditsBalance));
+      setBroadcastError(errMsg);
       return;
     }
 
@@ -337,7 +384,11 @@ export default function BulkSMSPage() {
       }
 
       setIsComposeModalOpen(false);
-      setBannerMessage(`Campaign "${title}" successfully queued to ${totalRecipients} recipients (${totalCreditsRequired} credits deducted).`);
+      const successMsg = (t('bulkSms.alertQueued') || 'Campaign "{title}" successfully queued to {recipients} recipients ({credits} credits deducted).')
+        .replace('{title}', title)
+        .replace('{recipients}', formatNumber(totalRecipients))
+        .replace('{credits}', formatNumber(totalCreditsRequired));
+      setBannerMessage(successMsg);
     }, 1200);
   };
 
@@ -345,7 +396,9 @@ export default function BulkSMSPage() {
   const handleRechargeCredits = (amount: number) => {
     setCreditsBalance(prev => prev + amount);
     setIsRechargeModalOpen(false);
-    setBannerMessage(`Successfully recharged ${amount.toLocaleString()} SMS credits to account.`);
+    const rechargeMsg = (t('bulkSms.alertRecharged') || 'Successfully recharged {amount} SMS credits to account.')
+      .replace('{amount}', formatNumber(amount));
+    setBannerMessage(rechargeMsg);
   };
 
   // Filtered campaigns
@@ -385,28 +438,41 @@ export default function BulkSMSPage() {
     setExportDropdownOpen(false);
     if (filteredCampaigns.length === 0) return;
 
-    const headers = ['SL', 'Campaign ID', 'Title', 'Audience', 'Recipients', 'SMS Parts', 'Credits', 'Sent Date', 'Status', 'Delivery Rate'];
+    const headers = [
+      '#',
+      t('bulkSms.colCampaignId') || 'Campaign ID',
+      t('common.title') || 'Title',
+      t('bulkSms.colAudience') || 'Audience',
+      t('bulkSms.colRecipients') || 'Recipients',
+      t('bulkSms.parts') || 'SMS Parts',
+      t('bulkSms.colCredits') || 'Credits',
+      t('bulkSms.colDateTime') || 'Sent Date',
+      t('bulkSms.colStatus') || 'Status',
+      t('bulkSms.colDeliveryRate') || 'Delivery Rate'
+    ];
     const rows = filteredCampaigns.map((c, idx) => [
-      (idx + 1).toString(),
+      formatNumber(idx + 1),
       `"${c.id}"`,
       `"${c.title.replace(/"/g, '""')}"`,
       `"${c.targetGroup.replace(/"/g, '""')}"`,
-      c.recipientsCount.toString(),
-      c.smsCount.toString(),
-      c.totalCredits.toString(),
+      formatNumber(c.recipientsCount),
+      formatNumber(c.smsCount),
+      formatNumber(c.totalCredits),
       `"${formatSingleLineDate(c.sentAt)}"`,
-      `"${c.status}"`,
-      `"${c.deliveryRate}%"`
+      `"${getStatusLabel(c.status)}"`,
+      `"${formatNumber(c.deliveryRate)}%"`
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `sms_campaigns_page_${page}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Export to PDF
@@ -422,20 +488,20 @@ export default function BulkSMSPage() {
 
     doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
-    const subtitle = `Total Campaigns: ${filteredCampaigns.length} | Available Credits: ${creditsBalance.toLocaleString()} | Date: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const subtitle = `Total Campaigns: ${formatNumber(filteredCampaigns.length)} | Available Credits: ${formatNumber(creditsBalance)} | Date: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     doc.text(subtitle, 14, 25);
 
     const tableColumn = ['#', 'Campaign ID', 'Title', 'Audience', 'Recipients', 'Credits', 'Date & Time', 'Status', 'Rate'];
     const tableRows = filteredCampaigns.map((c, idx) => [
-      (idx + 1).toString(),
+      formatNumber(idx + 1),
       c.id,
       c.title,
       c.targetGroup,
-      c.recipientsCount.toLocaleString(),
-      c.totalCredits.toLocaleString(),
+      formatNumber(c.recipientsCount),
+      formatNumber(c.totalCredits),
       formatSingleLineDate(c.sentAt),
       c.status.toUpperCase(),
-      `${c.deliveryRate}%`
+      `${formatNumber(c.deliveryRate)}%`
     ]);
 
     autoTable(doc, {
@@ -499,17 +565,17 @@ export default function BulkSMSPage() {
     doc.setFont('helvetica', 'bold');
     doc.text('Recipients Count:', 14, startY + 40);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${c.recipientsCount.toLocaleString()} Contacts (${c.smsCount} SMS/recp)`, 60, startY + 40);
+    doc.text(`${formatNumber(c.recipientsCount)} Contacts (${formatNumber(c.smsCount)} SMS/recp)`, 60, startY + 40);
 
     doc.setFont('helvetica', 'bold');
     doc.text('Total Credits Used:', 14, startY + 50);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${c.totalCredits.toLocaleString()} Credits`, 60, startY + 50);
+    doc.text(`${formatNumber(c.totalCredits)} Credits`, 60, startY + 50);
 
     doc.setFont('helvetica', 'bold');
     doc.text('Delivery Success Rate:', 14, startY + 60);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${c.deliveryRate}% (${Math.round((c.recipientsCount * c.deliveryRate) / 100).toLocaleString()} Delivered)`, 60, startY + 60);
+    doc.text(`${formatNumber(c.deliveryRate)}% (${formatNumber(Math.round((c.recipientsCount * c.deliveryRate) / 100))} Delivered)`, 60, startY + 60);
 
     // Message box
     doc.setFont('helvetica', 'bold');
@@ -540,10 +606,10 @@ export default function BulkSMSPage() {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance') || 'SMS Balance'}</div>
               <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-                {creditsBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>Credits</span>
+                {formatNumber(creditsBalance)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>{t('bulkSms.credits') || 'Credits'}</span>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Masking: <strong>SCHOOLCARE</strong>
+                {t('bulkSms.masking') || 'Masking'}: <strong>SCHOOLCARE</strong>
               </div>
             </div>
           </div>
@@ -552,7 +618,7 @@ export default function BulkSMSPage() {
             onClick={() => setIsRechargeModalOpen(true)}
             style={{ padding: '0.35rem 0.65rem', borderRadius: '0.55rem', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
-            + Top Up
+            {t('bulkSms.topUp') || '+ Top Up'}
           </button>
         </div>
 
@@ -564,10 +630,10 @@ export default function BulkSMSPage() {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentThisMonth') || 'Sent This Month'}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {sentThisMonth.toLocaleString()}
+              {formatNumber(sentThisMonth)}
             </div>
             <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              ↑ +14.2% vs last month
+              ↑ +{formatNumber('14.2')}% {t('bulkSms.vsLastMonth') || 'vs last month'}
             </div>
           </div>
         </div>
@@ -580,10 +646,10 @@ export default function BulkSMSPage() {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.deliveryRate') || 'Delivery Rate'}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              99.4%
+              {formatNumber('99.4')}%
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              24,035 Successful deliveries
+              {formatNumber(24035)} {t('bulkSms.successfulDeliveries') || 'Successful deliveries'}
             </div>
           </div>
         </div>
@@ -594,12 +660,12 @@ export default function BulkSMSPage() {
             <Clock size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Scheduled Campaigns</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.scheduledCampaigns') || 'Scheduled Campaigns'}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {campaigns.filter(c => c.status === 'scheduled').length}
+              {formatNumber(campaigns.filter(c => c.status === 'scheduled').length)}
             </div>
             <div style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              Next: May 15 • 9:00 AM
+              {t('bulkSms.nextScheduled') || 'Next'}: {language === 'bn' ? '১৫ মে • সকাল ৯:০০' : 'May 15 • 9:00 AM'}
             </div>
           </div>
         </div>
@@ -658,7 +724,7 @@ export default function BulkSMSPage() {
                 <Search size={17} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input 
                   type="text" 
-                  placeholder="Search campaigns, ID, or audience..." 
+                  placeholder={t('bulkSms.searchPlaceholder') || 'Search campaigns, ID, or audience...'} 
                   style={{ 
                     border: 'none', 
                     outline: 'none', 
@@ -705,7 +771,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <Clock size={14} /> Campaigns
+                  <Clock size={14} /> {t('bulkSms.tabCampaigns') || 'Campaigns'}
                 </button>
                 <button
                   type="button"
@@ -726,7 +792,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <FileText size={14} /> Templates
+                  <FileText size={14} /> {t('bulkSms.tabTemplates') || 'Templates'}
                 </button>
                 <button
                   type="button"
@@ -747,7 +813,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <ShieldCheck size={14} /> Gateway
+                  <ShieldCheck size={14} /> {t('bulkSms.tabGateway') || 'Gateway'}
                 </button>
               </div>
 
@@ -773,7 +839,7 @@ export default function BulkSMSPage() {
                   }}
                 >
                   <Filter size={15} />
-                  <span>Filters</span>
+                  <span>{t('bulkSms.filters') || 'Filters'}</span>
                   {activeFiltersCount > 0 && (
                     <span style={{ 
                       background: showFilters ? '#ffffff' : '#4f46e5', 
@@ -783,7 +849,7 @@ export default function BulkSMSPage() {
                       padding: '0.1rem 0.45rem',
                       fontWeight: 700
                     }}>
-                      {activeFiltersCount}
+                      {formatNumber(activeFiltersCount)}
                     </span>
                   )}
                 </button>
@@ -794,7 +860,7 @@ export default function BulkSMSPage() {
                 <div style={{ display: 'flex', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '3px' }}>
                   <button
                     type="button"
-                    title="Table View"
+                    title={t('bulkSms.tableView') || 'Table View'}
                     onClick={() => setViewMode('table')}
                     style={{
                       display: 'flex',
@@ -814,7 +880,7 @@ export default function BulkSMSPage() {
                   </button>
                   <button
                     type="button"
-                    title="Cards View"
+                    title={t('bulkSms.cardsView') || 'Cards View'}
                     onClick={() => setViewMode('cards')}
                     style={{
                       display: 'flex',
@@ -842,7 +908,7 @@ export default function BulkSMSPage() {
                     type="button"
                     onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                     disabled={filteredCampaigns.length === 0}
-                    title="Export Options"
+                    title={t('bulkSms.export') || 'Export Options'}
                     style={{ 
                       background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
                       border: '1px solid var(--border)', 
@@ -860,7 +926,7 @@ export default function BulkSMSPage() {
                     }}
                   >
                     <Download size={15} />
-                    <span>Export</span>
+                    <span>{t('bulkSms.export') || 'Export'}</span>
                     <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </button>
 
@@ -904,7 +970,7 @@ export default function BulkSMSPage() {
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                        <span>Export as CSV</span>
+                        <span>{t('bulkSms.exportCSV') || 'Export as CSV'}</span>
                       </button>
                       <button
                         onClick={handleExportPDF}
@@ -927,7 +993,7 @@ export default function BulkSMSPage() {
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <FileText size={15} style={{ color: '#ef4444' }} />
-                        <span>Export as PDF</span>
+                        <span>{t('bulkSms.exportPDF') || 'Export as PDF'}</span>
                       </button>
                     </div>
                   )}
@@ -937,15 +1003,15 @@ export default function BulkSMSPage() {
               {/* Rows Per Page Selector */}
               {activeTab === 'campaigns' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('bulkSms.show') || 'Show:'}</span>
                   <select 
                     value={limit} 
                     onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                     style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
                   >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
+                    <option value={10}>{formatNumber(10)}</option>
+                    <option value={20}>{formatNumber(20)}</option>
+                    <option value={50}>{formatNumber(50)}</option>
                   </select>
                 </div>
               )}
@@ -984,7 +1050,7 @@ export default function BulkSMSPage() {
                   setLoading(true);
                   setTimeout(() => setLoading(false), 500);
                 }}
-                title="Refresh Campaigns"
+                title={t('bulkSms.refresh') || 'Refresh Campaigns'}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1023,35 +1089,35 @@ export default function BulkSMSPage() {
             >
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Delivery Status
+                  {t('bulkSms.filterStatus') || 'Delivery Status'}
                 </label>
                 <select
                   value={statusFilter}
                   onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
-                  <option value="all">All Statuses</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="processing">Processing</option>
-                  <option value="failed">Failed</option>
+                  <option value="all">{t('bulkSms.allStatuses') || 'All Statuses'}</option>
+                  <option value="delivered">{t('bulkSms.statusDelivered') || 'Delivered'}</option>
+                  <option value="scheduled">{t('bulkSms.statusScheduled') || 'Scheduled'}</option>
+                  <option value="processing">{t('bulkSms.statusProcessing') || 'Processing'}</option>
+                  <option value="failed">{t('bulkSms.statusFailed') || 'Failed'}</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Audience Group
+                  {t('bulkSms.filterAudience') || 'Audience Group'}
                 </label>
                 <select
                   value={audienceFilter}
                   onChange={e => { setAudienceFilter(e.target.value); setPage(1); }}
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
-                  <option value="all">All Audiences</option>
-                  <option value="Parents">Parents & Guardians</option>
-                  <option value="Class">Specific Classes</option>
-                  <option value="Staff">Staff & Teachers</option>
-                  <option value="Absent">Absent Students</option>
+                  <option value="all">{t('bulkSms.allAudiences') || 'All Audiences'}</option>
+                  <option value="Parents">{t('bulkSms.audParents') || 'Parents & Guardians'}</option>
+                  <option value="Class">{t('bulkSms.audClass') || 'Specific Classes'}</option>
+                  <option value="Staff">{t('bulkSms.audStaff') || 'Staff & Teachers'}</option>
+                  <option value="Absent">{t('bulkSms.audAbsent') || 'Absent Students'}</option>
                 </select>
               </div>
 
@@ -1072,7 +1138,7 @@ export default function BulkSMSPage() {
                     cursor: 'pointer'
                   }}
                 >
-                  Reset Filters
+                  {t('bulkSms.resetFilters') || 'Reset Filters'}
                 </button>
               </div>
             </div>
@@ -1081,25 +1147,25 @@ export default function BulkSMSPage() {
           {/* Active Filter Badges */}
           {activeTab === 'campaigns' && activeFiltersCount > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', paddingTop: '0.25rem' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Active Filters:</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.activeFilters') || 'Active Filters:'}</span>
               
               {searchTerm && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#eff6ff', color: '#2563eb', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Search: &ldquo;{searchTerm}&rdquo;
+                  {t('bulkSms.filterLabelSearch') || 'Search:'} &ldquo;{searchTerm}&rdquo;
                   <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#2563eb', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {statusFilter !== 'all' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Status: {statusFilter}
+                  {t('bulkSms.filterLabelStatus') || 'Status:'} {getStatusLabel(statusFilter as SMSCampaign['status'])}
                   <button onClick={() => setStatusFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#16a34a', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {audienceFilter !== 'all' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#fff7ed', color: '#ea580c', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Audience: {audienceFilter}
+                  {t('bulkSms.filterLabelAudience') || 'Audience:'} {audienceFilter}
                   <button onClick={() => setAudienceFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#ea580c', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
@@ -1108,7 +1174,7 @@ export default function BulkSMSPage() {
                 onClick={resetAllFilters}
                 style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: '0 0.25rem' }}
               >
-                Clear all
+                {t('bulkSms.clearAll') || 'Clear all'}
               </button>
             </div>
           )}
@@ -1122,9 +1188,11 @@ export default function BulkSMSPage() {
               <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.7 }}>
                 <MessageSquare size={36} />
               </div>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>No SMS Campaigns Found</h3>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
+                {t('bulkSms.noCampaignsFound') || 'No SMS Campaigns Found'}
+              </h3>
               <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '420px' }}>
-                No broadcast records match your search query or filter parameters.
+                {t('bulkSms.noCampaignsDesc') || 'No broadcast records match your search query or filter parameters.'}
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
                 <button
@@ -1132,14 +1200,14 @@ export default function BulkSMSPage() {
                   onClick={resetAllFilters}
                   style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}
                 >
-                  Reset Filters
+                  {t('bulkSms.resetFilters') || 'Reset Filters'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsComposeModalOpen(true)}
                   style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  <Plus size={16} /> New Broadcast
+                  <Plus size={16} /> {t('bulkSms.newBroadcast') || 'New Broadcast'}
                 </button>
               </div>
             </div>
@@ -1150,14 +1218,14 @@ export default function BulkSMSPage() {
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.9rem 1.25rem', width: '45px' }}>#</th>
-                    <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Date & Time</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Campaign & ID</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Target Audience</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Recipients</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Credits</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Delivery Rate</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Status</th>
-                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>Actions</th>
+                    <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('bulkSms.colDateTime') || 'Date & Time'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colCampaignId') || 'Campaign & ID'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colAudience') || 'Target Audience'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colRecipients') || 'Recipients'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colCredits') || 'Credits'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colDeliveryRate') || 'Delivery Rate'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colStatus') || 'Status'}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>{t('bulkSms.colActions') || 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1170,7 +1238,7 @@ export default function BulkSMSPage() {
                     >
                       {/* Index */}
                       <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
-                        {(page - 1) * limit + idx + 1}
+                        {formatNumber((page - 1) * limit + idx + 1)}
                       </td>
 
                       {/* Date & Time - Strictly Single Line */}
@@ -1215,28 +1283,28 @@ export default function BulkSMSPage() {
                       {/* Recipients & SMS Parts */}
                       <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
                         <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                          {cmp.recipientsCount.toLocaleString()}
+                          {formatNumber(cmp.recipientsCount)}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
-                          {cmp.smsCount} SMS / recipient
+                          {formatNumber(cmp.smsCount)} {t('bulkSms.smsPerRecipient') || 'SMS / recipient'}
                         </div>
                       </td>
 
                       {/* Credits */}
                       <td style={{ padding: '1rem 1rem', fontWeight: 800, color: '#4f46e5', whiteSpace: 'nowrap' }}>
-                        {cmp.totalCredits.toLocaleString()}
+                        {formatNumber(cmp.totalCredits)}
                       </td>
 
                       {/* Delivery Rate */}
                       <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
                         {cmp.status === 'scheduled' ? (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Pending</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.statusPending') || 'Pending'}</span>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                             <div style={{ width: '56px', height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
                               <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
                             </div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>{cmp.deliveryRate}%</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>{formatNumber(cmp.deliveryRate)}%</span>
                           </div>
                         )}
                       </td>
@@ -1245,17 +1313,22 @@ export default function BulkSMSPage() {
                       <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
                         {cmp.status === 'delivered' && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <CheckCircle2 size={12} /> Delivered
+                            <CheckCircle2 size={12} /> {t('bulkSms.statusDelivered') || 'Delivered'}
                           </span>
                         )}
                         {cmp.status === 'scheduled' && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <Clock size={12} /> Scheduled
+                            <Clock size={12} /> {t('bulkSms.statusScheduled') || 'Scheduled'}
                           </span>
                         )}
                         {cmp.status === 'processing' && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <RefreshCw size={12} className="animate-spin" /> Processing
+                            <RefreshCw size={12} className="animate-spin" /> {t('bulkSms.statusProcessing') || 'Processing'}
+                          </span>
+                        )}
+                        {cmp.status === 'failed' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            <AlertTriangle size={12} /> {t('bulkSms.statusFailed') || 'Failed'}
                           </span>
                         )}
                       </td>
@@ -1265,7 +1338,7 @@ export default function BulkSMSPage() {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           <button
                             type="button"
-                            title="View Report & Log"
+                            title={t('bulkSms.viewReport') || 'View Report & Log'}
                             onClick={() => {
                               setSelectedCampaign(cmp);
                               setDetailsModalOpen(true);
@@ -1290,7 +1363,7 @@ export default function BulkSMSPage() {
 
                           <button
                             type="button"
-                            title="Clone & Resend"
+                            title={t('bulkSms.cloneResend') || 'Clone & Resend'}
                             onClick={() => {
                               setMessage(cmp.messageText || cmp.title);
                               setCampaignTitle(`Copy of ${cmp.title}`);
@@ -1376,8 +1449,8 @@ export default function BulkSMSPage() {
                   {/* Delivery Progress Bar */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
-                      <span style={{ color: 'var(--muted-foreground)' }}>Delivery Rate:</span>
-                      <strong style={{ color: 'var(--foreground)' }}>{cmp.deliveryRate}%</strong>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{t('bulkSms.deliveryRate') || 'Delivery Rate'}:</span>
+                      <strong style={{ color: 'var(--foreground)' }}>{formatNumber(cmp.deliveryRate)}%</strong>
                     </div>
                     <div style={{ height: '6px', width: '100%', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
                       <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
@@ -1387,16 +1460,16 @@ export default function BulkSMSPage() {
                   {/* Footer Stats & Actions */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Recipients / Credits</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.recipientsCredits') || 'Recipients / Credits'}</div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                        {cmp.recipientsCount.toLocaleString()} <span style={{ color: '#4f46e5' }}>({cmp.totalCredits.toLocaleString()} cr)</span>
+                        {formatNumber(cmp.recipientsCount)} <span style={{ color: '#4f46e5' }}>({formatNumber(cmp.totalCredits)} {t('bulkSms.crShort') || 'cr'})</span>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <button
                         type="button"
-                        title="View Details"
+                        title={t('bulkSms.viewReport') || 'View Report & Log'}
                         onClick={() => {
                           setSelectedCampaign(cmp);
                           setDetailsModalOpen(true);
@@ -1418,7 +1491,7 @@ export default function BulkSMSPage() {
                       </button>
                       <button
                         type="button"
-                        title="Clone & Resend"
+                        title={t('bulkSms.cloneResend') || 'Clone & Resend'}
                         onClick={() => {
                           setMessage(cmp.messageText || cmp.title);
                           setCampaignTitle(`Copy of ${cmp.title}`);
@@ -1478,7 +1551,7 @@ export default function BulkSMSPage() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
                         <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', background: col.bg, color: col.text, fontSize: '0.74rem', fontWeight: 700 }}>
-                          {tpl.category}
+                          {getCategoryLabel(tpl.category)}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
                           {tpl.id}
@@ -1494,7 +1567,7 @@ export default function BulkSMSPage() {
                       </div>
 
                       <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>
-                        Length: <strong>{tpl.charCount}</strong> chars (1 SMS Part)
+                        {t('bulkSms.templateLength') || 'Length:'} <strong>{formatNumber(tpl.charCount)}</strong> {t('bulkSms.chars') || 'chars'} ({formatNumber(1)} {t('bulkSms.smsPart') || 'SMS Part'})
                       </div>
                     </div>
 
@@ -1518,7 +1591,7 @@ export default function BulkSMSPage() {
                           gap: '0.4rem',
                         }}
                       >
-                        <Send size={14} /> Use Template
+                        <Send size={14} /> {t('bulkSms.useTemplate') || 'Use Template'}
                       </button>
                       <button
                         type="button"
@@ -1536,7 +1609,7 @@ export default function BulkSMSPage() {
                           alignItems: 'center',
                           gap: '0.35rem',
                         }}
-                        title="Copy Template"
+                        title={t('bulkSms.copyTemplate') || 'Copy Template'}
                       >
                         {copiedTemplateId === tpl.id ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
                       </button>
@@ -1557,38 +1630,42 @@ export default function BulkSMSPage() {
                   <ShieldCheck size={22} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>Telecom Gateway Status</h3>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Primary carrier connection</p>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                    {t('bulkSms.gatewayStatus') || 'Telecom Gateway Status'}
+                  </h3>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                    {t('bulkSms.carrierConnection') || 'Primary carrier connection'}
+                  </p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Gateway Provider</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.gatewayProvider') || 'Gateway Provider'}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>SSL Wireless Telecom Hub</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Connection Health</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.connectionHealth') || 'Connection Health'}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} /> Operational (Ping 38ms)
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} /> {t('bulkSms.operational') || 'Operational (Ping 38ms)'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Masking Approval</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a' }}>SCHOOLCARE (BTRC Active)</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.maskingApproval') || 'Masking Approval'}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a' }}>{t('bulkSms.activeBtrc') || 'SCHOOLCARE (BTRC Active)'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Throughput Rate</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>500 SMS / second</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.throughputRate') || 'Throughput Rate'}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>{formatNumber(500)} {t('bulkSms.smsPerSecond') || 'SMS / second'}</span>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => setBannerMessage('Gateway Ping Successful! Server latency is 38ms.')}
+                onClick={() => setBannerMessage(t('bulkSms.alertPingSuccess') || 'Gateway Ping Successful! Server latency is 38ms.')}
                 style={{ marginTop: '1.25rem', width: '100%', padding: '0.65rem 0', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
               >
-                Test Gateway Ping
+                {t('bulkSms.testPing') || 'Test Gateway Ping'}
               </button>
             </div>
 
@@ -1598,16 +1675,20 @@ export default function BulkSMSPage() {
                   <Bell size={22} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>Automatic Event Triggers</h3>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Auto-send SMS on school actions</p>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                    {t('bulkSms.autoTriggers') || 'Automatic Event Triggers'}
+                  </h3>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                    {t('bulkSms.autoSendDesc') || 'Auto-send SMS on school actions'}
+                  </p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {[
-                  { title: 'Auto Absentee Alert', desc: 'Trigger SMS automatically when student marked absent by teacher', active: true },
-                  { title: 'Fee Payment Confirmation', desc: 'Send receipt SMS instantly when accountant collects tuition', active: true },
-                  { title: 'Exam Routine Publication', desc: 'Broadcast to parents when exam schedule is published', active: false },
+                  { title: t('bulkSms.triggerAbsenteeTitle') || 'Auto Absentee Alert', desc: t('bulkSms.triggerAbsenteeDesc') || 'Trigger SMS automatically when student marked absent by teacher', active: true },
+                  { title: t('bulkSms.triggerFeeTitle') || 'Fee Payment Confirmation', desc: t('bulkSms.triggerFeeDesc') || 'Send receipt SMS instantly when accountant collects tuition', active: true },
+                  { title: t('bulkSms.triggerExamTitle') || 'Exam Routine Publication', desc: t('bulkSms.triggerExamDesc') || 'Broadcast to parents when exam schedule is published', active: false },
                 ].map((ev, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
                     <div>
@@ -1642,12 +1723,12 @@ export default function BulkSMSPage() {
             }}
           >
             <div>
-              Showing <strong>{paginatedCampaigns.length}</strong> of <strong>{filteredCampaigns.length}</strong> campaign{filteredCampaigns.length !== 1 ? 's' : ''}
+              {t('bulkSms.showing') || 'Showing'} <strong>{formatNumber(paginatedCampaigns.length)}</strong> {t('bulkSms.of') || 'of'} <strong>{formatNumber(filteredCampaigns.length)}</strong> {t('bulkSms.campaignsCount') || 'campaigns'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.82rem', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('bulkSms.page') || 'Page'} {formatNumber(page)} {t('bulkSms.of') || 'of'} {formatNumber(totalPages)}
               </span>
               <button
                 type="button"
@@ -1727,10 +1808,10 @@ export default function BulkSMSPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    Compose SMS Broadcast
+                    {t('bulkSms.composeTitle') || 'Compose SMS Broadcast'}
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
-                    Transmit notices, fee reminders, or emergency alerts via telecom gateway
+                    {t('bulkSms.composeSubtitle') || 'Transmit notices, fee reminders, or emergency alerts via telecom gateway'}
                   </p>
                 </div>
               </div>
@@ -1759,11 +1840,11 @@ export default function BulkSMSPage() {
                 {/* Campaign Title */}
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                    Campaign Title <span style={{ color: '#ef4444' }}>*</span>
+                    {t('bulkSms.campaignTitleLabel') || 'Campaign Title'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Monthly Tuition Fee Reminder, PTM Meeting"
+                    placeholder={t('bulkSms.campaignTitlePlaceholder') || 'e.g. Monthly Tuition Fee Reminder, PTM Meeting'}
                     value={campaignTitle}
                     onChange={e => setCampaignTitle(e.target.value)}
                     style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
@@ -1774,14 +1855,14 @@ export default function BulkSMSPage() {
                 {/* Target Audience Tabs */}
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                    Target Audience <span style={{ color: '#ef4444' }}>*</span>
+                    {t('bulkSms.targetAudienceLabel') || 'Target Audience'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                     {[
-                      { id: 'all', label: 'All Parents', count: '1,350', icon: Users },
-                      { id: 'class', label: 'Class', count: '120', icon: GraduationCap },
-                      { id: 'teachers', label: 'Staff', count: '68', icon: UserCheck },
-                      { id: 'custom', label: 'Custom', count: '45', icon: Smartphone },
+                      { id: 'all', label: t('bulkSms.audAllParents') || 'All Parents', count: formatNumber(1350), icon: Users },
+                      { id: 'class', label: t('bulkSms.audClassOption') || 'Class', count: formatNumber(120), icon: GraduationCap },
+                      { id: 'teachers', label: t('bulkSms.audStaffOption') || 'Staff', count: formatNumber(68), icon: UserCheck },
+                      { id: 'custom', label: t('bulkSms.audCustomOption') || 'Custom', count: formatNumber(45), icon: Smartphone },
                     ].map(aud => {
                       const isSelected = targetAudience === aud.id;
                       return (
@@ -1839,22 +1920,22 @@ export default function BulkSMSPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                      Sender Masking
+                      {t('bulkSms.senderMaskingLabel') || 'Sender Masking'}
                     </label>
                     <select
                       value={senderId}
                       onChange={e => setSenderId(e.target.value)}
                       style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                     >
-                      <option value="SCHOOLCARE">SCHOOLCARE (Masked)</option>
-                      <option value="EDUALERT">EDUALERT (Emergency)</option>
-                      <option value="01888-XXXXXX">01888-XXXXXX (Non-mask)</option>
+                      <option value="SCHOOLCARE">SCHOOLCARE ({t('bulkSms.masked') || 'Masked'})</option>
+                      <option value="EDUALERT">EDUALERT ({t('bulkSms.emergency') || 'Emergency'})</option>
+                      <option value="01888-XXXXXX">01888-XXXXXX ({t('bulkSms.nonMask') || 'Non-mask'})</option>
                     </select>
                   </div>
 
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                      Insert Template
+                      {t('bulkSms.insertTemplateLabel') || 'Insert Template'}
                     </label>
                     <select
                       onChange={e => {
@@ -1867,7 +1948,7 @@ export default function BulkSMSPage() {
                       defaultValue=""
                       style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                     >
-                      <option value="" disabled>Choose template...</option>
+                      <option value="" disabled>{t('bulkSms.chooseTemplate') || 'Choose template...'}</option>
                       {STATIC_TEMPLATES.map(tpl => (
                         <option key={tpl.id} value={tpl.id}>{tpl.title}</option>
                       ))}
@@ -1879,9 +1960,9 @@ export default function BulkSMSPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                      Personalization Tags
+                      {t('bulkSms.personalizationTags') || 'Personalization Tags'}
                     </label>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Click to append</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.clickToAppend') || 'Click to append'}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                     {DYNAMIC_TAGS.map(item => (
@@ -1910,30 +1991,30 @@ export default function BulkSMSPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                      SMS Content <span style={{ color: '#ef4444' }}>*</span>
+                      {t('bulkSms.smsContentLabel') || 'SMS Content'} <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <span style={{ fontSize: '0.72rem', color: isUnicode ? '#ea580c' : '#16a34a', fontWeight: 600 }}>
-                      {isUnicode ? '● Unicode (Bangla/Special)' : '● Standard GSM'}
+                      {isUnicode ? (t('bulkSms.unicodeBadge') || '● Unicode (Bangla/Special)') : (t('bulkSms.standardGsmBadge') || '● Standard GSM')}
                     </span>
                   </div>
                   <textarea
                     rows={4}
                     value={message}
                     onChange={e => setMessage(e.target.value)}
-                    placeholder="Type broadcast text here..."
+                    placeholder={t('bulkSms.typeBroadcastPlaceholder') || 'Type broadcast text here...'}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none', resize: 'vertical', lineHeight: 1.45 }}
                     required
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem', fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
-                    <span>Characters: <strong>{charLength}</strong> / {charsPerSMS} per SMS</span>
-                    <span>Parts: <strong style={{ color: '#4f46e5' }}>{smsParts} SMS</strong></span>
+                    <span>{t('bulkSms.characters') || 'Characters:'} <strong>{formatNumber(charLength)}</strong> / {formatNumber(charsPerSMS)} {t('bulkSms.perSms') || 'per SMS'}</span>
+                    <span>{t('bulkSms.parts') || 'Parts:'} <strong style={{ color: '#4f46e5' }}>{formatNumber(smsParts)} {t('bulkSms.smsPart') || 'SMS'}</strong></span>
                   </div>
                 </div>
 
                 {/* Dispatch Schedule */}
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                    Dispatch Time
+                    {t('bulkSms.dispatchTimeLabel') || 'Dispatch Time'}
                   </label>
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
@@ -1943,7 +2024,7 @@ export default function BulkSMSPage() {
                         checked={scheduleType === 'instant'}
                         onChange={() => setScheduleType('instant')}
                       />
-                      Send Immediately
+                      {t('bulkSms.sendImmediately') || 'Send Immediately'}
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
                       <input
@@ -1952,7 +2033,7 @@ export default function BulkSMSPage() {
                         checked={scheduleType === 'scheduled'}
                         onChange={() => setScheduleType('scheduled')}
                       />
-                      Schedule for Later
+                      {t('bulkSms.scheduleForLater') || 'Schedule for Later'}
                     </label>
                     {scheduleType === 'scheduled' && (
                       <input
@@ -1968,9 +2049,9 @@ export default function BulkSMSPage() {
                 {/* Submit Actions */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Required Cost:</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.requiredCost') || 'Required Cost:'}</div>
                     <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                      {totalCreditsRequired} Credits <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>({totalRecipients} × {smsParts})</span>
+                      {formatNumber(totalCreditsRequired)} {t('bulkSms.credits') || 'Credits'} <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>({formatNumber(totalRecipients)} × {formatNumber(smsParts)})</span>
                     </div>
                   </div>
 
@@ -1980,7 +2061,7 @@ export default function BulkSMSPage() {
                       onClick={() => setIsComposeModalOpen(false)}
                       style={{ padding: '0.6rem 1rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Cancel
+                      {t('common.cancel') || 'Cancel'}
                     </button>
                     <button
                       type="submit"
@@ -2003,12 +2084,12 @@ export default function BulkSMSPage() {
                       {isBroadcasting ? (
                         <>
                           <RefreshCw size={15} className="animate-spin" />
-                          <span>Transmitting...</span>
+                          <span>{t('bulkSms.transmitting') || 'Transmitting...'}</span>
                         </>
                       ) : (
                         <>
                           <Send size={15} />
-                          <span>Broadcast Now</span>
+                          <span>{t('bulkSms.broadcastNow') || 'Broadcast Now'}</span>
                         </>
                       )}
                     </button>
@@ -2020,7 +2101,7 @@ export default function BulkSMSPage() {
               {/* Right Column: Live Recipient Smartphone Mockup */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.65rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                  <Smartphone size={15} /> Live Phone Preview
+                  <Smartphone size={15} /> {t('bulkSms.livePhonePreview') || 'Live Phone Preview'}
                 </div>
 
                 <div
@@ -2057,14 +2138,14 @@ export default function BulkSMSPage() {
                         SC
                       </div>
                       <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{senderId}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#64748b' }}>Verified Telecom Sender</div>
+                      <div style={{ fontSize: '0.62rem', color: '#64748b' }}>{t('bulkSms.verifiedTelecomSender') || 'Verified Telecom Sender'}</div>
                     </div>
 
                     {/* Chat Area */}
                     <div style={{ flex: 1, padding: '0.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <div style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600, background: '#e2e8f0', padding: '0.1rem 0.45rem', borderRadius: '99px' }}>
-                          Today 10:30 AM
+                          {t('bulkSms.todayTime') || 'Today 10:30 AM'}
                         </span>
                       </div>
 
@@ -2087,11 +2168,11 @@ export default function BulkSMSPage() {
                           getRenderedPreview()
                         ) : (
                           <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                            Type message on left to preview...
+                            {t('bulkSms.previewPlaceholder') || 'Type message on left to preview...'}
                           </span>
                         )}
                         <div style={{ textAlign: 'right', marginTop: '0.25rem', fontSize: '0.6rem', color: '#94a3b8' }}>
-                          Delivered
+                          {t('bulkSms.statusDelivered') || 'Delivered'}
                         </div>
                       </div>
                     </div>
@@ -2146,7 +2227,7 @@ export default function BulkSMSPage() {
             }}>
               <div>
                 <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.9, fontWeight: 700 }}>
-                  Campaign Report &bull; {selectedCampaign.senderId}
+                  {t('bulkSms.campaignReport') || 'Campaign Report'} &bull; {selectedCampaign.senderId}
                 </span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0.15rem 0 0' }}>
                   {selectedCampaign.title}
@@ -2164,33 +2245,33 @@ export default function BulkSMSPage() {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '0.85rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Campaign ID</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colCampaignId') || 'Campaign ID'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {selectedCampaign.id}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Target Group</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.targetGroup') || 'Target Group'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {selectedCampaign.targetGroup}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recipients</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colRecipients') || 'Recipients'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {selectedCampaign.recipientsCount.toLocaleString()} ({selectedCampaign.smsCount} SMS/recp)
+                    {formatNumber(selectedCampaign.recipientsCount)} {t('bulkSms.contacts') || 'Contacts'} ({formatNumber(selectedCampaign.smsCount)} {t('bulkSms.smsPerRecipient') || 'SMS/recp'})
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Credits Deducted</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.creditsDeducted') || 'Credits Deducted'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4f46e5', marginTop: '0.15rem' }}>
-                    {selectedCampaign.totalCredits.toLocaleString()} Credits
+                    {formatNumber(selectedCampaign.totalCredits)} {t('bulkSms.credits') || 'Credits'}
                   </div>
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Sent Date & Time</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentDateTime') || 'Sent Date & Time'}</div>
                 <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
                   <Calendar size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                   <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(selectedCampaign.sentAt)}</span>
@@ -2199,7 +2280,7 @@ export default function BulkSMSPage() {
 
               {selectedCampaign.messageText && (
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Broadcast Message</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.broadcastMessage') || 'Broadcast Message'}</div>
                   <div style={{ fontSize: '0.84rem', color: 'var(--foreground)', marginTop: '0.2rem', padding: '0.75rem', background: 'var(--muted)', borderRadius: '0.5rem', lineHeight: 1.45 }}>
                     {selectedCampaign.messageText}
                   </div>
@@ -2225,7 +2306,7 @@ export default function BulkSMSPage() {
                   }}
                 >
                   <Download size={15} />
-                  <span>Download Report (PDF)</span>
+                  <span>{t('bulkSms.downloadReportPDF') || 'Download Report (PDF)'}</span>
                 </button>
 
                 <button
@@ -2233,7 +2314,7 @@ export default function BulkSMSPage() {
                   onClick={() => setDetailsModalOpen(false)}
                   style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: 'none', background: '#4f46e5', color: '#ffffff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer' }}
                 >
-                  Close
+                  {t('common.close') || 'Close'}
                 </button>
               </div>
             </div>
@@ -2274,8 +2355,12 @@ export default function BulkSMSPage() {
                   <CreditCard size={20} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>Recharge SMS Credits</h3>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>Choose a package to recharge instantly</p>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                    {t('bulkSms.rechargeTitle') || 'Recharge SMS Credits'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                    {t('bulkSms.rechargeSubtitle') || 'Choose a package to recharge instantly'}
+                  </p>
                 </div>
               </div>
               <button
@@ -2289,10 +2374,10 @@ export default function BulkSMSPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {[
-                { credits: 5000, price: '৳ 1,750', perSms: '৳ 0.35 / SMS', popular: false },
-                { credits: 15000, price: '৳ 4,800', perSms: '৳ 0.32 / SMS', popular: true },
-                { credits: 30000, price: '৳ 9,000', perSms: '৳ 0.30 / SMS', popular: false },
-                { credits: 60000, price: '৳ 16,800', perSms: '৳ 0.28 / SMS', popular: false },
+                { credits: 5000, price: 1750, perSmsRate: '0.35', popular: false },
+                { credits: 15000, price: 4800, perSmsRate: '0.32', popular: true },
+                { credits: 30000, price: 9000, perSmsRate: '0.30', popular: false },
+                { credits: 60000, price: 16800, perSmsRate: '0.28', popular: false },
               ].map(pkg => (
                 <div
                   key={pkg.credits}
@@ -2313,17 +2398,21 @@ export default function BulkSMSPage() {
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>{pkg.credits.toLocaleString()} Credits</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                        {formatNumber(pkg.credits)} {t('bulkSms.credits') || 'Credits'}
+                      </span>
                       {pkg.popular && (
                         <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '99px', background: '#4f46e5', color: 'white', fontWeight: 700 }}>
-                          Best Value
+                          {t('bulkSms.bestValue') || 'Best Value'}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>{pkg.perSms}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>
+                      ৳ {formatNumber(pkg.perSmsRate)} {t('bulkSms.perSmsCost') || '/ SMS'}
+                    </div>
                   </div>
                   <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#16a34a' }}>
-                    {pkg.price}
+                    ৳ {formatNumber(pkg.price)}
                   </div>
                 </div>
               ))}
@@ -2335,7 +2424,7 @@ export default function BulkSMSPage() {
                 onClick={() => setIsRechargeModalOpen(false)}
                 style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
               >
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
             </div>
           </div>

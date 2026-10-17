@@ -102,15 +102,35 @@ const EMPTY_FORM: AcademicBookForm = {
   isActive: true,
 };
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes || isNaN(bytes)) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export default function AcademicBooksPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+
+  const formatNumber = useCallback((num: number | string) => {
+    if (num === null || num === undefined || num === '') return '';
+    const n = Number(num);
+    if (isNaN(n)) return num.toString();
+    return language === 'bn' ? n.toLocaleString('bn-BD') : n.toString();
+  }, [language]);
+
+  const formatFileSize = useCallback((bytes?: number): string => {
+    if (!bytes || isNaN(bytes)) return '';
+    if (bytes < 1024) {
+      return `${formatNumber(bytes)} ${t('academicBooks.bytes') || 'B'}`;
+    }
+    if (bytes < 1024 * 1024) {
+      const kb = (bytes / 1024).toFixed(1);
+      const formattedKb = language === 'bn' 
+        ? Number(kb).toLocaleString('bn-BD', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) 
+        : kb;
+      return `${formattedKb} ${t('academicBooks.kb') || 'KB'}`;
+    }
+    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    const formattedMb = language === 'bn' 
+      ? Number(mb).toLocaleString('bn-BD', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) 
+      : mb;
+    return `${formattedMb} ${t('academicBooks.mb') || 'MB'}`;
+  }, [formatNumber, language, t]);
+
   const [books, setBooks] = useState<AcademicBook[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -392,10 +412,10 @@ export default function AcademicBooksPage() {
       if (result.statusCode === 200 && result.data?.url) {
         setFormState(prev => ({ ...prev, coverImageUrl: result.data.url }));
       } else {
-        alert('Failed to upload cover image.');
+        alert(t('academicBooks.uploadCoverFailed') || 'Failed to upload cover image.');
       }
     } catch {
-      alert('Error uploading cover image.');
+      alert(t('academicBooks.uploadCoverError') || 'Error uploading cover image.');
     } finally {
       setUploadingCover(false);
     }
@@ -425,10 +445,10 @@ export default function AcademicBooksPage() {
           fileSize: prev.fileSize || file.size
         }));
       } else {
-        alert('Failed to upload PDF document.');
+        alert(t('academicBooks.uploadPdfFailed') || 'Failed to upload PDF document.');
       }
     } catch {
-      alert('Error uploading PDF document.');
+      alert(t('academicBooks.uploadPdfError') || 'Error uploading PDF document.');
     } finally {
       setUploadingPdf(false);
     }
@@ -437,7 +457,7 @@ export default function AcademicBooksPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.title.trim()) {
-      alert('Book title is required.');
+      alert(t('academicBooks.titleRequired') || 'Book title is required.');
       return;
     }
 
@@ -486,10 +506,10 @@ export default function AcademicBooksPage() {
         fetchBooks();
       } else {
         const errorData = await res.json().catch(() => ({}));
-        alert(`Failed to save book: ${errorData.message || 'Unknown error'}`);
+        alert(`${t('academicBooks.saveFailed') || 'Failed to save book'}: ${errorData.message || 'Unknown error'}`);
       }
     } catch {
-      alert('Error saving academic book information.');
+      alert(t('academicBooks.saveError') || 'Error saving academic book information.');
     } finally {
       setActionLoading(false);
     }
@@ -519,10 +539,10 @@ export default function AcademicBooksPage() {
         setDeleteModal({ open: false, id: '', title: '' });
         fetchBooks();
       } else {
-        alert('Failed to delete book.');
+        alert(t('academicBooks.deleteFailed') || 'Failed to delete book.');
       }
     } catch {
-      alert('Error deleting academic book.');
+      alert(t('academicBooks.deleteError') || 'Error deleting academic book.');
     } finally {
       setDeleteLoading(false);
     }
@@ -532,17 +552,28 @@ export default function AcademicBooksPage() {
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
     if (sortedBooks.length === 0) return;
-    const headers = ["SL", "Title", "Author", "Class", "Subject", "Edition", "Pages", "File Size", "Status", "PDF URL"];
+    const headers = [
+      t('academicBooks.exportSl') || "SL",
+      t('academicBooks.exportTitle') || "Title",
+      t('academicBooks.exportAuthor') || "Author",
+      t('academicBooks.exportClass') || "Class",
+      t('academicBooks.exportSubject') || "Subject",
+      t('academicBooks.exportEdition') || "Edition",
+      t('academicBooks.exportPages') || "Pages",
+      t('academicBooks.exportFileSize') || "File Size",
+      t('academicBooks.exportStatus') || "Status",
+      t('academicBooks.exportPdfUrl') || "PDF URL"
+    ];
     const rows = sortedBooks.map((b, idx) => [
-      ((page - 1) * limit + idx + 1).toString(),
+      formatNumber((page - 1) * limit + idx + 1),
       `"${(b.title || '').replace(/"/g, '""')}"`,
       `"${(b.author || '').replace(/"/g, '""')}"`,
-      `"${(getClassName(b) || '').replace(/"/g, '""')}"`,
-      `"${(b.subject || '').replace(/"/g, '""')}"`,
-      `"${(b.edition || '').replace(/"/g, '""')}"`,
-      (b.totalPages || '').toString(),
+      `"${(getClassName(b) || t('academicBooks.allClasses') || 'All Classes').replace(/"/g, '""')}"`,
+      `"${(b.subject || t('academicBooks.general') || 'General').replace(/"/g, '""')}"`,
+      `"${(b.edition || t('academicBooks.standard') || 'Standard').replace(/"/g, '""')}"`,
+      b.totalPages ? formatNumber(b.totalPages) : '',
       formatFileSize(b.fileSize),
-      b.isActive !== false ? "Active" : "Inactive",
+      b.isActive !== false ? (t('common.active') || "Active") : (t('common.inactive') || "Inactive"),
       `"${b.pdfUrl || ''}"`
     ]);
 
@@ -566,34 +597,44 @@ export default function AcademicBooksPage() {
     // Header
     doc.setFontSize(18);
     doc.setTextColor(79, 70, 229); // Primary Indigo color
-    doc.text("Academic Books Report", 14, 18);
+    doc.text(t('academicBooks.reportTitle') || "Academic Books Report", 14, 18);
 
     doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
+    const dateStr = new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US');
     const subtitleParts = [
-      `Page: ${page} of ${totalPages}`,
-      `Total: ${total} books`,
-      `Generated: ${new Date().toLocaleDateString()}`
+      `${t('academicBooks.page') || 'Page'}: ${formatNumber(page)} ${t('academicBooks.of') || 'of'} ${formatNumber(totalPages)}`,
+      `${t('academicBooks.total') || 'Total'}: ${formatNumber(total)} ${t('academicBooks.booksCount') || 'books'}`,
+      `${t('academicBooks.generated') || 'Generated'}: ${dateStr}`
     ];
     if (filterClass) {
       const cls = classes.find(c => (c.id || c.uuid) === filterClass)?.name;
-      if (cls) subtitleParts.push(`Class: ${cls}`);
+      if (cls) subtitleParts.push(`${t('common.class') || 'Class'}: ${cls}`);
     }
     if (filterSubject) {
-      subtitleParts.push(`Subject: ${filterSubject}`);
+      subtitleParts.push(`${t('common.subject') || 'Subject'}: ${filterSubject}`);
     }
     doc.text(subtitleParts.join(' | '), 14, 25);
 
-    const tableColumn = ["#", "Title", "Author", "Class", "Subject", "Edition", "Pages", "Status"];
+    const tableColumn = [
+      "#",
+      t('academicBooks.exportTitle') || "Title",
+      t('academicBooks.exportAuthor') || "Author",
+      t('academicBooks.exportClass') || "Class",
+      t('academicBooks.exportSubject') || "Subject",
+      t('academicBooks.exportEdition') || "Edition",
+      t('academicBooks.exportPages') || "Pages",
+      t('academicBooks.exportStatus') || "Status"
+    ];
     const tableRows = sortedBooks.map((b, idx) => [
-      ((page - 1) * limit + idx + 1).toString(),
-      b.title || 'N/A',
-      b.author || 'N/A',
-      getClassName(b) || 'All Classes',
-      b.subject || 'General',
-      b.edition || 'Standard',
-      b.totalPages ? b.totalPages.toString() : 'N/A',
-      b.isActive !== false ? 'Active' : 'Inactive'
+      formatNumber((page - 1) * limit + idx + 1),
+      b.title || (t('common.na') || 'N/A'),
+      b.author || (t('common.na') || 'N/A'),
+      getClassName(b) || (t('academicBooks.allClasses') || 'All Classes'),
+      b.subject || (t('academicBooks.general') || 'General'),
+      b.edition || (t('academicBooks.standard') || 'Standard'),
+      b.totalPages ? formatNumber(b.totalPages) : (t('common.na') || 'N/A'),
+      b.isActive !== false ? (t('common.active') || 'Active') : (t('common.inactive') || 'Inactive')
     ]);
 
     autoTable(doc, {
@@ -604,11 +645,11 @@ export default function AcademicBooksPage() {
       headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 249, 252] },
       didDrawPage: (data) => {
-        const pageCount = doc.getNumberOfPages();
+        const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
+          `${t('academicBooks.page') || 'Page'} ${formatNumber(data.pageNumber)} ${t('academicBooks.of') || 'of'} ${formatNumber(pageCount)}`,
           doc.internal.pageSize.width - 25,
           doc.internal.pageSize.height - 10
         );
@@ -674,7 +715,7 @@ export default function AcademicBooksPage() {
               <button
                 className="btn"
                 onClick={fetchBooks}
-                title="Refresh books list"
+                title={t('academicBooks.refreshTooltip') || "Refresh books list"}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '0.75rem',
@@ -690,7 +731,7 @@ export default function AcademicBooksPage() {
                 }}
               >
                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden sm:inline">{t('academicBooks.refresh') || 'Refresh'}</span>
               </button>
 
               {/* Filters Toggle Button */}
@@ -712,7 +753,7 @@ export default function AcademicBooksPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('academicBooks.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{ 
                     background: showFilters ? '#ffffff' : 'var(--primary)', 
@@ -722,7 +763,7 @@ export default function AcademicBooksPage() {
                     padding: '0.1rem 0.5rem',
                     fontWeight: 700
                   }}>
-                    {activeFiltersCount}
+                    {formatNumber(activeFiltersCount)}
                   </span>
                 )}
               </button>
@@ -733,7 +774,7 @@ export default function AcademicBooksPage() {
                   className="btn"
                   onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                   disabled={sortedBooks.length === 0}
-                  title="Export Options"
+                  title={t('academicBooks.export') || "Export Options"}
                   style={{ 
                     background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
                     border: '1px solid var(--border)', 
@@ -751,7 +792,7 @@ export default function AcademicBooksPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('academicBooks.export') || 'Export'}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
 
@@ -796,7 +837,7 @@ export default function AcademicBooksPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                      <span>Export as CSV</span>
+                      <span>{t('academicBooks.exportCsv') || 'Export as CSV'}</span>
                     </button>
                     <button
                       onClick={handleExportPDF}
@@ -820,7 +861,7 @@ export default function AcademicBooksPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileText size={15} style={{ color: '#ef4444' }} />
-                      <span>Export as PDF</span>
+                      <span>{t('academicBooks.exportPdf') || 'Export as PDF'}</span>
                     </button>
                   </div>
                 )}
@@ -847,15 +888,17 @@ export default function AcademicBooksPage() {
 
               {/* Page Sizer */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                  {t('academicBooks.show') || 'Show:'}
+                </span>
                 <select 
                   value={limit} 
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                   style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
+                  <option value={10}>{formatNumber(10)}</option>
+                  <option value={20}>{formatNumber(20)}</option>
+                  <option value={50}>{formatNumber(50)}</option>
                 </select>
               </div>
 
@@ -871,7 +914,7 @@ export default function AcademicBooksPage() {
                     textDecoration: 'underline'
                   }}
                 >
-                  Clear all
+                  {t('academicBooks.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -936,7 +979,7 @@ export default function AcademicBooksPage() {
               {/* Status Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Status
+                  {t('academicBooks.status') || 'Status'}
                 </label>
                 <select 
                   className="input" 
@@ -956,7 +999,7 @@ export default function AcademicBooksPage() {
               {/* Sort Order */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Sort By
+                  {t('academicBooks.sortBy') || 'Sort By'}
                 </label>
                 <select 
                   className="input" 
@@ -964,12 +1007,12 @@ export default function AcademicBooksPage() {
                   onChange={(e) => setSortBy(e.target.value as 'title-asc' | 'title-desc' | 'year-desc' | 'year-asc' | 'pages-desc' | 'none')}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="title-asc">Title: A → Z</option>
-                  <option value="title-desc">Title: Z → A</option>
-                  <option value="year-desc">Year: Newest First</option>
-                  <option value="year-asc">Year: Oldest First</option>
-                  <option value="pages-desc">Pages: Most to Least</option>
-                  <option value="none">Original Order</option>
+                  <option value="title-asc">{t('academicBooks.sortTitleAsc') || 'Title: A → Z'}</option>
+                  <option value="title-desc">{t('academicBooks.sortTitleDesc') || 'Title: Z → A'}</option>
+                  <option value="year-desc">{t('academicBooks.sortYearDesc') || 'Year: Newest First'}</option>
+                  <option value="year-asc">{t('academicBooks.sortYearAsc') || 'Year: Oldest First'}</option>
+                  <option value="pages-desc">{t('academicBooks.sortPagesDesc') || 'Pages: Most to Least'}</option>
+                  <option value="none">{t('academicBooks.sortNone') || 'Original Order'}</option>
                 </select>
               </div>
             </div>
@@ -985,22 +1028,22 @@ export default function AcademicBooksPage() {
                   #
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Book Details
+                  {t('academicBooks.bookDetails') || 'Book Details'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Subject & Class
+                  {t('academicBooks.subjectAndClass') || 'Subject & Class'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Author / Publisher
+                  {t('academicBooks.authorPublisher') || 'Author / Publisher'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Pages & File Size
+                  {t('academicBooks.pagesAndFileSize') || 'Pages & File Size'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '110px' }}>
-                  Status
+                  {t('academicBooks.status') || 'Status'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
-                  Actions
+                  {t('academicBooks.actions') || 'Actions'}
                 </th>
               </tr>
             </thead>
@@ -1050,7 +1093,7 @@ export default function AcademicBooksPage() {
               ) : paginatedBooks.length > 0 ? (
                 paginatedBooks.map((book, index) => {
                   const sl = (page - 1) * limit + index + 1;
-                  const className = getClassName(book) || 'All Classes';
+                  const className = getClassName(book) || t('academicBooks.allClasses') || 'All Classes';
 
                   return (
                     <tr 
@@ -1064,7 +1107,7 @@ export default function AcademicBooksPage() {
                     >
                       {/* SL No */}
                       <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                        {sl}
+                        {formatNumber(sl)}
                       </td>
 
                       {/* Book Details (Thumbnail + Title + Edition) */}
@@ -1079,7 +1122,7 @@ export default function AcademicBooksPage() {
                             flexShrink: 0, 
                             display: 'flex', 
                             alignItems: 'center', 
-                            justifyContent: 'center',
+                            justifyContent: 'center', 
                             border: '1.5px solid var(--border)'
                           }}>
                             {book.coverImageUrl ? (
@@ -1099,7 +1142,7 @@ export default function AcademicBooksPage() {
                             <span 
                               style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }}
                               onClick={() => setViewingBook(book)}
-                              title="Click to view and read"
+                              title={t('academicBooks.clickToView') || "Click to view and read"}
                             >
                               {book.title}
                             </span>
@@ -1111,7 +1154,7 @@ export default function AcademicBooksPage() {
                               )}
                               {book.publishedYear && (
                                 <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                                  ({book.publishedYear})
+                                  ({formatNumber(book.publishedYear)})
                                 </span>
                               )}
                             </div>
@@ -1128,7 +1171,7 @@ export default function AcademicBooksPage() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
                             <Tag size={13} />
-                            <span>{book.subject || 'General Curriculum'}</span>
+                            <span>{book.subject || t('academicBooks.generalCurriculum') || 'General Curriculum'}</span>
                           </div>
                         </div>
                       </td>
@@ -1139,13 +1182,13 @@ export default function AcademicBooksPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: book.author ? 'var(--foreground)' : 'var(--muted-foreground)' }}>
                             <User size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                             <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={book.author}>
-                              {book.author || 'Academic Textbook'}
+                              {book.author || t('academicBooks.academicTextbook') || 'Academic Textbook'}
                             </span>
                           </div>
                           {book.publishedYear && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
                               <Calendar size={12} />
-                              <span>{book.publishedYear}</span>
+                              <span>{formatNumber(book.publishedYear)}</span>
                             </div>
                           )}
                         </div>
@@ -1156,7 +1199,7 @@ export default function AcademicBooksPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--foreground)' }}>
                             <FileText size={13} style={{ color: 'var(--muted-foreground)' }} />
-                            <span>{book.totalPages ? `${book.totalPages} Pages` : 'Pages N/A'}</span>
+                            <span>{book.totalPages ? `${formatNumber(book.totalPages)} ${t('academicBooks.pages') || 'Pages'}` : (t('academicBooks.pagesNa') || 'Pages N/A')}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {book.fileSize && (
@@ -1173,7 +1216,7 @@ export default function AcademicBooksPage() {
                                 background: 'rgba(79, 70, 229, 0.1)',
                                 color: 'var(--primary)'
                               }}>
-                                PDF Ready
+                                {t('academicBooks.pdfReady') || 'PDF Ready'}
                               </span>
                             ) : (
                               <span style={{
@@ -1184,7 +1227,7 @@ export default function AcademicBooksPage() {
                                 background: 'var(--muted)',
                                 color: 'var(--muted-foreground)'
                               }}>
-                                No PDF
+                                {t('academicBooks.noPdf') || 'No PDF'}
                               </span>
                             )}
                           </div>
@@ -1220,7 +1263,8 @@ export default function AcademicBooksPage() {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           <button 
                             className="action-btn" 
-                            title="Read book & view details" 
+                            title={t('academicBooks.viewTooltip') || "Read book & view details"} 
+                            aria-label={t('academicBooks.viewTooltip') || "Read book & view details"}
                             onClick={() => setViewingBook(book)}
                             style={{ 
                               width: '32px', 
@@ -1240,7 +1284,8 @@ export default function AcademicBooksPage() {
                           
                           <button 
                             className="action-btn" 
-                            title="Edit book" 
+                            title={t('academicBooks.editTooltip') || "Edit book"} 
+                            aria-label={t('academicBooks.editTooltip') || "Edit book"}
                             onClick={() => openEditModal(book)}
                             style={{ 
                               width: '32px', 
@@ -1260,7 +1305,8 @@ export default function AcademicBooksPage() {
                           
                           <button 
                             className="action-btn" 
-                            title="Delete book" 
+                            title={t('academicBooks.deleteTooltip') || "Delete book"} 
+                            aria-label={t('academicBooks.deleteTooltip') || "Delete book"}
                             onClick={() => handleDelete(book)}
                             style={{ 
                               width: '32px', 
@@ -1294,8 +1340,8 @@ export default function AcademicBooksPage() {
                       </p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {searchTerm || filterClass || filterSubject || filterIsActive
-                          ? 'Try adjusting your search keywords or resetting filters.'
-                          : 'No academic books have been created yet. Click "Add Academic Book" to begin publishing textbooks.'}
+                          ? (t('academicBooks.adjustFilters') || 'Try adjusting your search keywords or resetting filters.')
+                          : (t('academicBooks.noBooksYet') || 'No academic books have been created yet. Click "Add Academic Book" to begin publishing textbooks.')}
                       </p>
                       {(searchTerm || filterClass || filterSubject || filterIsActive) && (
                         <button 
@@ -1303,7 +1349,7 @@ export default function AcademicBooksPage() {
                           className="btn" 
                           style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
                         >
-                          Clear Filters
+                          {t('academicBooks.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -1327,12 +1373,12 @@ export default function AcademicBooksPage() {
             gap: '1rem'
           }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> academic books
+              {t('academicBooks.showing') || 'Showing'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(((page - 1) * limit) + 1)}</strong> {t('academicBooks.to') || 'to'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(Math.min(page * limit, total))}</strong> {t('academicBooks.of') || 'of'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(total)}</strong> {t('academicBooks.booksCount') || 'academic books'}
             </span>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('academicBooks.page') || 'Page'} {formatNumber(page)} {t('academicBooks.of') || 'of'} {formatNumber(totalPages)}
               </span>
 
               <button 
@@ -1347,7 +1393,8 @@ export default function AcademicBooksPage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('academicBooks.prevPage') || "Previous page"}
+                aria-label={t('academicBooks.prevPage') || "Previous page"}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1364,7 +1411,8 @@ export default function AcademicBooksPage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('academicBooks.nextPage') || "Next page"}
+                aria-label={t('academicBooks.nextPage') || "Next page"}
               >
                 <ChevronRight size={16} />
               </button>
@@ -1427,7 +1475,7 @@ export default function AcademicBooksPage() {
                     {viewingBook.title}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: '0.15rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {viewingBook.author || 'Academic Curriculum Textbook'} {viewingBook.edition ? `• ${viewingBook.edition}` : ''}
+                    {viewingBook.author || t('academicBooks.academicCurriculumTextbook') || 'Academic Curriculum Textbook'} {viewingBook.edition ? `• ${viewingBook.edition}` : ''}
                   </p>
                 </div>
               </div>
@@ -1455,7 +1503,7 @@ export default function AcademicBooksPage() {
                       }}
                     >
                       <ExternalLink size={14} /> 
-                      <span className="hidden sm:inline">New Tab</span>
+                      <span className="hidden sm:inline">{t('academicBooks.newTab') || 'New Tab'}</span>
                     </a>
                     <button
                       className="btn"
@@ -1474,7 +1522,7 @@ export default function AcademicBooksPage() {
                       }}
                     >
                       {isReaderFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                      <span className="hidden sm:inline">{isReaderFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                      <span className="hidden sm:inline">{isReaderFullscreen ? (t('academicBooks.exitFullscreen') || 'Exit Fullscreen') : (t('academicBooks.fullscreen') || 'Fullscreen')}</span>
                     </button>
                   </>
                 )}
@@ -1485,6 +1533,7 @@ export default function AcademicBooksPage() {
                     setViewingBook(null);
                     setIsReaderFullscreen(false);
                   }} 
+                  aria-label={t('common.close') || 'Close'}
                   style={{ 
                     width: '32px', 
                     height: '32px', 
@@ -1542,12 +1591,12 @@ export default function AcademicBooksPage() {
                           background: viewingBook.isActive !== false ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                           color: viewingBook.isActive !== false ? '#10b981' : '#ef4444',
                         }}>
-                          {viewingBook.isActive !== false ? 'Active' : 'Inactive'}
+                          {viewingBook.isActive !== false ? (t('common.active') || 'Active') : (t('common.inactive') || 'Inactive')}
                         </span>
                       </div>
                       
                       <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-                        By <strong>{viewingBook.author || 'Academic Board'}</strong> {viewingBook.publishedYear ? `(${viewingBook.publishedYear})` : ''}
+                        {t('academicBooks.by') || 'By'} <strong>{viewingBook.author || t('academicBooks.academicTextbook') || 'Academic Board'}</strong> {viewingBook.publishedYear ? `(${formatNumber(viewingBook.publishedYear)})` : ''}
                       </div>
 
                       {viewingBook.description && (
@@ -1561,24 +1610,44 @@ export default function AcademicBooksPage() {
                   {/* Metadata Stats Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
                     <div style={{ padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Class</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>{getClassName(viewingBook) || 'All Classes'}</div>
+                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {t('common.class') || 'Class'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>
+                        {getClassName(viewingBook) || t('academicBooks.allClasses') || 'All Classes'}
+                      </div>
                     </div>
                     <div style={{ padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Subject</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>{viewingBook.subject || 'General'}</div>
+                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {t('common.subject') || 'Subject'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>
+                        {viewingBook.subject || t('academicBooks.general') || 'General'}
+                      </div>
                     </div>
                     <div style={{ padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Edition</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>{viewingBook.edition || 'Standard'}</div>
+                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {t('academicBooks.edition') || 'Edition'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>
+                        {viewingBook.edition || t('academicBooks.standard') || 'Standard'}
+                      </div>
                     </div>
                     <div style={{ padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Pages</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>{viewingBook.totalPages ? `${viewingBook.totalPages} Pages` : 'N/A'}</div>
+                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {t('academicBooks.totalPages') || 'Total Pages'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>
+                        {viewingBook.totalPages ? `${formatNumber(viewingBook.totalPages)} ${t('academicBooks.pages') || 'Pages'}` : (t('academicBooks.notSpecified') || 'N/A')}
+                      </div>
                     </div>
                     <div style={{ padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>File Size</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>{formatFileSize(viewingBook.fileSize) || 'N/A'}</div>
+                      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>
+                        {t('academicBooks.fileSize') || 'File Size'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.2rem', color: 'var(--foreground)' }}>
+                        {formatFileSize(viewingBook.fileSize) || t('academicBooks.notSpecified') || 'N/A'}
+                      </div>
                     </div>
                   </div>
                 </>
@@ -1624,9 +1693,11 @@ export default function AcademicBooksPage() {
                     }}>
                       <BookOpen size={32} color="#94a3b8" />
                     </div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>No PDF Document Attached</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
+                      {t('academicBooks.noPdfHeading') || 'No PDF Document Attached'}
+                    </h3>
                     <p style={{ maxWidth: '400px', marginTop: '0.4rem', color: '#94a3b8', fontSize: '0.875rem' }}>
-                      This textbook does not have a PDF document link attached yet. Edit this book to provide a valid PDF document URL or upload a file.
+                      {t('academicBooks.noPdfDesc') || 'This textbook does not have a PDF document link attached yet. Edit this book to provide a valid PDF document URL or upload a file.'}
                     </p>
                     <button
                       onClick={() => {
@@ -1637,7 +1708,7 @@ export default function AcademicBooksPage() {
                       className="btn btn-primary"
                       style={{ marginTop: '1.25rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                     >
-                      <Edit3 size={15} /> Edit Book to Add PDF
+                      <Edit3 size={15} /> {t('academicBooks.editToAddPdf') || 'Edit Book to Add PDF'}
                     </button>
                   </div>
                 )}
@@ -1653,7 +1724,7 @@ export default function AcademicBooksPage() {
                   style={{ border: '1px solid var(--border)', borderRadius: '0.75rem' }} 
                   onClick={() => setViewingBook(null)}
                 >
-                  Close
+                  {t('common.close') || 'Close'}
                 </button>
                 <button 
                   type="button" 
@@ -1665,7 +1736,7 @@ export default function AcademicBooksPage() {
                     openEditModal(b);
                   }}
                 >
-                  <Edit3 size={16} /> Edit Book
+                  <Edit3 size={16} /> {t('academicBooks.editBook') || 'Edit Book'}
                 </button>
               </div>
             )}
@@ -1722,10 +1793,10 @@ export default function AcademicBooksPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                    {modalMode === 'add' ? 'Add Academic Book' : 'Edit Academic Book'}
+                    {modalMode === 'add' ? (t('academicBooks.addHeading') || 'Add Academic Book') : (t('academicBooks.editHeading') || 'Edit Academic Book')}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
-                    {modalMode === 'add' ? 'Publish a curriculum textbook or digital study material' : 'Update details for this curriculum textbook'}
+                    {modalMode === 'add' ? (t('academicBooks.addSub') || 'Publish a curriculum textbook or digital study material') : (t('academicBooks.editSub') || 'Update details for this curriculum textbook')}
                   </p>
                 </div>
               </div>
@@ -1733,6 +1804,7 @@ export default function AcademicBooksPage() {
                 className="action-btn" 
                 onClick={() => setIsModalOpen(false)} 
                 disabled={actionLoading}
+                aria-label={t('common.close') || 'Close'}
                 style={{ 
                   width: '32px', 
                   height: '32px', 
@@ -1740,10 +1812,10 @@ export default function AcademicBooksPage() {
                   border: '1px solid var(--border)', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  justifyContent: 'center',
-                  background: 'var(--card)',
-                  cursor: 'pointer',
-                  color: 'var(--foreground)'
+                  justifyContent: 'center', 
+                  background: 'var(--card)', 
+                  cursor: 'pointer', 
+                  color: 'var(--foreground)' 
                 }}
               >
                 <X size={18} />
@@ -1763,10 +1835,10 @@ export default function AcademicBooksPage() {
                     overflow: 'hidden', 
                     border: '1.5px solid var(--border)', 
                     background: 'var(--card)', 
-                    flexShrink: 0,
+                    flexShrink: 0, 
                     display: 'flex', 
                     alignItems: 'center', 
-                    justifyContent: 'center'
+                    justifyContent: 'center' 
                   }}>
                     {formState.coverImageUrl ? (
                       <img src={formState.coverImageUrl} alt="Cover Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1776,22 +1848,22 @@ export default function AcademicBooksPage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>
-                      Book Cover Image
+                      {t('academicBooks.coverImage') || 'Book Cover Image'}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <label className="btn" style={{ 
                         border: '1px solid var(--border)', 
                         background: 'var(--card)', 
                         cursor: 'pointer', 
-                        padding: '0.4rem 0.85rem',
-                        fontSize: '0.825rem',
-                        borderRadius: '0.5rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem'
+                        padding: '0.4rem 0.85rem', 
+                        fontSize: '0.825rem', 
+                        borderRadius: '0.5rem', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.4rem' 
                       }}>
                         {uploadingCover ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                        <span>{uploadingCover ? 'Uploading...' : 'Upload Cover'}</span>
+                        <span>{uploadingCover ? (t('academicBooks.uploading') || 'Uploading...') : (t('academicBooks.uploadCover') || 'Upload Cover')}</span>
                         <input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingCover} />
                       </label>
                       {formState.coverImageUrl && (
@@ -1800,7 +1872,7 @@ export default function AcademicBooksPage() {
                           onClick={() => setFormState(p => ({ ...p, coverImageUrl: '' }))}
                           style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}
                         >
-                          Remove
+                          {t('academicBooks.remove') || 'Remove'}
                         </button>
                       )}
                     </div>
@@ -1809,7 +1881,9 @@ export default function AcademicBooksPage() {
 
                 {/* Direct Cover URL (Optional fallback) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Cover Image URL (Direct Link)</label>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('academicBooks.orCoverUrl') || 'Cover Image URL (Direct Link)'}
+                  </label>
                   <input 
                     type="url" 
                     className="input" 
@@ -1823,7 +1897,9 @@ export default function AcademicBooksPage() {
                 {/* Book Title & Author */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Book Title *</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.bookTitle') || 'Book Title'} *
+                    </label>
                     <input 
                       type="text" 
                       className="input" 
@@ -1831,18 +1907,20 @@ export default function AcademicBooksPage() {
                       onChange={(e) => setFormState({...formState, title: e.target.value})} 
                       required 
                       disabled={actionLoading} 
-                      placeholder="e.g. Class 9 Higher Mathematics"
+                      placeholder={t('academicBooks.titlePlaceholder') || "e.g. Class 9 Higher Mathematics"}
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Author / Publisher</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.authorPublisherLabel') || 'Author / Publisher'}
+                    </label>
                     <input 
                       type="text" 
                       className="input" 
                       value={formState.author} 
                       onChange={(e) => setFormState({...formState, author: e.target.value})} 
                       disabled={actionLoading} 
-                      placeholder="e.g. National Curriculum and Textbook Board (NCTB)"
+                      placeholder={t('academicBooks.authorPlaceholder') || "e.g. National Curriculum and Textbook Board (NCTB)"}
                     />
                   </div>
                 </div>
@@ -1850,11 +1928,13 @@ export default function AcademicBooksPage() {
                 {/* Class & Subject */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Class</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('common.class') || 'Class'}
+                    </label>
                     <select
-                      className="input"
-                      value={formState.classId}
-                      onChange={(e) => setFormState({...formState, classId: e.target.value})}
+                      className="input" 
+                      value={formState.classId} 
+                      onChange={(e) => setFormState({...formState, classId: e.target.value})} 
                       disabled={actionLoading}
                     >
                       <option value="">{t('common.selectClass') || 'Select Class...'}</option>
@@ -1867,7 +1947,9 @@ export default function AcademicBooksPage() {
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Subject</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('common.subject') || 'Subject'}
+                    </label>
                     <input 
                       type="text" 
                       className="input" 
@@ -1883,7 +1965,7 @@ export default function AcademicBooksPage() {
                         });
                       }} 
                       disabled={actionLoading} 
-                      placeholder="e.g. Mathematics, English, Physics..."
+                      placeholder={t('academicBooks.subjectPlaceholder') || "e.g. Mathematics, English, Physics..."}
                     />
                     <datalist id="subjects-modal-datalist">
                       {subjects.map((s, idx) => (
@@ -1896,25 +1978,29 @@ export default function AcademicBooksPage() {
                 {/* Edition & Published Year */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Edition</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.edition') || 'Edition'}
+                    </label>
                     <input 
                       type="text" 
                       className="input" 
                       value={formState.edition} 
                       onChange={(e) => setFormState({...formState, edition: e.target.value})} 
                       disabled={actionLoading} 
-                      placeholder="e.g. 2024 Edition"
+                      placeholder={t('academicBooks.editionPlaceholder') || "e.g. 2024 Edition"}
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Published Year</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.publishedYear') || 'Published Year'}
+                    </label>
                     <input 
                       type="number" 
                       className="input" 
                       value={formState.publishedYear} 
                       onChange={(e) => setFormState({...formState, publishedYear: e.target.value})} 
                       disabled={actionLoading} 
-                      placeholder="e.g. 2024"
+                      placeholder={t('academicBooks.yearPlaceholder') || "e.g. 2024"}
                     />
                   </div>
                 </div>
@@ -1922,25 +2008,29 @@ export default function AcademicBooksPage() {
                 {/* Total Pages & File Size */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Total Pages</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.totalPages') || 'Total Pages'}
+                    </label>
                     <input 
                       type="number" 
                       className="input" 
                       value={formState.totalPages} 
                       onChange={(e) => setFormState({...formState, totalPages: e.target.value})} 
                       disabled={actionLoading} 
-                      placeholder="e.g. 280"
+                      placeholder={t('academicBooks.pagesPlaceholder') || "e.g. 280"}
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>File Size (in bytes)</label>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('academicBooks.fileSizeBytes') || 'File Size (in bytes)'}
+                    </label>
                     <input 
                       type="number" 
                       className="input" 
                       value={formState.fileSize} 
                       onChange={(e) => setFormState({...formState, fileSize: e.target.value})} 
                       disabled={actionLoading} 
-                      placeholder="e.g. 15485760 (15 MB)"
+                      placeholder={t('academicBooks.fileSizePlaceholder') || "e.g. 15485760 (15 MB)"}
                     />
                   </div>
                 </div>
@@ -1949,21 +2039,21 @@ export default function AcademicBooksPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', background: 'var(--background)', borderRadius: '0.875rem', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                      PDF Document <span style={{ color: 'var(--primary)', fontSize: '0.75rem' }}>(for Reader feature)</span>
+                      {t('academicBooks.pdfDoc') || 'PDF Document'} <span style={{ color: 'var(--primary)', fontSize: '0.75rem' }}>{t('academicBooks.forReader') || '(for Reader feature)'}</span>
                     </label>
                     <label className="btn" style={{ 
                       border: '1px solid var(--border)', 
                       background: 'var(--card)', 
                       cursor: 'pointer', 
-                      padding: '0.35rem 0.75rem',
-                      fontSize: '0.8rem',
-                      borderRadius: '0.5rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
+                      padding: '0.35rem 0.75rem', 
+                      fontSize: '0.8rem', 
+                      borderRadius: '0.5rem', 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '0.4rem' 
                     }}>
                       {uploadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                      <span>{uploadingPdf ? 'Uploading...' : 'Upload PDF'}</span>
+                      <span>{uploadingPdf ? (t('academicBooks.uploading') || 'Uploading...') : (t('academicBooks.uploadPdf') || 'Upload PDF')}</span>
                       <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingPdf} />
                     </label>
                   </div>
@@ -1973,18 +2063,20 @@ export default function AcademicBooksPage() {
                     value={formState.pdfUrl} 
                     onChange={(e) => setFormState({...formState, pdfUrl: e.target.value})} 
                     disabled={actionLoading} 
-                    placeholder="https://example.com/curriculum-book.pdf"
+                    placeholder={t('academicBooks.pdfUrlPlaceholder') || "https://example.com/curriculum-book.pdf"}
                   />
                   {formState.pdfUrl && (
                     <span style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <CheckCircle2 size={13} /> PDF URL is attached
+                      <CheckCircle2 size={13} /> {t('academicBooks.pdfAttached') || 'PDF URL is attached'}
                     </span>
                   )}
                 </div>
 
                 {/* Description */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>Book Description</label>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('academicBooks.bookDesc') || 'Book Description'}
+                  </label>
                   <textarea 
                     className="input" 
                     value={formState.description} 
@@ -1992,7 +2084,7 @@ export default function AcademicBooksPage() {
                     disabled={actionLoading} 
                     rows={3}
                     style={{ height: 'auto', padding: '0.65rem 0.85rem', fontFamily: 'inherit', resize: 'vertical' }}
-                    placeholder="Standard curriculum syllabus textbook for secondary educational grades..."
+                    placeholder={t('academicBooks.descPlaceholder') || "Standard curriculum syllabus textbook for secondary educational grades..."}
                   />
                 </div>
 
@@ -2012,7 +2104,7 @@ export default function AcademicBooksPage() {
                       transition: 'background 0.2s',
                       flexShrink: 0,
                     }}
-                    aria-label="Toggle Active Status"
+                    aria-label={t('academicBooks.toggleStatus') || "Toggle Active Status"}
                   >
                     <span
                       style={{
@@ -2029,7 +2121,9 @@ export default function AcademicBooksPage() {
                     />
                   </button>
                   <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                    {formState.isActive ? 'Active (Visible to Students & Staff)' : 'Inactive (Draft / Hidden)'}
+                    {formState.isActive 
+                      ? (t('academicBooks.statusActiveLabel') || 'Active (Visible to Students & Staff)') 
+                      : (t('academicBooks.statusInactiveLabel') || 'Inactive (Draft / Hidden)')}
                   </span>
                 </div>
 
@@ -2051,7 +2145,11 @@ export default function AcademicBooksPage() {
                     style={{ borderRadius: '0.75rem', padding: '0.625rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {actionLoading && <Loader2 size={16} className="animate-spin" />} 
-                    {modalMode === 'add' ? (t('academicBooks.addBook') || 'Create Book') : (t('common.saveChanges') || 'Save Changes')}
+                    {actionLoading 
+                      ? (t('academicBooks.saving') || 'Saving...') 
+                      : modalMode === 'add' 
+                        ? (t('academicBooks.createBook') || 'Create Book') 
+                        : (t('common.saveChanges') || 'Save Changes')}
                   </button>
                 </div>
               </form>
@@ -2098,10 +2196,12 @@ export default function AcademicBooksPage() {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>
-                  Delete Academic Book?
+                  {t('academicBooks.deleteHeading') || 'Delete Academic Book?'}
                 </h2>
                 <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-                  Are you sure you want to permanently delete textbook <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>? Students and staff will no longer be able to access this material.
+                  {t('academicBooks.deleteConfirmPrefix') || 'Are you sure you want to permanently delete textbook'}{' '}
+                  <strong style={{ color: 'var(--foreground)' }}>&ldquo;{deleteModal.title}&rdquo;</strong>?{' '}
+                  {t('academicBooks.deleteConfirmSuffix') || 'Students and staff will no longer be able to access this material.'}
                 </p>
               </div>
             </div>
@@ -2113,7 +2213,7 @@ export default function AcademicBooksPage() {
                 onClick={() => setDeleteModal({ open: false, id: '', title: '' })}
                 disabled={deleteLoading}
               >
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
               <button
                 className="btn"
@@ -2122,20 +2222,20 @@ export default function AcademicBooksPage() {
                   background: 'linear-gradient(135deg, #ef4444, #dc2626)', 
                   color: '#ffffff', 
                   fontSize: '0.9rem', 
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.75rem', 
                   border: 'none', 
                   boxShadow: '0 4px 15px rgba(239,68,68,0.35)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
-                  gap: '0.5rem',
-                  fontWeight: 600
+                  gap: '0.5rem', 
+                  fontWeight: 600 
                 }}
                 onClick={confirmDelete}
                 disabled={deleteLoading}
               >
                 {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                {deleteLoading ? 'Deleting...' : 'Delete'}
+                {deleteLoading ? (t('academicBooks.deleting') || 'Deleting...') : (t('academicBooks.delete') || 'Delete')}
               </button>
             </div>
           </div>

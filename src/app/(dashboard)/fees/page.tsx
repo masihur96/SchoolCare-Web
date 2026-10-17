@@ -101,7 +101,7 @@ const PAYMENT_METHODS = [
 const FORM_PAYMENT_METHODS = PAYMENT_METHODS.filter(m => m.value !== 'ALL');
 
 export default function ExpenseTrackingPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -280,34 +280,84 @@ export default function ExpenseTrackingPage() {
   }, [successBanner]);
 
   // Helpers
-  const formatCurrency = (amount: number | string) => {
+  const formatNumber = useCallback((num: number | string) => {
+    if (language === 'bn') {
+      const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+      return String(num).replace(/\d/g, (digit) => bengaliDigits[parseInt(digit, 10)]);
+    }
+    return String(num);
+  }, [language]);
+
+  const formatCurrency = useCallback((amount: number | string) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(num)) return '৳0';
+    if (isNaN(num)) return language === 'bn' ? '৳০' : '৳0';
     return (
       '৳' +
-      new Intl.NumberFormat('en-BD', {
+      new Intl.NumberFormat(language === 'bn' ? 'bn-BD' : 'en-BD', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
       }).format(Math.abs(num))
     );
-  };
+  }, [language]);
 
-  const formatSingleLineDate = (dateString?: string) => {
+  const formatSingleLineDate = useCallback((dateString?: string) => {
     if (!dateString) return '—';
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return dateString;
-    const datePart = d.toLocaleDateString('en-US', {
+    const datePart = d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-    const timePart = d.toLocaleTimeString('en-US', {
+    const timePart = d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
     return `${datePart} • ${timePart}`;
-  };
+  }, [language]);
+
+  const getCategoryLabel = useCallback((cat: string) => {
+    switch (cat) {
+      case 'All Categories': return t('fees.cat.all');
+      case 'Electricity Bill': return t('fees.cat.electricity');
+      case 'Salary': return t('fees.cat.salary');
+      case 'Tuition Fee Collection': return t('fees.cat.tuitionFee');
+      case 'Rent': return t('fees.cat.rent');
+      case 'Maintenance & Repairs': return t('fees.cat.maintenance');
+      case 'Internet & Utilities': return t('fees.cat.utilities');
+      case 'Stationery & Supplies': return t('fees.cat.stationery');
+      case 'Lab Equipment': return t('fees.cat.labEquipment');
+      case 'Sports & Extracurricular': return t('fees.cat.sports');
+      case 'Transportation & Fuel': return t('fees.cat.transportation');
+      case 'Software & IT': return t('fees.cat.softwareIt');
+      case 'Exam Expenses': return t('fees.cat.examExpenses');
+      case 'Event & Celebrations': return t('fees.cat.events');
+      case 'Food & Refreshment': return t('fees.cat.food');
+      case 'Medical & First Aid': return t('fees.cat.medical');
+      case 'Printing & Photocopy': return t('fees.cat.printing');
+      case 'Other': return t('fees.cat.other');
+      default: return cat;
+    }
+  }, [t]);
+
+  const getPaymentMethodLabel = useCallback((method: string) => {
+    switch (method?.toUpperCase()) {
+      case 'ALL': return t('fees.pm.all');
+      case 'CASH': return t('fees.pm.cash');
+      case 'BANK_TRANSFER': return t('fees.pm.bankTransfer');
+      case 'BKASH': return t('fees.pm.bkash');
+      case 'NAGAD': return t('fees.pm.nagad');
+      case 'CHEQUE': return t('fees.pm.cheque');
+      case 'CARD': return t('fees.pm.card');
+      default: return method?.replace('_', ' ') || method;
+    }
+  }, [t]);
+
+  const getMonthName = useCallback((monthNum: string) => {
+    const key = `fees.month.${monthNum}`;
+    return t(key) || monthNum;
+  }, [t]);
 
   const handleResetFilters = () => {
     setTypeFilter('EXPENSE');
@@ -393,12 +443,12 @@ export default function ExpenseTrackingPage() {
     setFormError(null);
 
     if (!formData.title.trim()) {
-      setFormError('Please enter a title or payee description.');
+      setFormError(t('fees.titleRequired'));
       return;
     }
     const parsedAmount = parseFloat(formData.amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setFormError('Please enter a valid amount greater than 0.');
+      setFormError(t('fees.amountInvalid'));
       return;
     }
 
@@ -439,8 +489,10 @@ export default function ExpenseTrackingPage() {
       setIsFormModalOpen(false);
       setSuccessBanner(
         formMode === 'create'
-          ? `Successfully recorded ${formData.type.toLowerCase()} of ${formatCurrency(parsedAmount)}.`
-          : 'Transaction updated successfully.'
+          ? (formData.type === 'EXPENSE'
+              ? `${t('fees.successCreatedExpense')} ${formatCurrency(parsedAmount)}.`
+              : `${t('fees.successCreatedIncome')} ${formatCurrency(parsedAmount)}.`)
+          : t('fees.successUpdated')
       );
       fetchTransactions();
     } catch (err: unknown) {
@@ -469,7 +521,7 @@ export default function ExpenseTrackingPage() {
 
       setDeleteModalOpen(false);
       setTxToDelete(null);
-      setSuccessBanner('Transaction deleted successfully.');
+      setSuccessBanner(t('fees.successDeleted'));
       fetchTransactions();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Error deleting transaction');
@@ -484,32 +536,32 @@ export default function ExpenseTrackingPage() {
     if (transactions.length === 0) return;
 
     const headers = [
-      'SL',
-      'Date & Time',
-      'Type',
-      'Title',
-      'Category',
-      'Amount (BDT)',
-      'Payment Method',
-      'Reference',
-      'Handled By',
-      'Description',
+      t('fees.sl'),
+      t('fees.dateTime'),
+      t('fees.type'),
+      t('fees.titleReference'),
+      t('fees.category'),
+      `${t('fees.amount')} (BDT)`,
+      t('fees.paymentMethod'),
+      t('fees.referenceNo'),
+      t('fees.handledBy'),
+      t('fees.notesDetails'),
     ];
     const rows = transactions.map((tx, idx) => [
-      ((page - 1) * limit + idx + 1).toString(),
+      formatNumber((page - 1) * limit + idx + 1),
       `"${formatSingleLineDate(tx.transactionDate)}"`,
-      `"${tx.type}"`,
+      `"${tx.type === 'EXPENSE' ? t('fees.expenses') : t('fees.income')}"`,
       `"${(tx.title || '').replace(/"/g, '""')}"`,
-      `"${(tx.category || '').replace(/"/g, '""')}"`,
+      `"${getCategoryLabel(tx.category || '').replace(/"/g, '""')}"`,
       tx.amount.toString(),
-      `"${(tx.paymentMethod || '').replace('_', ' ')}"`,
+      `"${getPaymentMethodLabel(tx.paymentMethod || '').replace(/"/g, '""')}"`,
       `"${(tx.referenceNumber || '').replace(/"/g, '""')}"`,
       `"${(tx.performedByName || 'Admin').replace(/"/g, '""')}"`,
       `"${(tx.description || '').replace(/"/g, '""')}"`,
     ]);
 
     const csvContent =
-      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -528,29 +580,29 @@ export default function ExpenseTrackingPage() {
 
     doc.setFontSize(16);
     doc.setTextColor(239, 68, 68);
-    doc.text('Expense Tracking & Institutional Ledger Report', 14, 18);
+    doc.text(t('fees.export.reportTitle') || 'Expense Tracking & Institutional Ledger Report', 14, 18);
 
     doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
     const subtitleParts = [
-      `Page: ${page} of ${totalPages}`,
-      `Total Entries: ${total}`,
-      `Filter: ${typeFilter}`,
+      `Page: ${formatNumber(page)} of ${formatNumber(totalPages)}`,
+      `Total Entries: ${formatNumber(total)}`,
+      `Filter: ${typeFilter === 'EXPENSE' ? t('fees.expenses') : typeFilter === 'INCOME' ? t('fees.income') : t('fees.all')}`,
       `Total Expense: ${formatCurrency(summary.totalExpense)}`,
       `Total Income: ${formatCurrency(summary.totalIncome)}`,
       `Net Cashflow: ${formatCurrency(summary.netBalance)}`,
-      `Generated: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      `Generated: ${new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
     ];
     doc.text(subtitleParts.join(' | '), 14, 25);
 
     const tableColumn = ['#', 'Date & Time', 'Type', 'Title', 'Category', 'Payment Method', 'Reference', 'Handled By', 'Amount'];
     const tableRows = transactions.map((tx, idx) => [
-      ((page - 1) * limit + idx + 1).toString(),
+      formatNumber((page - 1) * limit + idx + 1),
       formatSingleLineDate(tx.transactionDate),
-      tx.type,
+      tx.type === 'EXPENSE' ? t('fees.expenses') : t('fees.income'),
       tx.title || 'Untitled',
-      tx.category || 'General',
-      tx.paymentMethod?.replace('_', ' ') || 'CASH',
+      getCategoryLabel(tx.category || 'Other'),
+      getPaymentMethodLabel(tx.paymentMethod || 'CASH'),
       tx.referenceNumber || '—',
       tx.performedByName || 'Admin',
       `${tx.type === 'EXPENSE' ? '-' : '+'} ${formatCurrency(tx.amount)}`,
@@ -681,12 +733,12 @@ export default function ExpenseTrackingPage() {
             <TrendingDown size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalExpense') || 'Total Expenses'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalExpense')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ef4444', lineHeight: 1.15, marginTop: '0.15rem' }}>
               {formatCurrency(summary.totalExpense)}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Recorded institutional payouts
+              {t('fees.recordedPayouts')}
             </div>
           </div>
         </div>
@@ -697,12 +749,12 @@ export default function ExpenseTrackingPage() {
             <TrendingUp size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalIncome') || 'Total Collections'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalIncome')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#16a34a', lineHeight: 1.15, marginTop: '0.15rem' }}>
               {formatCurrency(summary.totalIncome)}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Tuition, admissions & fees
+              {t('fees.tuitionAdmissions')}
             </div>
           </div>
         </div>
@@ -713,12 +765,12 @@ export default function ExpenseTrackingPage() {
             <Wallet size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.netBalance') || 'Net Cashflow'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.netBalance')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: summary.netBalance >= 0 ? '#2563eb' : '#ea580c', lineHeight: 1.15, marginTop: '0.15rem' }}>
               {summary.netBalance >= 0 ? '+' : '-'} {formatCurrency(summary.netBalance)}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {summary.netBalance >= 0 ? 'Positive ledger reserve' : 'Deficit balance alert'}
+              {summary.netBalance >= 0 ? t('fees.positiveReserve') : t('fees.deficitAlert')}
             </div>
           </div>
         </div>
@@ -729,12 +781,12 @@ export default function ExpenseTrackingPage() {
             <Receipt size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('common.total') || 'Total'} {t('common.records') || 'Records'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.totalRecords')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {summary.totalCount || total}
+              {formatNumber(summary.totalCount || total)}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Recorded entries in ledger
+              {t('fees.recordedEntries')}
             </div>
           </div>
         </div>
@@ -793,7 +845,7 @@ export default function ExpenseTrackingPage() {
                 <Search size={17} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input 
                   type="text" 
-                  placeholder="Search title, payee, or reference..." 
+                  placeholder={t('fees.searchPlaceholder')} 
                   style={{ 
                     border: 'none', 
                     outline: 'none', 
@@ -840,7 +892,7 @@ export default function ExpenseTrackingPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <TrendingDown size={14} /> Expenses
+                  <TrendingDown size={14} /> {t('fees.expenses')}
                 </button>
                 <button
                   type="button"
@@ -861,7 +913,7 @@ export default function ExpenseTrackingPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <FileText size={14} /> All
+                  <FileText size={14} /> {t('fees.all')}
                 </button>
                 <button
                   type="button"
@@ -882,7 +934,7 @@ export default function ExpenseTrackingPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <TrendingUp size={14} /> Income
+                  <TrendingUp size={14} /> {t('fees.income')}
                 </button>
               </div>
 
@@ -907,7 +959,7 @@ export default function ExpenseTrackingPage() {
                 }}
               >
                 <Filter size={15} />
-                <span>Filters</span>
+                <span>{t('fees.filters')}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{ 
                     background: showFilters ? '#ffffff' : '#4f46e5', 
@@ -917,7 +969,7 @@ export default function ExpenseTrackingPage() {
                     padding: '0.1rem 0.45rem',
                     fontWeight: 700
                   }}>
-                    {activeFiltersCount}
+                    {formatNumber(activeFiltersCount)}
                   </span>
                 )}
               </button>
@@ -926,7 +978,7 @@ export default function ExpenseTrackingPage() {
               <div style={{ display: 'flex', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '3px' }}>
                 <button
                   type="button"
-                  title="Table View"
+                  title={t('fees.tableView')}
                   onClick={() => setViewMode('table')}
                   style={{
                     display: 'flex',
@@ -946,7 +998,7 @@ export default function ExpenseTrackingPage() {
                 </button>
                 <button
                   type="button"
-                  title="Cards View"
+                  title={t('fees.cardsView')}
                   onClick={() => setViewMode('cards')}
                   style={{
                     display: 'flex',
@@ -972,7 +1024,7 @@ export default function ExpenseTrackingPage() {
                   type="button"
                   onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                   disabled={transactions.length === 0}
-                  title="Export Options"
+                  title={t('fees.export')}
                   style={{ 
                     background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
                     border: '1px solid var(--border)', 
@@ -990,7 +1042,7 @@ export default function ExpenseTrackingPage() {
                   }}
                 >
                   <Download size={15} />
-                  <span>Export</span>
+                  <span>{t('fees.export')}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
 
@@ -1034,7 +1086,7 @@ export default function ExpenseTrackingPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                      <span>Export as CSV</span>
+                      <span>{t('fees.exportCsv')}</span>
                     </button>
                     <button
                       onClick={handleExportPDF}
@@ -1057,7 +1109,7 @@ export default function ExpenseTrackingPage() {
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <FileText size={15} style={{ color: '#ef4444' }} />
-                      <span>Export as PDF</span>
+                      <span>{t('fees.exportPdf')}</span>
                     </button>
                   </div>
                 )}
@@ -1065,16 +1117,16 @@ export default function ExpenseTrackingPage() {
 
               {/* Rows Per Page Selector */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('fees.show')}</span>
                 <select 
                   value={limit} 
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                   style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
+                  <option value={10}>{formatNumber(10)}</option>
+                  <option value={20}>{formatNumber(20)}</option>
+                  <option value={50}>{formatNumber(50)}</option>
+                  <option value={100}>{formatNumber(100)}</option>
                 </select>
               </div>
 
@@ -1099,14 +1151,14 @@ export default function ExpenseTrackingPage() {
                 }}
               >
                 <Plus size={17} />
-                <span>{t('fees.addTransaction') || 'Record Expense'}</span>
+                <span>{t('fees.recordExpense')}</span>
               </button>
 
               {/* Refresh Button */}
               <button
                 type="button"
                 onClick={() => fetchTransactions()}
-                title="Refresh Ledger"
+                title={t('fees.refreshLedger')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1146,7 +1198,7 @@ export default function ExpenseTrackingPage() {
               {/* Category */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Category
+                  {t('fees.category')}
                 </label>
                 <select
                   value={category}
@@ -1154,7 +1206,7 @@ export default function ExpenseTrackingPage() {
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
                   {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>{getCategoryLabel(c)}</option>
                   ))}
                 </select>
               </div>
@@ -1162,7 +1214,7 @@ export default function ExpenseTrackingPage() {
               {/* Payment Method */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Payment Method
+                  {t('fees.paymentMethod')}
                 </label>
                 <select
                   value={paymentMethod}
@@ -1170,7 +1222,7 @@ export default function ExpenseTrackingPage() {
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
                   {PAYMENT_METHODS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.value} value={m.value}>{getPaymentMethodLabel(m.value)}</option>
                   ))}
                 </select>
               </div>
@@ -1178,7 +1230,7 @@ export default function ExpenseTrackingPage() {
               {/* Start Date */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Start Date
+                  {t('fees.startDate')}
                 </label>
                 <input
                   type="date"
@@ -1191,7 +1243,7 @@ export default function ExpenseTrackingPage() {
               {/* End Date */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  End Date
+                  {t('fees.endDate')}
                 </label>
                 <input
                   type="date"
@@ -1204,7 +1256,7 @@ export default function ExpenseTrackingPage() {
               {/* Specific Month */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Specific Month
+                  {t('fees.specificMonth')}
                 </label>
                 <select
                   value={month}
@@ -1213,20 +1265,10 @@ export default function ExpenseTrackingPage() {
                 >
                   <option value="">{t('common.allMonths') || 'All Months'}</option>
                   {[
-                    { m: '1', name: 'January' },
-                    { m: '2', name: 'February' },
-                    { m: '3', name: 'March' },
-                    { m: '4', name: 'April' },
-                    { m: '5', name: 'May' },
-                    { m: '6', name: 'June' },
-                    { m: '7', name: 'July' },
-                    { m: '8', name: 'August' },
-                    { m: '9', name: 'September' },
-                    { m: '10', name: 'October' },
-                    { m: '11', name: 'November' },
-                    { m: '12', name: 'December' },
-                  ].map(item => (
-                    <option key={item.m} value={item.m}>{item.name}</option>
+                    '1', '2', '3', '4', '5', '6',
+                    '7', '8', '9', '10', '11', '12'
+                  ].map(m => (
+                    <option key={m} value={m}>{getMonthName(m)}</option>
                   ))}
                 </select>
               </div>
@@ -1234,7 +1276,7 @@ export default function ExpenseTrackingPage() {
               {/* Sort By & Order */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  Sort Order
+                  {t('fees.sortOrder')}
                 </label>
                 <select
                   value={`${sortBy}:${sortOrder}`}
@@ -1246,10 +1288,10 @@ export default function ExpenseTrackingPage() {
                   }}
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
-                  <option value="transactionDate:DESC">Date: Newest First</option>
-                  <option value="transactionDate:ASC">Date: Oldest First</option>
-                  <option value="amount:DESC">Amount: Highest First</option>
-                  <option value="amount:ASC">Amount: Lowest First</option>
+                  <option value="transactionDate:DESC">{t('fees.sortNewest')}</option>
+                  <option value="transactionDate:ASC">{t('fees.sortOldest')}</option>
+                  <option value="amount:DESC">{t('fees.sortAmountHighest')}</option>
+                  <option value="amount:ASC">{t('fees.sortAmountLowest')}</option>
                 </select>
               </div>
 
@@ -1271,7 +1313,7 @@ export default function ExpenseTrackingPage() {
                     cursor: 'pointer'
                   }}
                 >
-                  Reset Filters
+                  {t('fees.resetFilters')}
                 </button>
               </div>
 
@@ -1281,46 +1323,46 @@ export default function ExpenseTrackingPage() {
           {/* ── Active Filter Badges ────────────────────────────── */}
           {activeFiltersCount > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', paddingTop: '0.25rem' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Active Filters:</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.activeFilters')}</span>
               
               {debouncedSearch && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#eff6ff', color: '#2563eb', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Search: &ldquo;{debouncedSearch}&rdquo;
+                  {t('fees.filters')}: &ldquo;{debouncedSearch}&rdquo;
                   <button onClick={() => { setSearchTerm(''); setDebouncedSearch(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#2563eb', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {category !== 'All Categories' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#fef2f2', color: '#dc2626', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Category: {category}
+                  {t('fees.category')}: {getCategoryLabel(category)}
                   <button onClick={() => setCategory('All Categories')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#dc2626', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {paymentMethod !== 'ALL' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Method: {paymentMethod.replace('_', ' ')}
+                  {t('fees.paymentMethod')}: {getPaymentMethodLabel(paymentMethod)}
                   <button onClick={() => setPaymentMethod('ALL')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#16a34a', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {(startDate || endDate) && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#fff7ed', color: '#ea580c', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Date: {startDate || 'Start'} to {endDate || 'End'}
+                  {startDate || t('fees.startDate')} {t('fees.to')} {endDate || t('fees.endDate')}
                   <button onClick={() => { setStartDate(''); setEndDate(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#ea580c', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {month && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#eef2ff', color: '#4f46e5', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Month: {month}
+                  {t('fees.specificMonth')}: {getMonthName(month)}
                   <button onClick={() => setMonth('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#4f46e5', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
               {year && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#f1f5f9', color: '#475569', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  Year: {year}
+                  {formatNumber(year)}
                   <button onClick={() => setYear('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#475569', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
@@ -1329,7 +1371,7 @@ export default function ExpenseTrackingPage() {
                 onClick={handleResetFilters}
                 style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: '0 0.25rem' }}
               >
-                Clear all
+                {t('fees.clearAll')}
               </button>
             </div>
           )}
@@ -1354,13 +1396,13 @@ export default function ExpenseTrackingPage() {
             <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
               <AlertCircle size={34} color="#ef4444" />
             </div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Failed to Load Transactions</h3>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('fees.failedToLoad')}</h3>
             <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '450px' }}>{error}</p>
             <button
               onClick={() => fetchTransactions()}
               style={{ marginTop: '1.25rem', padding: '0.65rem 1.4rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
             >
-              <RefreshCw size={15} /> Try Again
+              <RefreshCw size={15} /> {t('fees.tryAgain')}
             </button>
           </div>
         ) : transactions.length === 0 ? (
@@ -1368,9 +1410,9 @@ export default function ExpenseTrackingPage() {
             <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.7 }}>
               <Receipt size={36} />
             </div>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('fees.noTransactions') || 'No Transactions Found'}</h3>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>{t('fees.noTransactions')}</h3>
             <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '420px' }}>
-              No records match your active search terms, category filters, or date range.
+              {t('fees.noMatchingDesc')}
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
               <button
@@ -1378,14 +1420,14 @@ export default function ExpenseTrackingPage() {
                 onClick={handleResetFilters}
                 style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}
               >
-                Reset Filters
+                {t('fees.resetFilters')}
               </button>
               <button
                 type="button"
                 onClick={openCreateModal}
                 style={{ padding: '0.65rem 1.25rem', background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
-                <Plus size={16} /> Record Expense
+                <Plus size={16} /> {t('fees.recordExpense')}
               </button>
             </div>
           </div>
@@ -1395,14 +1437,14 @@ export default function ExpenseTrackingPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '0.9rem 1.25rem', width: '50px' }}>#</th>
-                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>Date & Time</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Title & Reference</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Category</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Payment Method</th>
-                  <th style={{ padding: '0.9rem 1rem' }}>Handled By</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>Amount</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>Actions</th>
+                  <th style={{ padding: '0.9rem 1.25rem', width: '50px' }}>{t('fees.sl')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('fees.dateTime')}</th>
+                  <th style={{ padding: '0.9rem 1rem' }}>{t('fees.titleReference')}</th>
+                  <th style={{ padding: '0.9rem 1rem' }}>{t('fees.category')}</th>
+                  <th style={{ padding: '0.9rem 1rem' }}>{t('fees.paymentMethod')}</th>
+                  <th style={{ padding: '0.9rem 1rem' }}>{t('fees.handledBy')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>{t('fees.amount')}</th>
+                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>{t('fees.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1418,7 +1460,7 @@ export default function ExpenseTrackingPage() {
                     >
                       {/* Index */}
                       <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
-                        {(page - 1) * limit + idx + 1}
+                        {formatNumber((page - 1) * limit + idx + 1)}
                       </td>
 
                       {/* Date & Time - Strictly Single Line */}
@@ -1432,7 +1474,7 @@ export default function ExpenseTrackingPage() {
                       {/* Title & Payee */}
                       <td style={{ padding: '1rem 1rem', minWidth: '180px' }}>
                         <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                          {tx.title || 'Untitled Transaction'}
+                          {tx.title || t('fees.untitled')}
                         </div>
                         {tx.description && (
                           <div style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginTop: '0.15rem', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1460,7 +1502,7 @@ export default function ExpenseTrackingPage() {
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          {tx.category || 'General'}
+                          {getCategoryLabel(tx.category || 'Other')}
                         </span>
                       </td>
 
@@ -1482,7 +1524,7 @@ export default function ExpenseTrackingPage() {
                           }}
                         >
                           <CreditCard size={12} style={{ color: 'var(--muted-foreground)' }} />
-                          {tx.paymentMethod?.replace('_', ' ') || 'CASH'}
+                          {getPaymentMethodLabel(tx.paymentMethod || 'CASH')}
                         </span>
                       </td>
 
@@ -1508,7 +1550,7 @@ export default function ExpenseTrackingPage() {
                           <span>{formatCurrency(tx.amount)}</span>
                         </div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {tx.type}
+                          {tx.type === 'EXPENSE' ? t('fees.expenses') : t('fees.income')}
                         </div>
                       </td>
 
@@ -1518,7 +1560,7 @@ export default function ExpenseTrackingPage() {
                           {/* View Voucher / Details */}
                           <button
                             type="button"
-                            title="View Voucher"
+                            title={t('fees.viewVoucher')}
                             onClick={() => openDetailsModal(tx)}
                             style={{
                               width: '32px',
@@ -1541,7 +1583,7 @@ export default function ExpenseTrackingPage() {
                           {/* Edit */}
                           <button
                             type="button"
-                            title="Edit Transaction"
+                            title={t('fees.editTransaction')}
                             onClick={() => openEditModal(tx)}
                             style={{
                               width: '32px',
@@ -1564,7 +1606,7 @@ export default function ExpenseTrackingPage() {
                           {/* Delete */}
                           <button
                             type="button"
-                            title="Delete Transaction"
+                            title={t('fees.deleteTransaction')}
                             onClick={() => openDeleteModal(tx)}
                             style={{
                               width: '32px',
@@ -1632,7 +1674,7 @@ export default function ExpenseTrackingPage() {
                         fontWeight: 700,
                       }}
                     >
-                      {tx.category || 'General'}
+                      {getCategoryLabel(tx.category || 'Other')}
                     </span>
                     <span
                       style={{
@@ -1646,7 +1688,7 @@ export default function ExpenseTrackingPage() {
                         letterSpacing: '0.04em'
                       }}
                     >
-                      {tx.type}
+                      {tx.type === 'EXPENSE' ? t('fees.expenses') : t('fees.income')}
                     </span>
                   </div>
 
@@ -1656,7 +1698,7 @@ export default function ExpenseTrackingPage() {
                       {isExpense ? '-' : '+'} {formatCurrency(tx.amount)}
                     </div>
                     <div style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.35rem' }}>
-                      {tx.title || 'Untitled Transaction'}
+                      {tx.title || t('fees.untitled')}
                     </div>
                     {tx.description && (
                       <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: '0.25rem 0 0', lineHeight: 1.4 }}>
@@ -1695,13 +1737,13 @@ export default function ExpenseTrackingPage() {
                       }}
                     >
                       <CreditCard size={11} style={{ color: 'var(--muted-foreground)' }} />
-                      {tx.paymentMethod?.replace('_', ' ') || 'CASH'}
+                      {getPaymentMethodLabel(tx.paymentMethod || 'CASH')}
                     </span>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <button
                         type="button"
-                        title="View Details"
+                        title={t('fees.viewVoucher')}
                         onClick={() => openDetailsModal(tx)}
                         style={{
                           width: '30px',
@@ -1720,7 +1762,7 @@ export default function ExpenseTrackingPage() {
                       </button>
                       <button
                         type="button"
-                        title="Edit"
+                        title={t('fees.editTransaction')}
                         onClick={() => openEditModal(tx)}
                         style={{
                           width: '30px',
@@ -1739,7 +1781,7 @@ export default function ExpenseTrackingPage() {
                       </button>
                       <button
                         type="button"
-                        title="Delete"
+                        title={t('fees.deleteTransaction')}
                         onClick={() => openDeleteModal(tx)}
                         style={{
                           width: '30px',
@@ -1781,12 +1823,12 @@ export default function ExpenseTrackingPage() {
             }}
           >
             <div>
-              Showing <strong>{transactions.length}</strong> of <strong>{total}</strong> transaction{total !== 1 ? 's' : ''}
+              {t('fees.showing')} <strong>{formatNumber(transactions.length)}</strong> {t('fees.of')} <strong>{formatNumber(total)}</strong> {t('fees.transactionsCount')}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.82rem', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages || 1}
+                {t('fees.page')} {formatNumber(page)} {t('fees.of')} {formatNumber(totalPages || 1)}
               </span>
               <button
                 type="button"
@@ -1866,10 +1908,10 @@ export default function ExpenseTrackingPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    {formMode === 'create' ? (formData.type === 'EXPENSE' ? 'Record Expense' : 'Record Collection') : 'Edit Transaction'}
+                    {formMode === 'create' ? (formData.type === 'EXPENSE' ? t('fees.modalCreateExpenseTitle') : t('fees.modalCreateIncomeTitle')) : t('fees.modalEditTitle')}
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
-                    {formMode === 'create' ? 'Add a new ledger entry with receipts and categorization' : 'Update the selected ledger record'}
+                    {formMode === 'create' ? t('fees.modalCreateDesc') : t('fees.modalEditDesc')}
                   </p>
                 </div>
               </div>
@@ -1895,7 +1937,7 @@ export default function ExpenseTrackingPage() {
               {/* Type Toggle (Expense vs Income) */}
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                  Transaction Type <span style={{ color: '#ef4444' }}>*</span>
+                  {t('fees.transactionType')} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <button
@@ -1916,7 +1958,7 @@ export default function ExpenseTrackingPage() {
                       gap: '0.45rem'
                     }}
                   >
-                    <TrendingDown size={16} /> Expense (Debit)
+                    <TrendingDown size={16} /> {t('fees.expenseDebit')}
                   </button>
                   <button
                     type="button"
@@ -1936,7 +1978,7 @@ export default function ExpenseTrackingPage() {
                       gap: '0.45rem'
                     }}
                   >
-                    <TrendingUp size={16} /> Income (Credit)
+                    <TrendingUp size={16} /> {t('fees.incomeCredit')}
                   </button>
                 </div>
               </div>
@@ -1944,11 +1986,11 @@ export default function ExpenseTrackingPage() {
               {/* Title / Payee */}
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                  Title / Payee Name <span style={{ color: '#ef4444' }}>*</span>
+                  {t('fees.titlePayee')} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. DESCO Electric Bill, Campus Renovation, Teacher Salary"
+                  placeholder={t('fees.titlePayeePlaceholder')}
                   value={formData.title}
                   onChange={e => setFormData({ ...formData, title: e.target.value })}
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
@@ -1960,7 +2002,7 @@ export default function ExpenseTrackingPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                    Amount (৳) <span style={{ color: '#ef4444' }}>*</span>
+                    {t('fees.amount')} (৳) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"
@@ -1976,7 +2018,7 @@ export default function ExpenseTrackingPage() {
 
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                    Category <span style={{ color: '#ef4444' }}>*</span>
+                    {t('fees.category')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     value={formData.category}
@@ -1984,7 +2026,7 @@ export default function ExpenseTrackingPage() {
                     style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
                   >
                     {FORM_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>{getCategoryLabel(c)}</option>
                     ))}
                   </select>
                 </div>
@@ -1994,7 +2036,7 @@ export default function ExpenseTrackingPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                    Payment Method <span style={{ color: '#ef4444' }}>*</span>
+                    {t('fees.paymentMethod')} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     value={formData.paymentMethod}
@@ -2002,18 +2044,18 @@ export default function ExpenseTrackingPage() {
                     style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
                   >
                     {FORM_PAYMENT_METHODS.map(m => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
+                      <option key={m.value} value={m.value}>{getPaymentMethodLabel(m.value)}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                    Reference / Voucher #
+                    {t('fees.referenceVoucher')}
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. CHQ-9281, TRX-0492"
+                    placeholder={t('fees.referencePlaceholder')}
                     value={formData.referenceNumber}
                     onChange={e => setFormData({ ...formData, referenceNumber: e.target.value })}
                     style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none' }}
@@ -2024,7 +2066,7 @@ export default function ExpenseTrackingPage() {
               {/* Transaction Date */}
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                  Transaction Date & Time <span style={{ color: '#ef4444' }}>*</span>
+                  {t('fees.transactionDateTime')} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="datetime-local"
@@ -2038,11 +2080,11 @@ export default function ExpenseTrackingPage() {
               {/* Description / Notes */}
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                  Notes & Details
+                  {t('fees.notesDetails')}
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Additional context, invoice breakdown, or remarks..."
+                  placeholder={t('fees.notesPlaceholder')}
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.88rem', outline: 'none', resize: 'vertical' }}
@@ -2057,7 +2099,7 @@ export default function ExpenseTrackingPage() {
                   disabled={formLoading}
                   style={{ padding: '0.65rem 1.25rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Cancel
+                  {t('fees.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -2077,7 +2119,7 @@ export default function ExpenseTrackingPage() {
                   }}
                 >
                   {formLoading && <RefreshCw size={14} className="animate-spin" />}
-                  <span>{formMode === 'create' ? 'Save Transaction' : 'Update Record'}</span>
+                  <span>{formMode === 'create' ? t('fees.saveTransaction') : t('fees.updateRecord')}</span>
                 </button>
               </div>
 
@@ -2124,7 +2166,7 @@ export default function ExpenseTrackingPage() {
             }}>
               <div>
                 <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.9, fontWeight: 700 }}>
-                  Ledger Voucher &bull; {viewTx.type}
+                  {t('fees.ledgerVoucher')} &bull; {viewTx.type === 'EXPENSE' ? t('fees.expenses') : t('fees.income')}
                 </span>
                 <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.15rem 0 0' }}>
                   {viewTx.type === 'EXPENSE' ? '-' : '+'} {formatCurrency(viewTx.amount)}
@@ -2143,33 +2185,33 @@ export default function ExpenseTrackingPage() {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Title / Payee</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.titlePayee')}</div>
                 <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                  {viewTx.title || 'Untitled Transaction'}
+                  {viewTx.title || t('fees.untitled')}
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '0.85rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Category</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.category')}</div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {viewTx.category || 'General'}
+                    {getCategoryLabel(viewTx.category || 'Other')}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Payment Method</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.paymentMethod')}</div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {viewTx.paymentMethod?.replace('_', ' ') || 'CASH'}
+                    {getPaymentMethodLabel(viewTx.paymentMethod || 'CASH')}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Reference No</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.referenceNo')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {viewTx.referenceNumber || '—'}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recorded By</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.recordedBy')}</div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {viewTx.performedByName || 'Admin Staff'}
                   </div>
@@ -2178,7 +2220,7 @@ export default function ExpenseTrackingPage() {
 
               {/* Date */}
               <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Transaction Date</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.transactionDate')}</div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
                   <Calendar size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                   <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(viewTx.transactionDate)}</span>
@@ -2188,7 +2230,7 @@ export default function ExpenseTrackingPage() {
               {/* Notes */}
               {viewTx.description && (
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Remarks & Notes</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('fees.remarksNotes')}</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--foreground)', marginTop: '0.2rem', padding: '0.65rem 0.85rem', background: 'var(--muted)', borderRadius: '0.5rem', lineHeight: 1.4 }}>
                     {viewTx.description}
                   </div>
@@ -2215,7 +2257,7 @@ export default function ExpenseTrackingPage() {
                   }}
                 >
                   <Printer size={15} />
-                  <span>Download Voucher</span>
+                  <span>{t('fees.downloadVoucher')}</span>
                 </button>
 
                 <button
@@ -2223,7 +2265,7 @@ export default function ExpenseTrackingPage() {
                   onClick={() => setDetailsModalOpen(false)}
                   style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: 'none', background: '#4f46e5', color: '#ffffff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer' }}
                 >
-                  Close
+                  {t('fees.close')}
                 </button>
               </div>
 
@@ -2263,14 +2305,15 @@ export default function ExpenseTrackingPage() {
             </div>
 
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-              Delete Transaction?
+              {t('fees.deletePrompt')}
             </h3>
 
             <p style={{ color: 'var(--muted-foreground)', fontSize: '0.88rem', margin: '0.5rem 0 1.25rem', lineHeight: 1.45 }}>
-              Are you sure you want to remove <strong>&ldquo;{txToDelete.title}&rdquo;</strong> of{' '}
+              {t('fees.deleteConfirmPrefix')} <strong>&ldquo;{txToDelete.title || t('fees.untitled')}&rdquo;</strong> {t('fees.deleteConfirmOf')}{' '}
               <strong style={{ color: txToDelete.type === 'EXPENSE' ? '#ef4444' : '#16a34a' }}>
                 {formatCurrency(txToDelete.amount)}
-              </strong>? This action will permanently affect the school ledger.
+              </strong>
+              {t('fees.deleteConfirmSuffix')}
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
@@ -2280,7 +2323,7 @@ export default function ExpenseTrackingPage() {
                 disabled={deleteLoading}
                 style={{ padding: '0.65rem 1.25rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
               >
-                Cancel
+                {t('fees.cancel')}
               </button>
               <button
                 type="button"
@@ -2289,7 +2332,7 @@ export default function ExpenseTrackingPage() {
                 style={{ padding: '0.65rem 1.4rem', borderRadius: '0.65rem', border: 'none', background: '#ef4444', color: '#ffffff', fontWeight: 700, fontSize: '0.88rem', cursor: deleteLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 {deleteLoading && <RefreshCw size={14} className="animate-spin" />}
-                <span>Delete Entry</span>
+                <span>{t('fees.deleteEntry')}</span>
               </button>
             </div>
           </div>

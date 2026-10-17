@@ -6,7 +6,7 @@ import {
   Search, Plus, Edit3, Trash2, Eye, Filter,
   ChevronLeft, ChevronRight, Loader2, X, Upload, AlertTriangle,
   BookOpen, BookMarked, Download, FileSpreadsheet, FileText,
-  ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, User, Hash
+  ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, User
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -77,7 +77,46 @@ const getCategoryBadgeStyle = (cat?: string) => {
 };
 
 export default function LibraryPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const formatNumber = useCallback((num: number | string | undefined | null) => {
+    if (num === undefined || num === null || num === '') return '';
+    return language === 'bn' ? Number(num).toLocaleString('bn-BD') : num.toString();
+  }, [language]);
+
+  const getCategoryLabel = useCallback((cat?: string) => {
+    if (!cat) return t('library.categoryGeneral') || 'General';
+    const keyMap: Record<string, string> = {
+      'Fiction': 'library.cat.fiction',
+      'Non-Fiction': 'library.cat.nonFiction',
+      'Science': 'library.cat.science',
+      'Mathematics': 'library.cat.mathematics',
+      'History': 'library.cat.history',
+      'Literature': 'library.cat.literature',
+      'Technology': 'library.cat.technology',
+      'Arts': 'library.cat.arts',
+      'Religion': 'library.cat.religion',
+      'Reference': 'library.cat.reference',
+    };
+    const key = keyMap[cat];
+    if (key) {
+      const translated = t(key);
+      if (translated && translated !== key) return translated;
+    }
+    return cat;
+  }, [t]);
+
+  const getModalTitle = () => {
+    if (modalMode === 'add') return t('library.addNewBook') || 'Add New Book';
+    if (modalMode === 'edit') return t('library.editBookTitle') || 'Edit Book Details';
+    return t('library.bookDetails') || 'Book Details';
+  };
+
+  const getModalSubtitle = () => {
+    if (modalMode === 'view') return t('library.viewSubtitle') || 'Read-only book information';
+    return t('library.formSubtitle') || 'Fill in the information below to continue';
+  };
+
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -246,8 +285,8 @@ export default function LibraryPage() {
     setDeleteModal({
       open: true,
       id: book.id,
-      title: book.title || 'Untitled Book',
-      isbn: book.isbn || 'N/A'
+      title: book.title || (t('library.untitledBook') || 'Untitled Book'),
+      isbn: book.isbn || (t('common.na') || 'N/A')
     });
   };
 
@@ -267,10 +306,10 @@ export default function LibraryPage() {
         fetchBooks();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(`Failed to delete book: ${errorData.message || 'Unknown error'}`);
+        alert(`${t('library.deleteFailed') || 'Failed to delete book'}: ${errorData.message || t('common.unknownError') || 'Unknown error'}`);
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error deleting book.');
+      alert(err instanceof Error ? err.message : (t('library.deleteError') || 'Error deleting book.'));
     } finally {
       setDeleteLoading(false);
     }
@@ -297,10 +336,10 @@ export default function LibraryPage() {
       if (result.statusCode === 200 && result.data?.url) {
         setFormState(prev => ({ ...prev, coverImageUrl: result.data.url }));
       } else {
-        alert('Failed to upload image.');
+        alert(t('library.uploadFailed') || 'Failed to upload image.');
       }
     } catch {
-      alert('Error uploading image.');
+      alert(t('library.uploadError') || 'Error uploading image.');
     } finally {
       setUploadingImage(false);
     }
@@ -310,7 +349,7 @@ export default function LibraryPage() {
     e.preventDefault();
     if (modalMode === 'view') return;
     if (!formState.title.trim()) {
-      setSubmitError('Book title is required.');
+      setSubmitError(t('library.titleRequired') || 'Book title is required.');
       return;
     }
 
@@ -360,7 +399,7 @@ export default function LibraryPage() {
         setSubmitError(errorData.message || `Request failed (${response.status})`);
       }
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Error saving book information.');
+      setSubmitError(err instanceof Error ? err.message : (t('library.saveError') || 'Error saving book information.'));
     } finally {
       setActionLoading(false);
     }
@@ -446,16 +485,25 @@ export default function LibraryPage() {
     setExportDropdownOpen(false);
     if (paginatedBooks.length === 0) return;
 
-    const headers = ["SL", "Title", "Author", "Category", "ISBN", "Total Quantity", "Available Copies", "Status"];
+    const headers = [
+      t('library.exportSl') || "SL",
+      t('library.exportTitle') || "Title",
+      t('library.exportAuthor') || "Author",
+      t('library.exportCategory') || "Category",
+      t('library.exportIsbn') || "ISBN",
+      t('library.exportTotalQuantity') || "Total Quantity",
+      t('library.exportAvailableCopies') || "Available Copies",
+      t('library.exportStatus') || "Status"
+    ];
     const rows = paginatedBooks.map((b, idx) => [
       ((page - 1) * limit + idx + 1).toString(),
       `"${(b.title || '').replace(/"/g, '""')}"`,
       `"${(b.author || '').replace(/"/g, '""')}"`,
-      `"${(b.category || '').replace(/"/g, '""')}"`,
+      `"${(getCategoryLabel(b.category) || '').replace(/"/g, '""')}"`,
       `"${(b.isbn || '').replace(/"/g, '""')}"`,
-      b.quantity !== undefined ? b.quantity.toString() : 'N/A',
-      b.available !== undefined ? b.available.toString() : 'N/A',
-      b.isAvailable !== false ? "Available" : "Unavailable"
+      b.quantity !== undefined ? b.quantity.toString() : (t('common.na') || 'N/A'),
+      b.available !== undefined ? b.available.toString() : (t('common.na') || 'N/A'),
+      b.isAvailable !== false ? (t('library.available') || "Available") : (t('library.unavailable') || "Unavailable")
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -478,33 +526,42 @@ export default function LibraryPage() {
     // Header
     doc.setFontSize(18);
     doc.setTextColor(79, 70, 229);
-    doc.text("Library Books Report", 14, 18);
+    doc.text(t('library.reportTitle') || "Library Books Report", 14, 18);
 
     doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
     const subtitleParts = [
-      `Page: ${page} of ${totalPages}`,
-      `Total: ${total} books`,
-      `Generated: ${new Date().toLocaleDateString()}`
+      `${t('library.page') || 'Page'}: ${formatNumber(page)} ${t('library.of') || 'of'} ${formatNumber(totalPages)}`,
+      `${t('library.total') || 'Total'}: ${formatNumber(total)} ${t('library.booksCount') || 'books'}`,
+      `${t('library.generated') || 'Generated'}: ${new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US')}`
     ];
     if (filterCategory && filterCategory !== 'All') {
-      subtitleParts.push(`Category: ${filterCategory}`);
+      subtitleParts.push(`${t('library.category') || 'Category'}: ${getCategoryLabel(filterCategory)}`);
     }
     if (filterAvailability) {
-      subtitleParts.push(`Status: ${filterAvailability === 'available' ? 'Available' : 'Unavailable'}`);
+      subtitleParts.push(`${t('library.status') || 'Status'}: ${filterAvailability === 'available' ? (t('library.available') || 'Available') : (t('library.unavailable') || 'Unavailable')}`);
     }
     doc.text(subtitleParts.join(' | '), 14, 25);
 
-    const tableColumn = ["#", "Title", "Author", "Category", "ISBN", "Quantity", "Available", "Status"];
+    const tableColumn = [
+      "#",
+      t('library.exportTitle') || "Title",
+      t('library.exportAuthor') || "Author",
+      t('library.exportCategory') || "Category",
+      t('library.exportIsbn') || "ISBN",
+      t('library.exportTotalQuantity') || "Quantity",
+      t('library.exportAvailableCopies') || "Available",
+      t('library.exportStatus') || "Status"
+    ];
     const tableRows = paginatedBooks.map((b, idx) => [
-      ((page - 1) * limit + idx + 1).toString(),
-      b.title || 'N/A',
-      b.author || 'N/A',
-      b.category || 'N/A',
-      b.isbn || 'N/A',
-      b.quantity !== undefined ? String(b.quantity) : 'N/A',
-      b.available !== undefined ? String(b.available) : 'N/A',
-      b.isAvailable !== false ? 'Available' : 'Unavailable'
+      formatNumber((page - 1) * limit + idx + 1),
+      b.title || (t('common.na') || 'N/A'),
+      b.author || (t('common.na') || 'N/A'),
+      getCategoryLabel(b.category) || (t('common.na') || 'N/A'),
+      b.isbn || (t('common.na') || 'N/A'),
+      b.quantity !== undefined ? formatNumber(b.quantity) : (t('common.na') || 'N/A'),
+      b.available !== undefined ? formatNumber(b.available) : (t('common.na') || 'N/A'),
+      b.isAvailable !== false ? (t('library.available') || 'Available') : (t('library.unavailable') || 'Unavailable')
     ]);
 
     autoTable(doc, {
@@ -519,7 +576,7 @@ export default function LibraryPage() {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
+          `${t('library.page') || 'Page'} ${formatNumber(data.pageNumber)} ${t('library.of') || 'of'} ${formatNumber(pageCount)}`,
           doc.internal.pageSize.width - 25,
           doc.internal.pageSize.height - 10
         );
@@ -570,6 +627,7 @@ export default function LibraryPage() {
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
+                    aria-label={t('library.clearAll') || 'Clear search'}
                     style={{ background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', color: 'var(--muted-foreground)' }}
                   >
                     <X size={15} />
@@ -600,7 +658,7 @@ export default function LibraryPage() {
                 }}
               >
                 <Filter size={16} />
-                <span>Filters</span>
+                <span>{t('library.filters') || 'Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span style={{
                     background: showFilters ? '#ffffff' : 'var(--primary)',
@@ -610,7 +668,7 @@ export default function LibraryPage() {
                     padding: '0.1rem 0.5rem',
                     fontWeight: 700
                   }}>
-                    {activeFiltersCount}
+                    {formatNumber(activeFiltersCount)}
                   </span>
                 )}
               </button>
@@ -621,7 +679,7 @@ export default function LibraryPage() {
                   className="btn"
                   onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
                   disabled={paginatedBooks.length === 0}
-                  title="Export Options"
+                  title={t('library.exportOptions') || "Export Options"}
                   style={{
                     background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)',
                     border: '1px solid var(--border)',
@@ -639,7 +697,7 @@ export default function LibraryPage() {
                   }}
                 >
                   <Download size={16} />
-                  <span>Export</span>
+                  <span>{t('library.export') || 'Export'}</span>
                   <ChevronDown size={14} style={{ opacity: 0.7, transform: exportDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
 
@@ -684,7 +742,7 @@ export default function LibraryPage() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                      <span>Export as CSV</span>
+                      <span>{t('library.exportCsv') || 'Export as CSV'}</span>
                     </button>
                     <button
                       onClick={handleExportPDF}
@@ -708,7 +766,7 @@ export default function LibraryPage() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       <FileText size={15} style={{ color: '#ef4444' }} />
-                      <span>Export as PDF</span>
+                      <span>{t('library.exportPdf') || 'Export as PDF'}</span>
                     </button>
                   </div>
                 )}
@@ -736,15 +794,15 @@ export default function LibraryPage() {
 
               {/* Page Sizer */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Show:</span>
+                <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('library.show') || 'Show:'}</span>
                 <select
                   value={limit}
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                   style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
+                  <option value={10}>{formatNumber(10)}</option>
+                  <option value={20}>{formatNumber(20)}</option>
+                  <option value={50}>{formatNumber(50)}</option>
                 </select>
               </div>
 
@@ -760,7 +818,7 @@ export default function LibraryPage() {
                     textDecoration: 'underline'
                   }}
                 >
-                  Clear all
+                  {t('library.clearAll') || 'Clear all'}
                 </button>
               )}
             </div>
@@ -791,9 +849,9 @@ export default function LibraryPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="All">All Categories</option>
+                  <option value="All">{t('library.allCategories') || 'All Categories'}</option>
                   {BOOK_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
                   ))}
                 </select>
               </div>
@@ -801,7 +859,7 @@ export default function LibraryPage() {
               {/* Availability Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Availability Status
+                  {t('library.availabilityStatus') || 'Availability Status'}
                 </label>
                 <select
                   className="input"
@@ -812,16 +870,16 @@ export default function LibraryPage() {
                   }}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="">All Statuses</option>
-                  <option value="available">Available for Borrowing</option>
-                  <option value="unavailable">Currently Unavailable</option>
+                  <option value="">{t('library.allStatuses') || 'All Statuses'}</option>
+                  <option value="available">{t('library.availableForBorrowing') || 'Available for Borrowing'}</option>
+                  <option value="unavailable">{t('library.currentlyUnavailable') || 'Currently Unavailable'}</option>
                 </select>
               </div>
 
               {/* Sort Order */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Sort Order
+                  {t('library.sortOrder') || 'Sort Order'}
                 </label>
                 <select
                   className="input"
@@ -829,11 +887,11 @@ export default function LibraryPage() {
                   onChange={(e) => setSortBy(e.target.value as 'title-asc' | 'title-desc' | 'qty-desc' | 'qty-asc' | 'none')}
                   style={{ height: '38px', borderRadius: '0.5rem' }}
                 >
-                  <option value="title-asc">Title: A to Z</option>
-                  <option value="title-desc">Title: Z to A</option>
-                  <option value="qty-desc">Available Stock: High to Low</option>
-                  <option value="qty-asc">Available Stock: Low to High</option>
-                  <option value="none">Original Order</option>
+                  <option value="title-asc">{t('library.sortTitleAsc') || 'Title: A to Z'}</option>
+                  <option value="title-desc">{t('library.sortTitleDesc') || 'Title: Z to A'}</option>
+                  <option value="qty-desc">{t('library.sortQtyDesc') || 'Available Stock: High to Low'}</option>
+                  <option value="qty-asc">{t('library.sortQtyAsc') || 'Available Stock: Low to High'}</option>
+                  <option value="none">{t('library.sortNone') || 'Original Order'}</option>
                 </select>
               </div>
             </div>
@@ -846,11 +904,11 @@ export default function LibraryPage() {
             <thead>
               <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px' }}>
-                  #
+                  {t('library.sl') || '#'}
                 </th>
                 <th
                   onClick={toggleTitleSort}
-                  title="Click to sort by Title"
+                  title={t('library.clickToSortTitle') || "Click to sort by Title"}
                   style={{
                     padding: '0.875rem 1.25rem',
                     color: titleSortOrder !== 'none' ? 'var(--primary)' : 'var(--muted-foreground)',
@@ -863,7 +921,7 @@ export default function LibraryPage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span>Book Details</span>
+                    <span>{t('library.bookDetails') || 'Book Details'}</span>
                     {titleSortOrder === 'asc' ? (
                       <ArrowUp size={14} style={{ color: 'var(--primary)' }} />
                     ) : titleSortOrder === 'desc' ? (
@@ -877,16 +935,16 @@ export default function LibraryPage() {
                   {t('library.category') || 'Category'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>
-                  ISBN
+                  {t('library.isbn') || 'ISBN'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>
-                  Stock & Quantity
+                  {t('library.stockAndQuantity') || 'Stock & Quantity'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', width: '120px' }}>
-                  Status
+                  {t('library.status') || 'Status'}
                 </th>
                 <th style={{ padding: '0.875rem 1.25rem', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: '140px' }}>
-                  Actions
+                  {t('library.actions') || 'Actions'}
                 </th>
               </tr>
             </thead>
@@ -946,7 +1004,7 @@ export default function LibraryPage() {
                     >
                       {/* SL No */}
                       <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                        {sl}
+                        {formatNumber(sl)}
                       </td>
 
                       {/* Book Details (Cover + Title + Author) */}
@@ -980,13 +1038,13 @@ export default function LibraryPage() {
                             <span
                               style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.925rem', cursor: 'pointer' }}
                               onClick={() => openViewModal(book)}
-                              title="Click to view full details"
+                              title={t('library.clickToViewDetails') || "Click to view full details"}
                             >
                               {book.title}
                             </span>
                             <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                               <User size={12} />
-                              {book.author ? book.author : 'Unknown author'}
+                              {book.author ? book.author : (t('library.unknownAuthor') || 'Unknown author')}
                             </span>
                           </div>
                         </div>
@@ -1006,10 +1064,10 @@ export default function LibraryPage() {
                             color: catStyle.text,
                             border: `1px solid ${catStyle.border}`
                           }}>
-                            {book.category}
+                            {getCategoryLabel(book.category)}
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>General</span>
+                          <span style={{ fontSize: '0.825rem', color: 'var(--muted-foreground)' }}>{t('library.categoryGeneral') || 'General'}</span>
                         )}
                       </td>
 
@@ -1037,15 +1095,15 @@ export default function LibraryPage() {
                       <td style={{ padding: '1rem 1.25rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                            {book.available !== undefined ? book.available : (book.quantity !== undefined ? book.quantity : '—')}
+                            {book.available !== undefined ? formatNumber(book.available) : (book.quantity !== undefined ? formatNumber(book.quantity) : '—')}
                             {book.quantity !== undefined && book.available !== undefined ? (
-                              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: '0.8rem' }}> / {book.quantity}</span>
+                              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: '0.8rem' }}> / {formatNumber(book.quantity)}</span>
                             ) : ''}
                           </span>
                           <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
                             {book.available !== undefined && book.quantity !== undefined
-                              ? `${Math.max(0, book.quantity - book.available)} borrowed`
-                              : 'copies registered'}
+                              ? `${formatNumber(Math.max(0, book.quantity - book.available))} ${t('library.borrowed') || 'borrowed'}`
+                              : (t('library.copiesRegistered') || 'copies registered')}
                           </span>
                         </div>
                       </td>
@@ -1070,7 +1128,7 @@ export default function LibraryPage() {
                             borderRadius: '50%',
                             background: isAvail ? '#10b981' : '#ef4444'
                           }}></span>
-                          {isAvail ? (t('library.available') || 'Available') : 'Unavailable'}
+                          {isAvail ? (t('library.available') || 'Available') : (t('library.unavailable') || 'Unavailable')}
                         </span>
                       </td>
 
@@ -1079,7 +1137,8 @@ export default function LibraryPage() {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           <button
                             className="action-btn"
-                            title="View book details"
+                            title={t('library.viewBookDetails') || "View book details"}
+                            aria-label={t('library.viewBookDetails') || "View book details"}
                             onClick={() => openViewModal(book)}
                             style={{
                               width: '32px',
@@ -1099,7 +1158,8 @@ export default function LibraryPage() {
 
                           <button
                             className="action-btn"
-                            title="Edit book"
+                            title={t('library.editBook') || "Edit book"}
+                            aria-label={t('library.editBook') || "Edit book"}
                             onClick={() => openEditModal(book)}
                             style={{
                               width: '32px',
@@ -1119,7 +1179,8 @@ export default function LibraryPage() {
 
                           <button
                             className="action-btn"
-                            title="Delete book"
+                            title={t('library.deleteBook') || "Delete book"}
+                            aria-label={t('library.deleteBook') || "Delete book"}
                             onClick={() => handleDelete(book)}
                             style={{
                               width: '32px',
@@ -1153,8 +1214,8 @@ export default function LibraryPage() {
                       </p>
                       <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
                         {searchTerm || (filterCategory && filterCategory !== 'All') || filterAvailability
-                          ? 'Try adjusting your search keywords or resetting filters.'
-                          : 'No books have been added to the library yet. Click "Add Book" to begin.'}
+                          ? (t('library.tryAdjusting') || 'Try adjusting your search keywords or resetting filters.')
+                          : (t('library.noBooksYet') || 'No books have been added to the library yet. Click "Add Book" to begin.')}
                       </p>
                       {(searchTerm || (filterCategory && filterCategory !== 'All') || filterAvailability) && (
                         <button
@@ -1162,7 +1223,7 @@ export default function LibraryPage() {
                           className="btn"
                           style={{ marginTop: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', fontSize: '0.85rem' }}
                         >
-                          Clear Filters
+                          {t('library.clearFilters') || 'Clear Filters'}
                         </button>
                       )}
                     </div>
@@ -1186,12 +1247,12 @@ export default function LibraryPage() {
             gap: '1rem'
           }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              Showing <strong style={{ color: 'var(--foreground)' }}>{((page - 1) * limit) + 1}</strong> to <strong style={{ color: 'var(--foreground)' }}>{Math.min(page * limit, total)}</strong> of <strong style={{ color: 'var(--foreground)' }}>{total}</strong> books
+              {t('library.showing') || 'Showing'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(((page - 1) * limit) + 1)}</strong> {t('library.to') || 'to'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(Math.min(page * limit, total))}</strong> {t('library.of') || 'of'} <strong style={{ color: 'var(--foreground)' }}>{formatNumber(total)}</strong> {t('library.booksCount') || 'books'}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginRight: '0.5rem' }}>
-                Page {page} of {totalPages}
+                {t('library.page') || 'Page'} {formatNumber(page)} {t('library.of') || 'of'} {formatNumber(totalPages)}
               </span>
 
               <button
@@ -1206,7 +1267,8 @@ export default function LibraryPage() {
                 }}
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                title="Previous page"
+                title={t('library.prevPage') || "Previous page"}
+                aria-label={t('library.prevPage') || "Previous page"}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -1223,7 +1285,8 @@ export default function LibraryPage() {
                 }}
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                title="Next page"
+                title={t('library.nextPage') || "Next page"}
+                aria-label={t('library.nextPage') || "Next page"}
               >
                 <ChevronRight size={16} />
               </button>
@@ -1281,10 +1344,10 @@ export default function LibraryPage() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>
-                    {modalMode === 'add' ? 'Add New Book' : modalMode === 'edit' ? 'Edit Book Details' : 'Book Details'}
+                    {getModalTitle()}
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', margin: 0 }}>
-                    {modalMode === 'view' ? 'Read-only book information' : 'Fill in the information below to continue'}
+                    {getModalSubtitle()}
                   </p>
                 </div>
               </div>
@@ -1292,6 +1355,7 @@ export default function LibraryPage() {
                 className="action-btn"
                 onClick={() => setIsModalOpen(false)}
                 disabled={actionLoading}
+                aria-label={t('common.close') || 'Close'}
                 style={{
                   width: '32px',
                   height: '32px',
@@ -1343,7 +1407,7 @@ export default function LibraryPage() {
                         {selectedBook.title}
                       </h3>
                       <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-                        {selectedBook.author ? `by ${selectedBook.author}` : 'Unknown author'}
+                        {selectedBook.author ? `${t('library.byAuthor') || t('dashboard.by') || 'by'} ${selectedBook.author}` : (t('library.unknownAuthor') || 'Unknown author')}
                       </span>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
                         <span style={{
@@ -1354,7 +1418,7 @@ export default function LibraryPage() {
                           background: selectedBook.isAvailable !== false ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                           color: selectedBook.isAvailable !== false ? '#10b981' : '#ef4444',
                         }}>
-                          {selectedBook.isAvailable !== false ? 'Available' : 'Unavailable'}
+                          {selectedBook.isAvailable !== false ? (t('library.available') || 'Available') : (t('library.unavailable') || 'Unavailable')}
                         </span>
                         {selectedBook.category && (
                           <span style={{
@@ -1365,7 +1429,7 @@ export default function LibraryPage() {
                             background: getCategoryBadgeStyle(selectedBook.category).bg,
                             color: getCategoryBadgeStyle(selectedBook.category).text,
                           }}>
-                            {selectedBook.category}
+                            {getCategoryLabel(selectedBook.category)}
                           </span>
                         )}
                         {selectedBook.isbn && (
@@ -1378,7 +1442,7 @@ export default function LibraryPage() {
                             color: 'var(--primary)',
                             fontFamily: 'monospace'
                           }}>
-                            ISBN: {selectedBook.isbn}
+                            {t('library.isbn') || 'ISBN'}: {selectedBook.isbn}
                           </span>
                         )}
                       </div>
@@ -1387,27 +1451,27 @@ export default function LibraryPage() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Category</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('library.category') || 'Category'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
-                        {selectedBook.category || 'General'}
+                        {getCategoryLabel(selectedBook.category)}
                       </div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>ISBN / Code</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('library.isbnOrCode') || 'ISBN / Code'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)', fontFamily: 'monospace' }}>
-                        {selectedBook.isbn || 'Not specified'}
+                        {selectedBook.isbn || (t('library.notSpecified') || 'Not specified')}
                       </div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Available Copies</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('library.availableCopies') || 'Available Copies'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: (selectedBook.available ?? selectedBook.quantity ?? 0) > 0 ? '#10b981' : '#ef4444' }}>
-                        {selectedBook.available !== undefined ? selectedBook.available : (selectedBook.quantity !== undefined ? selectedBook.quantity : 'N/A')}
+                        {selectedBook.available !== undefined ? formatNumber(selectedBook.available) : (selectedBook.quantity !== undefined ? formatNumber(selectedBook.quantity) : (t('common.na') || 'N/A'))}
                       </div>
                     </div>
                     <div style={{ padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>Total Registered Copies</div>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('library.totalCopies') || 'Total Registered Copies'}</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem', color: 'var(--foreground)' }}>
-                        {selectedBook.quantity !== undefined ? selectedBook.quantity : 'N/A'}
+                        {selectedBook.quantity !== undefined ? formatNumber(selectedBook.quantity) : (t('common.na') || 'N/A')}
                       </div>
                     </div>
                   </div>
@@ -1415,7 +1479,7 @@ export default function LibraryPage() {
                   {selectedBook.description && (
                     <div style={{ padding: '1.1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--background)' }}>
                       <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--muted-foreground)', fontWeight: 600, marginBottom: '0.4rem' }}>
-                        Description
+                        {t('library.description') || 'Description'}
                       </div>
                       <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--foreground)', lineHeight: 1.6 }}>
                         {selectedBook.description}
@@ -1430,7 +1494,7 @@ export default function LibraryPage() {
                       style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '0.5rem 1.25rem' }}
                       onClick={() => setIsModalOpen(false)}
                     >
-                      Close
+                      {t('common.close') || 'Close'}
                     </button>
                     <button
                       type="button"
@@ -1438,7 +1502,7 @@ export default function LibraryPage() {
                       style={{ borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem' }}
                       onClick={() => openEditModal(selectedBook)}
                     >
-                      <Edit3 size={16} /> Edit Book
+                      <Edit3 size={16} /> {t('library.editBook') || 'Edit Book'}
                     </button>
                   </div>
                 </div>
@@ -1462,14 +1526,14 @@ export default function LibraryPage() {
                     }}>
                       {formState.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={formState.coverImageUrl} alt="Cover Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={formState.coverImageUrl} alt={t('library.coverPreview') || "Cover Preview"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <BookMarked size={24} style={{ color: 'var(--muted-foreground)' }} />
                       )}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.25rem' }}>
-                        Book Cover Image
+                        {t('library.coverImage') || 'Book Cover Image'}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label className="btn" style={{
@@ -1484,7 +1548,7 @@ export default function LibraryPage() {
                           gap: '0.4rem'
                         }}>
                           {uploadingImage ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                          <span>{uploadingImage ? 'Uploading...' : 'Upload Cover'}</span>
+                          <span>{uploadingImage ? (t('library.uploading') || 'Uploading...') : (t('library.uploadCover') || 'Upload Cover')}</span>
                           <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={actionLoading || uploadingImage} />
                         </label>
                         {formState.coverImageUrl && (
@@ -1502,7 +1566,7 @@ export default function LibraryPage() {
                               cursor: 'pointer'
                             }}
                           >
-                            Remove
+                            {t('common.remove') || 'Remove'}
                           </button>
                         )}
                       </div>
@@ -1512,7 +1576,7 @@ export default function LibraryPage() {
                   {/* Direct Cover Image URL */}
                   <div>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                      Or Cover Image URL
+                      {t('library.orCoverUrl') || 'Or Cover Image URL'}
                     </label>
                     <input
                       type="url"
@@ -1536,11 +1600,11 @@ export default function LibraryPage() {
                   {/* Title */}
                   <div>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                      Book Title <span style={{ color: '#ef4444' }}>*</span>
+                      {t('library.bookTitle') || 'Book Title'} <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. To Kill a Mockingbird"
+                      placeholder={t('library.titlePlaceholder') || "e.g. To Kill a Mockingbird"}
                       value={formState.title}
                       onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))}
                       required
@@ -1561,12 +1625,12 @@ export default function LibraryPage() {
                   {/* Author */}
                   <div>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                      Author
+                      {t('library.author') || 'Author'}
                     </label>
                     <div style={{ position: 'relative' }}>
                       <input
                         type="text"
-                        placeholder="e.g. Harper Lee"
+                        placeholder={t('library.authorPlaceholder') || "e.g. Harper Lee"}
                         value={formState.author}
                         onChange={(e) => setFormState(prev => ({ ...prev, author: e.target.value }))}
                         style={{
@@ -1588,11 +1652,11 @@ export default function LibraryPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                        ISBN
+                        {t('library.isbn') || 'ISBN'}
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 9780061120084"
+                        placeholder={t('library.isbnPlaceholder') || "e.g. 9780061120084"}
                         value={formState.isbn}
                         onChange={(e) => setFormState(prev => ({ ...prev, isbn: e.target.value }))}
                         style={{
@@ -1630,7 +1694,7 @@ export default function LibraryPage() {
                         }}
                       >
                         {BOOK_CATEGORIES.map(c => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>{getCategoryLabel(c)}</option>
                         ))}
                       </select>
                     </div>
@@ -1640,12 +1704,12 @@ export default function LibraryPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                        Total Quantity
+                        {t('library.totalQuantity') || 'Total Quantity'}
                       </label>
                       <input
                         type="number"
                         min="0"
-                        placeholder="e.g. 10"
+                        placeholder={t('library.quantityPlaceholder') || "e.g. 10"}
                         value={formState.quantity}
                         onChange={(e) => setFormState(prev => ({ ...prev, quantity: e.target.value }))}
                         style={{
@@ -1664,12 +1728,12 @@ export default function LibraryPage() {
 
                     <div>
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                        Available for Borrowing
+                        {t('library.availableForBorrowing') || 'Available for Borrowing'}
                       </label>
                       <input
                         type="number"
                         min="0"
-                        placeholder="e.g. 8"
+                        placeholder={t('library.availablePlaceholder') || "e.g. 8"}
                         value={formState.available}
                         onChange={(e) => setFormState(prev => ({ ...prev, available: e.target.value }))}
                         style={{
@@ -1690,10 +1754,10 @@ export default function LibraryPage() {
                   {/* Description */}
                   <div>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.35rem', display: 'block' }}>
-                      Description
+                      {t('library.description') || 'Description'}
                     </label>
                     <textarea
-                      placeholder="Brief summary or description of the book..."
+                      placeholder={t('library.descriptionPlaceholder') || "Brief summary or description of the book..."}
                       value={formState.description}
                       onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
                       rows={3}
@@ -1729,7 +1793,7 @@ export default function LibraryPage() {
                         transition: 'background 0.2s',
                         flexShrink: 0
                       }}
-                      aria-label="Toggle availability"
+                      aria-label={t('library.toggleAvailability') || "Toggle availability"}
                     >
                       <span style={{
                         position: 'absolute',
@@ -1744,7 +1808,7 @@ export default function LibraryPage() {
                       }} />
                     </button>
                     <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                      {formState.isAvailable ? 'Available for borrowing' : 'Not available'}
+                      {formState.isAvailable ? (t('library.availableForBorrowing') || 'Available for borrowing') : (t('library.notAvailable') || 'Not available')}
                     </span>
                   </div>
 
@@ -1781,7 +1845,7 @@ export default function LibraryPage() {
                         cursor: 'pointer'
                       }}
                     >
-                      Cancel
+                      {t('common.cancel') || 'Cancel'}
                     </button>
                     <button
                       type="submit"
@@ -1805,12 +1869,12 @@ export default function LibraryPage() {
                       {actionLoading ? (
                         <>
                           <Loader2 size={16} className="animate-spin" />
-                          <span>{modalMode === 'edit' ? 'Saving...' : 'Adding...'}</span>
+                          <span>{modalMode === 'edit' ? (t('library.saving') || 'Saving...') : (t('library.adding') || 'Adding...')}</span>
                         </>
                       ) : (
                         <>
                           {modalMode === 'edit' ? <Edit3 size={15} /> : <Plus size={16} />}
-                          <span>{modalMode === 'edit' ? 'Save Changes' : 'Add Book'}</span>
+                          <span>{modalMode === 'edit' ? (t('library.saveChanges') || 'Save Changes') : (t('library.addBook') || 'Add Book')}</span>
                         </>
                       )}
                     </button>
@@ -1860,11 +1924,11 @@ export default function LibraryPage() {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--foreground)' }}>
-                  Delete Book Record
+                  {t('library.deleteHeading') || 'Delete Book Record'}
                 </h2>
                 <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-                  Are you sure you want to permanently delete <strong style={{ color: 'var(--foreground)' }}>{deleteModal.title}</strong>
-                  {deleteModal.isbn && deleteModal.isbn !== 'N/A' ? ` (ISBN: ${deleteModal.isbn})` : ''}? This will remove it from the library catalog.
+                  {t('library.deleteConfirmPrefix') || 'Are you sure you want to permanently delete'} <strong style={{ color: 'var(--foreground)' }}>{deleteModal.title}</strong>
+                  {deleteModal.isbn && deleteModal.isbn !== 'N/A' && deleteModal.isbn !== '—' ? ` (${t('library.isbn') || 'ISBN'}: ${deleteModal.isbn})` : ''}? {t('library.deleteConfirmSuffix') || 'This will remove it from the library catalog.'}
                 </p>
               </div>
             </div>
@@ -1876,7 +1940,7 @@ export default function LibraryPage() {
                 onClick={() => setDeleteModal({ open: false, id: '', title: '', isbn: '' })}
                 disabled={deleteLoading}
               >
-                Cancel
+                {t('common.cancel') || 'Cancel'}
               </button>
               <button
                 className="btn"
@@ -1899,7 +1963,7 @@ export default function LibraryPage() {
                 disabled={deleteLoading}
               >
                 {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                <span>{deleteLoading ? 'Deleting...' : 'Delete'}</span>
+                <span>{deleteLoading ? (t('library.deleting') || 'Deleting...') : (t('library.delete') || 'Delete')}</span>
               </button>
             </div>
           </div>
