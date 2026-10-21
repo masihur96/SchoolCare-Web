@@ -8,7 +8,7 @@ import {
   Settings, Menu, X, GraduationCap, LogOut, UserCheck,
   Activity, Clock, MessageSquare, Book,
   BookMarked, PieChart, ChevronLeft, ChevronRight, MessageCircle,
-  MoreVertical, User, Key, Video, Send, CalendarDays
+  MoreVertical, User, Key, Video, Send, CalendarDays, Inbox
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -78,6 +78,7 @@ export function Sidebar() {
     { name: t('nav.homework'), href: '/homework', icon: Clock },
     { name: t('nav.onlineClass'), href: '/online-class', icon: Video },
     { name: t('nav.notice'), href: '/notices', icon: MessageSquare },
+    { name: t('nav.requestBox'), href: '/request-box', icon: Inbox },
     { name: t('nav.library'), href: '/library', icon: Book },
     { name: t('nav.academicBook'), href: '/academic-books', icon: BookMarked },
     { name: t('nav.expenseTracking'), href: '/fees', icon: PieChart },
