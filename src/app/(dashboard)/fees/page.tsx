@@ -61,6 +61,18 @@ interface FeeInvoice {
   studentId?: string;
   studentName?: string;
   studentRoll?: string;
+  student?: {
+    id?: string;
+    name?: string;
+    fullName?: string;
+    rollNumber?: string;
+    roll?: string;
+    email?: string;
+    phone?: string;
+    classIds?: string[];
+    sectionIds?: string[];
+    avatar?: string;
+  };
   createdAt: string;
   updatedAt?: string;
 }
@@ -333,12 +345,22 @@ export default function FeesManagementPage() {
       if (clsRes.ok) {
         const clsJson = await clsRes.json();
         const rawCls = Array.isArray(clsJson) ? clsJson : clsJson.data || [];
-        setClassesList(rawCls.filter((c: any) => !schoolId || c.schoolId === schoolId));
+        const filtered = rawCls.filter((c: any) => !schoolId || !c.schoolId || c.schoolId === schoolId);
+        setClassesList(filtered.length > 0 ? filtered : rawCls);
       }
 
       if (secRes.ok) {
         const secJson = await secRes.json();
-        const rawSec = Array.isArray(secJson) ? secJson : secJson.data || [];
+        let rawSec = Array.isArray(secJson) ? secJson : secJson.data || [];
+        if (rawSec.length === 0) {
+          try {
+            const fallbackSec = await fetch(`${API_BASE_URL}/admin/sections`, { headers });
+            if (fallbackSec.ok) {
+              const fallbackJson = await fallbackSec.json();
+              rawSec = Array.isArray(fallbackJson) ? fallbackJson : fallbackJson.data || [];
+            }
+          } catch {}
+        }
         setSectionsList(rawSec);
       }
 
@@ -351,6 +373,96 @@ export default function FeesManagementPage() {
       console.error('Failed to load classes/sections/students metadata', e);
     }
   }, []);
+
+  // Helper to resolve student information consistently across table, modal, and PDF
+  const resolveStudentInfo = useCallback((inv?: FeeInvoice | null) => {
+    if (!inv) {
+      return {
+        name: 'Student',
+        roll: '—',
+        className: 'Class',
+        sectionName: '',
+        phone: '',
+        email: '',
+        avatar: '',
+      };
+    }
+
+    const student = inv.student || allStudents.find(s => String(s.id) === String(inv.studentId));
+
+    // Name
+    const name =
+      inv.studentName ||
+      inv.student?.name ||
+      (inv.student as any)?.fullName ||
+      student?.name ||
+      'Student';
+
+    // Roll
+    const roll =
+      inv.studentRoll ||
+      inv.student?.rollNumber ||
+      (inv.student as any)?.roll ||
+      student?.rollNumber ||
+      '—';
+
+    // Class ID
+    const classId =
+      inv.classId ||
+      (Array.isArray(inv.student?.classIds) ? inv.student?.classIds[0] : null) ||
+      (Array.isArray(student?.classIds) ? student?.classIds[0] : null);
+
+    // Class Name
+    let className = inv.className || '';
+    if (!className && classId) {
+      const cls = classesList.find(c => String(c.id) === String(classId));
+      if (cls) className = cls.name;
+    }
+    if (!className && inv.student?.classIds && inv.student.classIds.length > 0) {
+      const cls = classesList.find(c => inv.student!.classIds!.some(cid => String(cid) === String(c.id)));
+      if (cls) className = cls.name;
+    }
+    if (!className && student?.classIds && student.classIds.length > 0) {
+      const cls = classesList.find(c => student.classIds!.some(cid => String(cid) === String(c.id)));
+      if (cls) className = cls.name;
+    }
+
+    // Section ID
+    const sectionId =
+      inv.sectionId ||
+      (Array.isArray(inv.student?.sectionIds) ? inv.student?.sectionIds[0] : null) ||
+      (Array.isArray(student?.sectionIds) ? student?.sectionIds[0] : null);
+
+    // Section Name
+    let sectionName = inv.sectionName || '';
+    if (!sectionName && sectionId) {
+      const sec = sectionsList.find(s => String(s.id) === String(sectionId));
+      if (sec) sectionName = sec.name;
+    }
+    if (!sectionName && inv.student?.sectionIds && inv.student.sectionIds.length > 0) {
+      const sec = sectionsList.find(s => inv.student!.sectionIds!.some(sid => String(sid) === String(s.id)));
+      if (sec) sectionName = sec.name;
+    }
+    if (!sectionName && student?.sectionIds && student.sectionIds.length > 0) {
+      const sec = sectionsList.find(s => student.sectionIds!.some(sid => String(sid) === String(s.id)));
+      if (sec) sectionName = sec.name;
+    }
+
+    // Contact details
+    const phone = (inv.student as any)?.phone || (student as any)?.phone || '';
+    const email = (inv.student as any)?.email || student?.email || '';
+    const avatar = (inv.student as any)?.avatar || (student as any)?.avatar || '';
+
+    return {
+      name,
+      roll,
+      className: className || 'Class',
+      sectionName,
+      phone,
+      email,
+      avatar,
+    };
+  }, [allStudents, classesList, sectionsList]);
 
   // Fetch Stats Summary: GET /fees/stats/summary
   const fetchStats = useCallback(async () => {
@@ -405,8 +517,13 @@ export default function FeesManagementPage() {
           : Array.isArray(data)
           ? data
           : [];
-        setInvoices(list);
-        setTotalInvoicesCount(data.total || data.pagination?.total || list.length);
+        const normalizedList = list.map((inv: any) => ({
+          ...inv,
+          studentName: inv.studentName || inv.student?.name || (inv.student as any)?.fullName,
+          studentRoll: inv.studentRoll || inv.student?.rollNumber || (inv.student as any)?.roll,
+        }));
+        setInvoices(normalizedList);
+        setTotalInvoicesCount(data.total || data.pagination?.total || normalizedList.length);
 
         setStats(prev => {
           if (prev.totalInvoices > 0) return prev;
@@ -716,20 +833,22 @@ export default function FeesManagementPage() {
       doc.setFont('helvetica', 'normal');
       doc.text(formatDate(inv.createdAt), 165, y);
 
+      const sInfo = resolveStudentInfo(inv);
+
       doc.setFont('helvetica', 'bold');
       doc.text('Student Name:', 14, y + 8);
       doc.setFont('helvetica', 'normal');
-      doc.text(inv.studentName || 'Student', 55, y + 8);
+      doc.text(sInfo.name, 55, y + 8);
 
       doc.setFont('helvetica', 'bold');
       doc.text('Roll Number:', 130, y + 8);
       doc.setFont('helvetica', 'normal');
-      doc.text(inv.studentRoll || '—', 165, y + 8);
+      doc.text(sInfo.roll, 165, y + 8);
 
       doc.setFont('helvetica', 'bold');
       doc.text('Class & Section:', 14, y + 16);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${inv.className || 'General'} ${inv.sectionName ? `(${inv.sectionName})` : ''}`, 55, y + 16);
+      doc.text(`${sInfo.className}${sInfo.sectionName ? ` (${sInfo.sectionName})` : ''}`, 55, y + 16);
 
       doc.setFont('helvetica', 'bold');
       doc.text('Billing Month/Year:', 130, y + 16);
@@ -1433,19 +1552,83 @@ export default function FeesManagementPage() {
                     invoices.map((inv, idx) => {
                       const paid = inv.paidAmount || (inv.status === 'PAID' ? inv.amount : 0);
                       const due = inv.dueAmount !== undefined ? inv.dueAmount : (inv.status === 'PAID' ? 0 : inv.amount - paid);
+                      const sInfo = resolveStudentInfo(inv);
+
                       return (
                         <tr key={inv.id || idx} style={{ borderBottom: '1px solid var(--border)' }}>
                           <td style={{ padding: '0.9rem 1rem', color: 'var(--muted-foreground)', fontSize: '0.8rem' }}>
                             {(invoicePage - 1) * invoiceLimit + idx + 1}
                           </td>
                           <td style={{ padding: '0.9rem 1rem' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                              {inv.studentName || 'Student'}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', gap: '0.5rem', marginTop: '0.15rem' }}>
-                              <span>Roll: {inv.studentRoll || '—'}</span>
-                              <span>•</span>
-                              <span>{inv.className || 'Class'} {inv.sectionName ? `(${inv.sectionName})` : ''}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div
+                                style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                                  color: '#2563eb',
+                                  border: '1px solid #bfdbfe',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  flexShrink: 0,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {sInfo.avatar ? (
+                                  <img
+                                    src={sInfo.avatar}
+                                    alt={sInfo.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  sInfo.name && sInfo.name !== 'Student'
+                                    ? sInfo.name.charAt(0).toUpperCase()
+                                    : <User size={18} />
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.92rem', lineHeight: 1.3 }}>
+                                  {sInfo.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'var(--muted-foreground)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: '0.4rem',
+                                    marginTop: '0.2rem',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      background: 'var(--muted)',
+                                      padding: '0.1rem 0.45rem',
+                                      borderRadius: '4px',
+                                      fontWeight: 600,
+                                      color: 'var(--foreground)',
+                                    }}
+                                  >
+                                    Roll: {sInfo.roll}
+                                  </span>
+                                  <span>•</span>
+                                  <span style={{ fontWeight: 600, color: '#2563eb' }}>
+                                    {sInfo.className}
+                                    {sInfo.sectionName ? ` (${sInfo.sectionName})` : ''}
+                                  </span>
+                                </div>
+                                {(sInfo.phone || sInfo.email) && (
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginTop: '0.15rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {sInfo.phone && <span>📞 {sInfo.phone}</span>}
+                                    {sInfo.email && <span>✉️ {sInfo.email}</span>}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td style={{ padding: '0.9rem 1rem' }}>
@@ -2584,7 +2767,9 @@ export default function FeesManagementPage() {
               <div style={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '10px', padding: '0.9rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                   <span style={{ color: 'var(--muted-foreground)' }}>Student:</span>
-                  <strong>{paymentInvoice.studentName || 'Student'} (Roll {paymentInvoice.studentRoll || '—'})</strong>
+                  <strong>
+                    {resolveStudentInfo(paymentInvoice).name} (Roll {resolveStudentInfo(paymentInvoice).roll}) • {resolveStudentInfo(paymentInvoice).className} {resolveStudentInfo(paymentInvoice).sectionName ? `(${resolveStudentInfo(paymentInvoice).sectionName})` : ''}
+                  </strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                   <span style={{ color: 'var(--muted-foreground)' }}>Fee Title:</span>
