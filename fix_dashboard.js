@@ -14,3 +14,4 @@ content = content.replace(/d\.attendStudent\.late/g, '(d.attendStudent as any)?.
 // Let's find where chartData is declared and move it above the return
 const returnIndex = content.indexOf('return (\\n    <div className="nd-root">');
 // Wait, I inserted it during the replace in `rewrite_dashboard.js`. Let's check where it got inserted.
+a
