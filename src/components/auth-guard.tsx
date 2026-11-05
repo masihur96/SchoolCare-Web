@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { setupFetchInterceptor } from '@/lib/fetchInterceptor';
+import { getCachedUserRole } from '@/lib/auth';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,11 +15,25 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     
     if (!token) {
-      // Not logged in, redirect to initial page
-      router.replace('/');
-    } else {
-      setIsAuthorized(true);
+      // Not logged in, redirect to login
+      router.replace('/login');
+      return;
     }
+
+    const role = getCachedUserRole();
+    if (role === 'superadmin') {
+      // Superadmin belongs to the superadmin module, redirect
+      router.replace('/superadmin/dashboard');
+      return;
+    }
+
+    if (role && role !== 'admin') {
+      // Non-admin roles cannot access admin dashboard
+      router.replace('/login');
+      return;
+    }
+
+    setIsAuthorized(true);
   }, [router]);
 
   if (!isAuthorized) {

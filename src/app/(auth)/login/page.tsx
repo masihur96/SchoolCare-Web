@@ -12,6 +12,7 @@ import { useTheme } from 'next-themes';
 
 import { useLanguage } from '@/components/language-provider';
 import { LanguageToggle } from '@/components/language-toggle';
+import { decodeJwt, fetchCurrentUserProfile, getCachedUserRole, clearAuthSession } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,7 +32,12 @@ export default function LoginPage() {
     setMounted(true);
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     if (token) {
-      router.replace('/dashboard');
+      const role = getCachedUserRole();
+      if (role === 'superadmin') {
+        router.replace('/superadmin/dashboard');
+      } else if (role === 'admin') {
+        router.replace('/dashboard');
+      }
     }
     const interval = setInterval(() => {
       setActiveTestimonial(prev => (prev + 1) % testimonials.length);
@@ -103,7 +109,27 @@ export default function LoginPage() {
         localStorage.setItem('refreshToken', refreshToken);
       }
 
-      router.push('/dashboard');
+      // Determine user role
+      let role = (data.user?.role || data.data?.user?.role || data.role || data.data?.role || '').toLowerCase();
+      if (!role && accessToken) {
+        const payload = decodeJwt(accessToken);
+        if (payload?.role) role = payload.role.toLowerCase();
+      }
+      if (!role && accessToken) {
+        const profile = await fetchCurrentUserProfile(accessToken);
+        if (profile?.role) role = profile.role.toLowerCase();
+      }
+
+      if (role === 'superadmin') {
+        localStorage.setItem('userRole', 'superadmin');
+        router.push('/superadmin/dashboard');
+      } else if (role === 'admin') {
+        localStorage.setItem('userRole', 'admin');
+        router.push('/dashboard');
+      } else {
+        clearAuthSession();
+        throw new Error('Access restricted. Only Administrator and Superadmin accounts are authorized to access this portal.');
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred during login');
     } finally {
