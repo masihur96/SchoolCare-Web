@@ -42,16 +42,18 @@ export function SuperadminNavbar() {
       if (res.ok) {
         const json = await res.json();
         const data = json.data || json;
-        const raw = data?.balance ?? data?.gatewayBalance ?? data?.liveBalance;
+        const raw = data?.gatewayBalance ?? data?.balance ?? data?.liveBalance;
+        let num: number | null = null;
         if (typeof raw === 'number') {
-          setBalance(raw);
+          num = raw;
         } else if (typeof raw === 'string' && !isNaN(Number(raw))) {
-          setBalance(Number(raw));
+          num = Number(raw);
         } else if (typeof raw === 'object' && raw !== null && typeof raw.balance === 'number') {
-          setBalance(raw.balance);
-        } else {
-          setBalance(null);
+          num = raw.balance;
+        } else if (typeof data?.totalRemainingBalance === 'number') {
+          num = data.totalRemainingBalance;
         }
+        setBalance(num);
       }
     } catch {
       // ignore

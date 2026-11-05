@@ -93,3 +93,17 @@ export function formatFriendlyDateTime(dateInput?: string | Date | null): string
     return '—';
   }
 }
+
+/**
+ * Generates an RFC4122 v4 UUID (e.g. 2c5fc20c-8cda-4d1f-a789-8ea12459e256)
+ */
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}

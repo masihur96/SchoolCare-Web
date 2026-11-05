@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
+import { formatBDT } from '@/lib/formatters';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -52,9 +53,12 @@ export default function SuperadminSmsOverviewPage() {
     fetchOverview();
   }, []);
 
-  const rawBalance = overview?.balance ?? overview?.gatewayBalance ?? overview?.liveBalance ?? 0;
-  let balanceDisplay = '0';
+  const poolBalance = typeof overview?.totalRemainingBalance === 'number' ? overview.totalRemainingBalance : null;
+  const rawBalance = overview?.gatewayBalance ?? overview?.balance ?? overview?.liveBalance ?? 0;
+  let balanceDisplay = poolBalance !== null ? poolBalance.toLocaleString() : '0';
   let balanceErrorMessage = '';
+  let containerIp = '';
+
   if (typeof rawBalance === 'number') {
     balanceDisplay = rawBalance.toLocaleString();
   } else if (typeof rawBalance === 'string' && !isNaN(Number(rawBalance))) {
@@ -62,17 +66,17 @@ export default function SuperadminSmsOverviewPage() {
   } else if (typeof rawBalance === 'object' && rawBalance !== null) {
     if (typeof rawBalance.balance === 'number') {
       balanceDisplay = rawBalance.balance.toLocaleString();
-    } else if (rawBalance.message) {
-      balanceDisplay = 'Gateway Error';
-      balanceErrorMessage = String(rawBalance.message);
-    } else if (rawBalance.status) {
-      balanceDisplay = String(rawBalance.status);
     } else {
-      balanceDisplay = 'Unavailable';
+      if (rawBalance.client_ip) {
+        containerIp = String(rawBalance.client_ip);
+      }
+      if (rawBalance.message) {
+        balanceErrorMessage = String(rawBalance.message);
+      }
     }
   }
 
-  const rawSent = overview?.totalSent ?? overview?.smsSent ?? overview?.metrics?.totalSent ?? 0;
+  const rawSent = overview?.totalUsedCredits ?? overview?.totalSent ?? overview?.smsSent ?? 0;
   const totalSent = typeof rawSent === 'number' ? rawSent.toLocaleString() : String(rawSent || 0);
 
   const rawSchools = overview?.schoolsWithSms ?? overview?.activeSchools ?? overview?.totalSchools ?? 0;
@@ -179,9 +183,15 @@ export default function SuperadminSmsOverviewPage() {
               <span style={{ fontSize: '1rem', fontWeight: 500, color: '#a78bfa' }}>SMS Credits</span>
             </h3>
             {balanceErrorMessage && (
-              <p style={{ fontSize: '0.8rem', color: '#f87171', marginBottom: '8px' }}>
-                Gateway Note: {balanceErrorMessage}
-              </p>
+              <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '0.8rem', color: '#fca5a5' }}>
+                <p style={{ fontWeight: 600 }}>Aggregator Connection Notice:</p>
+                <p style={{ marginTop: '2px' }}>{balanceErrorMessage}</p>
+                {containerIp && (
+                  <p style={{ marginTop: '4px', color: '#fef08a' }}>
+                    Active Container IP: <strong>{containerIp}</strong> (Whitelisted: 162.220.232.165/32)
+                  </p>
+                )}
+              </div>
             )}
             <p style={{ fontSize: '0.85rem', color: '#cbd5e1', maxWidth: '600px', lineHeight: 1.5 }}>
               Available quota for distribution to registered school tenants. Quotas are deducted in real-time as schools broadcast daily attendance, notices, and exam results.

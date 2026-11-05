@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -29,6 +30,7 @@ interface SmsTransactionItem {
     id: string;
     name: string;
     schoolId?: string;
+    avatar?: string | null;
   } | null;
   type: string; // 'CREDIT' | 'DEBIT' | 'ADJUSTMENT' | 'PURCHASE'
   amount: number;
@@ -350,7 +352,12 @@ export default function SuperadminSmsTransactionsPage() {
 
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Building2 size={15} color="#7c3aed" />
+                          <SchoolAvatar
+                            avatar={tx.school?.avatar}
+                            name={schoolName}
+                            size={22}
+                            radius={5}
+                          />
                           <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
                             {schoolName}
                           </span>

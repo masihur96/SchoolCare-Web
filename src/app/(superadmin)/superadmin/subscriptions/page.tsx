@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeCode, sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -27,6 +28,7 @@ interface SubscriptionItem {
     id: string;
     name: string;
     schoolId?: string;
+    avatar?: string | null;
   } | null;
   pricingPlan?: {
     id?: string;
@@ -335,8 +337,13 @@ export default function SuperadminSubscriptionsPage() {
                   return (
                     <tr key={sub.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Building2 size={16} color="#7c3aed" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <SchoolAvatar
+                            avatar={sub.school?.avatar}
+                            name={sub.school?.name}
+                            size={32}
+                            radius={6}
+                          />
                           <div>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
                               {sanitizeDisplayName(sub.school?.name, 'Registered Institution')}
@@ -489,9 +496,12 @@ export default function SuperadminSubscriptionsPage() {
             </div>
 
             <div style={{ background: 'var(--muted)', borderRadius: '8px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span style={{ color: 'var(--muted-foreground)' }}>Institution:</span>
-                <strong style={{ color: 'var(--foreground)' }}>{sanitizeDisplayName(selectedSub.school?.name, 'Registered Institution')}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <SchoolAvatar avatar={selectedSub.school?.avatar} name={selectedSub.school?.name} size={20} radius={4} />
+                  <strong style={{ color: 'var(--foreground)' }}>{sanitizeDisplayName(selectedSub.school?.name, 'Registered Institution')}</strong>
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: 'var(--muted-foreground)' }}>Plan Tier:</span>

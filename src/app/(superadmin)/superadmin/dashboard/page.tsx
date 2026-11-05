@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -72,11 +73,18 @@ export default function SuperadminDashboardPage() {
 
   const totalSchools = typeof stats?.totalSchools === 'number' ? stats.totalSchools : (stats?.schoolsCount ?? schools.length);
   const activeSchools = typeof stats?.activeSchools === 'number' ? stats.activeSchools : (stats?.activeSchoolsCount ?? schools.filter((s) => s.isActive !== false).length);
-  const totalUsers = typeof stats?.totalUsers === 'number' ? stats.totalUsers : (stats?.usersCount ?? 0);
+  const totalStudents = typeof stats?.totalStudents === 'number' ? stats.totalStudents : 0;
+  const totalTeachers = typeof stats?.totalTeachers === 'number' ? stats.totalTeachers : 0;
+  const totalUsers = typeof stats?.totalUsers === 'number'
+    ? stats.totalUsers
+    : (totalStudents + totalTeachers > 0 ? (totalStudents + totalTeachers) : (stats?.usersCount ?? 0));
   const activeSubscriptions = typeof stats?.activeSubscriptions === 'number' ? stats.activeSubscriptions : (stats?.subscriptionsCount ?? 0);
 
-  const rawBalance = smsOverview?.balance ?? smsOverview?.gatewayBalance ?? stats?.smsBalance;
+  const rawBalance = smsOverview?.gatewayBalance ?? smsOverview?.balance ?? stats?.smsBalance;
   let gatewayBalance = '—';
+  let aggregatorErrorIp: string | null = null;
+  let isAggregatorBlocked = false;
+
   if (typeof rawBalance === 'number') {
     gatewayBalance = rawBalance.toLocaleString();
   } else if (typeof rawBalance === 'string' && !isNaN(Number(rawBalance))) {
@@ -84,16 +92,23 @@ export default function SuperadminDashboardPage() {
   } else if (typeof rawBalance === 'object' && rawBalance !== null) {
     if (typeof rawBalance.balance === 'number') {
       gatewayBalance = rawBalance.balance.toLocaleString();
-    } else if (rawBalance.message) {
-      gatewayBalance = String(rawBalance.message);
-    } else if (rawBalance.status) {
-      gatewayBalance = String(rawBalance.status);
     } else {
-      gatewayBalance = 'Unavailable';
+      if (rawBalance.client_ip) {
+        aggregatorErrorIp = String(rawBalance.client_ip);
+      }
+      if (rawBalance.code === 2003 || rawBalance.code === 403 || String(rawBalance.message || '').includes('IP')) {
+        isAggregatorBlocked = true;
+      }
+      const pool = smsOverview?.totalRemainingBalance ?? smsOverview?.totalPurchasedCredits;
+      if (typeof pool === 'number') {
+        gatewayBalance = pool.toLocaleString();
+      } else {
+        gatewayBalance = 'Whitelist Pending';
+      }
     }
   }
 
-  const rawSent = smsOverview?.totalSent ?? smsOverview?.smsSent ?? stats?.totalSmsSent;
+  const rawSent = smsOverview?.totalUsedCredits ?? smsOverview?.totalSent ?? smsOverview?.smsSent ?? stats?.totalSmsSent;
   const totalSmsSent = typeof rawSent === 'number' ? rawSent.toLocaleString() : (typeof rawSent === 'string' ? rawSent : '0');
 
   return (
@@ -303,7 +318,11 @@ export default function SuperadminDashboardPage() {
             <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--foreground)' }}>
               {loading ? '...' : totalUsers}
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Across all tenants</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+              {totalStudents > 0 || totalTeachers > 0
+                ? `${totalStudents} Students · ${totalTeachers} Teachers`
+                : 'Across all tenants'}
+            </span>
           </div>
           <Link
             href="/superadmin/users"
@@ -409,8 +428,15 @@ export default function SuperadminDashboardPage() {
             <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--foreground)' }}>
               {loading ? '...' : gatewayBalance}
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Credits</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+              {isAggregatorBlocked ? 'Credits (Pool)' : 'Credits'}
+            </span>
           </div>
+          {isAggregatorBlocked && aggregatorErrorIp && (
+            <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 500 }}>
+              Aggregator IP needed: {aggregatorErrorIp}
+            </span>
+          )}
           <Link
             href="/superadmin/sms"
             style={{
@@ -497,23 +523,12 @@ export default function SuperadminDashboardPage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {school.name ? school.name.charAt(0).toUpperCase() : 'S'}
-                    </div>
+                    <SchoolAvatar
+                      avatar={school.avatar}
+                      name={school.name}
+                      size={36}
+                      radius={8}
+                    />
                     <div style={{ minWidth: 0 }}>
                       <p
                         style={{

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeCode, sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -29,6 +30,7 @@ interface SmsPurchaseItem {
     id: string;
     name: string;
     schoolId?: string;
+    avatar?: string | null;
   } | null;
   package?: {
     id: string;
@@ -408,8 +410,13 @@ export default function SuperadminSmsPurchasesPage() {
                   return (
                     <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Building2 size={16} color="#7c3aed" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <SchoolAvatar
+                            avatar={order.school?.avatar}
+                            name={schoolName}
+                            size={32}
+                            radius={6}
+                          />
                           <div>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
                               {schoolName}
@@ -613,13 +620,21 @@ export default function SuperadminSmsPurchasesPage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  Update Order Status
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  {sanitizeDisplayName(selectedOrder.school?.name, 'Institutional Order')} · {selectedOrder.package?.name || 'SMS Package'}
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <SchoolAvatar
+                  avatar={selectedOrder.school?.avatar}
+                  name={selectedOrder.school?.name}
+                  size={38}
+                  radius={8}
+                />
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    Update Order Status
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                    {sanitizeDisplayName(selectedOrder.school?.name, 'Institutional Order')} · {selectedOrder.package?.name || 'SMS Package'}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setStatusModalOpen(false)}

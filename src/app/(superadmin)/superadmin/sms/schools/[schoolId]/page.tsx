@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -148,22 +149,12 @@ export default function SingleSchoolSmsDetailPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.25rem',
-            }}
-          >
-            {schoolName.charAt(0).toUpperCase()}
-          </div>
+          <SchoolAvatar
+            avatar={profile?.avatar || profile?.school?.avatar}
+            name={schoolName}
+            size={48}
+            radius={12}
+          />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--foreground)' }}>

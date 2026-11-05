@@ -21,8 +21,42 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
+
+const ENTITY_RESTORE_TYPE_MAP: Record<string, string> = {
+  schools: 'school',
+  school: 'school',
+  users: 'user',
+  user: 'user',
+  classes: 'class',
+  class: 'class',
+  subjects: 'subject',
+  subject: 'subject',
+  sections: 'section',
+  section: 'section',
+  pricing: 'pricing',
+  pricingplans: 'pricing',
+  pricingplan: 'pricing',
+  subscriptions: 'subscription',
+  subscription: 'subscription',
+  homework: 'homework',
+  homeworks: 'homework',
+  attendance: 'attendance',
+  attendances: 'attendance',
+};
+
+function normalizeTrashEntity(raw: string): string {
+  const clean = (raw || '').trim().toLowerCase();
+  if (ENTITY_RESTORE_TYPE_MAP[clean]) {
+    return ENTITY_RESTORE_TYPE_MAP[clean];
+  }
+  if (clean.endsWith('s')) {
+    return clean.slice(0, -1);
+  }
+  return clean;
+}
 
 interface TrashItem {
   id: string;
@@ -30,9 +64,10 @@ interface TrashItem {
   name?: string;
   title?: string;
   email?: string;
+  avatar?: string;
   deletedAt?: string;
   schoolId?: string;
-  school?: { name?: string };
+  school?: { name?: string; avatar?: string };
   original?: any;
 }
 
@@ -85,10 +120,11 @@ export default function SuperadminTrashPage() {
         rawData.forEach((item: any) => {
           items.push({
             id: safeStr(item.id) || safeStr(item._id) || '',
-            entity: (safeStr(item.entity) || safeStr(item.type) || 'record').toLowerCase(),
+            entity: normalizeTrashEntity(safeStr(item.entity) || safeStr(item.type) || 'record'),
             name: extractName(item),
             title: safeStr(item.title),
             email: safeStr(item.email),
+            avatar: safeStr(item.avatar),
             deletedAt: safeStr(item.deletedAt) || safeStr(item.updatedAt),
             schoolId: safeStr(item.schoolId),
             school: item.school && typeof item.school === 'object' ? item.school : undefined,
@@ -102,10 +138,11 @@ export default function SuperadminTrashPage() {
             list.forEach((item: any) => {
               items.push({
                 id: safeStr(item.id) || safeStr(item._id) || '',
-                entity: entityKey.toLowerCase(),
+                entity: normalizeTrashEntity(entityKey),
                 name: extractName(item),
                 title: safeStr(item.title),
                 email: safeStr(item.email),
+                avatar: safeStr(item.avatar),
                 deletedAt: safeStr(item.deletedAt) || safeStr(item.updatedAt),
                 schoolId: safeStr(item.schoolId),
                 school: item.school && typeof item.school === 'object' ? item.school : undefined,
@@ -138,24 +175,15 @@ export default function SuperadminTrashPage() {
     setRestoring(true);
     try {
       const token = getStoredToken();
-      const entity = selectedItem.entity.toLowerCase();
+      const entity = normalizeTrashEntity(selectedItem.entity);
       const id = selectedItem.id;
 
-      // Try entity specific endpoint first, e.g. /superadmin/trash/schools/{id}/restore
-      let url = `${API_BASE_URL}/superadmin/trash/${entity}/${id}/restore`;
+      const url = `${API_BASE_URL}/superadmin/trash/${entity}/${id}/restore`;
 
-      let res = await fetch(url, {
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, Accept: '*/*' },
       });
-
-      if (!res.ok) {
-        // Fallback to generic restore if needed
-        res = await fetch(`${API_BASE_URL}/superadmin/trash/${entity}/${id}/restore`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, Accept: '*/*' },
-        });
-      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -175,20 +203,20 @@ export default function SuperadminTrashPage() {
 
   const entityTabs = [
     { key: 'ALL', label: 'All Entities', icon: Layers },
-    { key: 'schools', label: 'Schools', icon: Building2 },
-    { key: 'users', label: 'Users', icon: Users },
-    { key: 'classes', label: 'Classes', icon: BookOpen },
-    { key: 'subjects', label: 'Subjects', icon: Book },
-    { key: 'sections', label: 'Sections', icon: Layers },
+    { key: 'school', label: 'Schools', icon: Building2 },
+    { key: 'user', label: 'Users', icon: Users },
+    { key: 'class', label: 'Classes', icon: BookOpen },
+    { key: 'subject', label: 'Subjects', icon: Book },
+    { key: 'section', label: 'Sections', icon: Layers },
     { key: 'pricing', label: 'Pricing Plans', icon: CreditCard },
-    { key: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+    { key: 'subscription', label: 'Subscriptions', icon: CreditCard },
     { key: 'homework', label: 'Homework', icon: Clock },
     { key: 'attendance', label: 'Attendance', icon: CheckCircle },
   ];
 
   const getEntityCount = (key: string) => {
     if (key === 'ALL') return trashItems.length;
-    return trashItems.filter((i) => i.entity === key || i.entity.startsWith(key)).length;
+    return trashItems.filter((i) => i.entity === key).length;
   };
 
   const filteredItems = useMemo(() => {
@@ -201,8 +229,7 @@ export default function SuperadminTrashPage() {
         (item.id || '').toLowerCase().includes(q) ||
         (item.school?.name || '').toLowerCase().includes(q);
 
-      const matchEntity =
-        activeTab === 'ALL' ? true : item.entity === activeTab || item.entity.startsWith(activeTab);
+      const matchEntity = activeTab === 'ALL' ? true : item.entity === activeTab;
 
       return matchSearch && matchEntity;
     });
@@ -404,15 +431,25 @@ export default function SuperadminTrashPage() {
                 {filteredItems.map((item) => (
                   <tr key={`${item.entity}-${item.id}`} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '14px 16px' }}>
-                      <div>
-                        <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
-                          {sanitizeDisplayName(item.name || item.title, `${item.entity.toUpperCase()} Record`)}
-                        </span>
-                        {item.email && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
-                            {item.email}
-                          </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {item.entity === 'school' && (
+                          <SchoolAvatar
+                            avatar={item.avatar || item.original?.avatar}
+                            name={item.name}
+                            size={32}
+                            radius={6}
+                          />
                         )}
+                        <div>
+                          <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
+                            {sanitizeDisplayName(item.name || item.title, `${item.entity.toUpperCase()} Record`)}
+                          </span>
+                          {item.email && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                              {item.email}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -433,9 +470,19 @@ export default function SuperadminTrashPage() {
                     </td>
 
                     <td style={{ padding: '14px 16px' }}>
-                      <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
-                        {item.school?.name || (item.schoolId ? 'Assigned Institution' : 'Global Platform')}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {(item.school?.avatar || item.original?.school?.avatar) && (
+                          <SchoolAvatar
+                            avatar={item.school?.avatar || item.original?.school?.avatar}
+                            name={item.school?.name}
+                            size={20}
+                            radius={4}
+                          />
+                        )}
+                        <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
+                          {item.school?.name || (item.schoolId ? 'Assigned Institution' : 'Global Platform')}
+                        </span>
+                      </div>
                     </td>
 
                     <td style={{ padding: '14px 16px', color: 'var(--muted-foreground)', fontSize: '0.775rem' }}>
@@ -525,11 +572,21 @@ export default function SuperadminTrashPage() {
             </div>
 
             <div style={{ background: 'var(--muted)', borderRadius: '8px', padding: '12px 14px', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span style={{ color: 'var(--muted-foreground)' }}>Record Title:</span>
-                <strong style={{ color: 'var(--foreground)' }}>
-                  {sanitizeDisplayName(selectedItem.name || selectedItem.title, `${selectedItem.entity.toUpperCase()} Record`)}
-                </strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {(selectedItem.avatar || selectedItem.school?.avatar) && (
+                    <SchoolAvatar
+                      avatar={selectedItem.avatar || selectedItem.school?.avatar}
+                      name={selectedItem.name || selectedItem.title}
+                      size={20}
+                      radius={4}
+                    />
+                  )}
+                  <strong style={{ color: 'var(--foreground)' }}>
+                    {sanitizeDisplayName(selectedItem.name || selectedItem.title, `${selectedItem.entity.toUpperCase()} Record`)}
+                  </strong>
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--muted-foreground)' }}>Entity Category:</span>

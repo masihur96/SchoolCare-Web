@@ -20,9 +20,12 @@ import {
   Layers,
   AlertTriangle,
   Loader2,
+  Upload,
+  ImageIcon,
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
-import { sanitizeCode, sanitizeDisplayName, isTechnicalId } from '@/lib/formatters';
+import { sanitizeCode, sanitizeDisplayName, isTechnicalId, generateUUID } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -64,6 +67,34 @@ export default function SuperadminSchoolsPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const token = getStoredToken();
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API_BASE_URL}/general/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: '*/*' },
+        body: fd,
+      });
+      if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+      const json = await res.json();
+      // Handle both { url } and { data: { url } } response shapes
+      const url: string = json?.url || json?.data?.url || json?.fileUrl || json?.data?.fileUrl || '';
+      if (!url) throw new Error('No URL returned from upload');
+      setFormState((prev) => ({ ...prev, avatar: url }));
+    } catch (err: any) {
+      setFormError(err?.message || 'Logo upload failed. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+
 
   const fetchSchools = async () => {
     setLoading(true);
@@ -92,7 +123,7 @@ export default function SuperadminSchoolsPage() {
 
   const handleOpenCreate = () => {
     setFormState({
-      schoolId: `SCH-${Math.floor(100 + Math.random() * 900)}`,
+      schoolId: generateUUID(),
       name: '',
       address: '',
       phone: '',
@@ -126,14 +157,18 @@ export default function SuperadminSchoolsPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formState.schoolId.trim() || !formState.name.trim()) {
-      setFormError('School ID and Name are required.');
+    if (!formState.name.trim()) {
+      setFormError('School Name is required.');
       return;
     }
     setSubmitting(true);
     setFormError(null);
     try {
       const token = getStoredToken();
+      const payloadSchoolId = formState.schoolId && isTechnicalId(formState.schoolId)
+        ? formState.schoolId
+        : generateUUID();
+
       const res = await fetch(`${API_BASE_URL}/superadmin/schools`, {
         method: 'POST',
         headers: {
@@ -142,7 +177,7 @@ export default function SuperadminSchoolsPage() {
           Accept: '*/*',
         },
         body: JSON.stringify({
-          schoolId: formState.schoolId.trim(),
+          schoolId: payloadSchoolId,
           name: formState.name.trim(),
           address: formState.address.trim() || undefined,
           phone: formState.phone.trim() || undefined,
@@ -485,23 +520,12 @@ export default function SuperadminSchoolsPage() {
                       {/* Name & Avatar */}
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div
-                            style={{
-                              width: '38px',
-                              height: '38px',
-                              borderRadius: '8px',
-                              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 700,
-                              fontSize: '0.9rem',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {school.name ? school.name.charAt(0).toUpperCase() : 'S'}
-                          </div>
+                          <SchoolAvatar
+                            avatar={school.avatar}
+                            name={school.name}
+                            size={38}
+                            radius={8}
+                          />
                           <div>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
                               {school.name}
@@ -715,28 +739,6 @@ export default function SuperadminSchoolsPage() {
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', color: 'var(--foreground)' }}>
-                  School ID / Code *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. SCH-001 or GREENFIELD-01"
-                  value={formState.schoolId}
-                  onChange={(e) => setFormState({ ...formState, schoolId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--background)',
-                    color: 'var(--foreground)',
-                    fontSize: '0.875rem',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', color: 'var(--foreground)' }}>
                   School Name *
                 </label>
                 <input
@@ -821,7 +823,77 @@ export default function SuperadminSchoolsPage() {
                 />
               </div>
 
+              {/* School Logo Upload */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--foreground)' }}>
+                  School Logo
+                </label>
+                <div
+                  style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    background: 'var(--muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  {/* Preview */}
+                  {formState.avatar ? (
+                    <img
+                      src={formState.avatar}
+                      alt="School logo"
+                      style={{ width: 48, height: 48, borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border)', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <ImageIcon size={20} style={{ color: 'var(--muted-foreground)' }} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {formState.avatar ? (
+                      <p style={{ fontSize: '0.78rem', color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✓ Logo uploaded</p>
+                    ) : (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginBottom: 2 }}>PNG, JPG or SVG · Max 5 MB</p>
+                    )}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        color: avatarUploading ? 'var(--muted-foreground)' : '#7c3aed',
+                        cursor: avatarUploading ? 'not-allowed' : 'pointer',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        borderColor: avatarUploading ? 'var(--border)' : '#7c3aed',
+                        background: 'transparent',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {avatarUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                      {avatarUploading ? 'Uploading…' : formState.avatar ? 'Replace Logo' : 'Upload Logo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={avatarUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleAvatarUpload(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1rem' }}>
+
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
@@ -1033,7 +1105,76 @@ export default function SuperadminSchoolsPage() {
                 />
               </div>
 
+              {/* School Logo Upload */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--foreground)' }}>
+                  School Logo
+                </label>
+                <div
+                  style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    background: 'var(--muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  {formState.avatar ? (
+                    <img
+                      src={formState.avatar}
+                      alt="School logo"
+                      style={{ width: 48, height: 48, borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border)', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <ImageIcon size={20} style={{ color: 'var(--muted-foreground)' }} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {formState.avatar ? (
+                      <p style={{ fontSize: '0.78rem', color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✓ Logo uploaded</p>
+                    ) : (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginBottom: 2 }}>PNG, JPG or SVG · Max 5 MB</p>
+                    )}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        color: avatarUploading ? 'var(--muted-foreground)' : '#7c3aed',
+                        cursor: avatarUploading ? 'not-allowed' : 'pointer',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        borderColor: avatarUploading ? 'var(--border)' : '#7c3aed',
+                        background: 'transparent',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {avatarUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                      {avatarUploading ? 'Uploading…' : formState.avatar ? 'Replace Logo' : 'Upload Logo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={avatarUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleAvatarUpload(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1rem' }}>
+
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
@@ -1128,8 +1269,32 @@ export default function SuperadminSchoolsPage() {
               </div>
             </div>
 
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                background: 'var(--muted)',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+              }}
+            >
+              <SchoolAvatar avatar={selectedSchool.avatar} name={selectedSchool.name} size={36} radius={6} />
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ fontSize: '0.875rem', color: 'var(--foreground)', display: 'block' }}>
+                  {selectedSchool.name}
+                </strong>
+                {selectedSchool.email && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                    {selectedSchool.email}
+                  </span>
+                )}
+              </div>
+            </div>
+
             <p style={{ fontSize: '0.85rem', color: 'var(--foreground)', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-              Are you sure you want to soft-delete <strong>{selectedSchool.name}</strong>? You can restore it anytime from the <strong>Trash & Restore</strong> module.
+              Are you sure you want to soft-delete this institution? You can restore it anytime from the <strong>Trash & Restore</strong> module.
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>

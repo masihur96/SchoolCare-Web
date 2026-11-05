@@ -21,6 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -35,6 +36,7 @@ interface UserEntity {
     id: string;
     name: string;
     schoolId?: string;
+    avatar?: string | null;
   } | null;
   designation?: string;
   rollNumber?: string;
@@ -448,8 +450,17 @@ export default function SuperadminUsersPage() {
                       </td>
 
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Building2 size={14} color="var(--muted-foreground)" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {u.school?.avatar ? (
+                            <SchoolAvatar
+                              avatar={u.school.avatar}
+                              name={u.school.name}
+                              size={22}
+                              radius={5}
+                            />
+                          ) : (
+                            <Building2 size={15} color="var(--muted-foreground)" />
+                          )}
                           <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
                             {u.school?.name || (u.role === 'superadmin' ? 'Platform Operations' : 'Institutional Staff')}
                           </span>
@@ -644,9 +655,19 @@ export default function SuperadminUsersPage() {
                 </div>
                 <div>
                   <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'block' }}>Assigned School:</span>
-                  <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
-                    {previewUser.school?.name || (previewUser.role === 'superadmin' ? 'Global Platform Access' : 'Registered Institution')}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    {previewUser.school?.avatar && (
+                      <SchoolAvatar
+                        avatar={previewUser.school.avatar}
+                        name={previewUser.school.name}
+                        size={22}
+                        radius={5}
+                      />
+                    )}
+                    <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
+                      {previewUser.school?.name || (previewUser.role === 'superadmin' ? 'Global Platform Access' : 'Registered Institution')}
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'block' }}>Designation:</span>

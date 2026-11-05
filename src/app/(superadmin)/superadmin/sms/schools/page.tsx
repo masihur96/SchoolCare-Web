@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken } from '@/lib/auth';
 import { sanitizeCode, sanitizeDisplayName } from '@/lib/formatters';
+import SchoolAvatar from '@/components/superadmin/school-avatar';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 
@@ -28,10 +29,12 @@ interface SchoolSmsItem {
   schoolId: string;
   schoolName?: string;
   name?: string;
+  avatar?: string | null;
   school?: {
     id: string;
     name: string;
     schoolId?: string;
+    avatar?: string | null;
   };
   balance?: number;
   smsBalance?: number;
@@ -365,6 +368,7 @@ export default function SuperadminSmsSchoolsPage() {
                   const balance = typeof rawBalance === 'number' ? rawBalance : (typeof rawBalance === 'object' && rawBalance !== null && typeof rawBalance.balance === 'number' ? rawBalance.balance : 0);
                   const totalSent = typeof school.totalSent === 'number' ? school.totalSent : 0;
                   const totalPurchased = typeof school.totalPurchased === 'number' ? school.totalPurchased : 0;
+                  const schoolAvatar = school.avatar || school.school?.avatar;
                   const isEnabled = school.isSmsEnabled !== false && school.status !== 'DISABLED';
                   const isToggling = togglingId === schoolId;
 
@@ -372,23 +376,12 @@ export default function SuperadminSmsSchoolsPage() {
                     <tr key={schoolId} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div
-                            style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '8px',
-                              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {schoolName.charAt(0).toUpperCase()}
-                          </div>
+                          <SchoolAvatar
+                            avatar={schoolAvatar}
+                            name={schoolName}
+                            size={36}
+                            radius={8}
+                          />
                           <div>
                             <span style={{ fontWeight: 600, color: 'var(--foreground)', display: 'block' }}>
                               {schoolName}
@@ -533,13 +526,21 @@ export default function SuperadminSmsSchoolsPage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  Adjust SMS Quota
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                  {sanitizeDisplayName(selectedSchool.schoolName || selectedSchool.name, 'Selected Institution')}
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <SchoolAvatar
+                  avatar={selectedSchool.avatar || selectedSchool.school?.avatar}
+                  name={selectedSchool.schoolName || selectedSchool.name}
+                  size={40}
+                  radius={8}
+                />
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    Adjust SMS Quota
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                    {sanitizeDisplayName(selectedSchool.schoolName || selectedSchool.name, 'Selected Institution')}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setAdjustModalOpen(false)}
