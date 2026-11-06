@@ -188,7 +188,7 @@ export default function SuperadminSmsOverviewPage() {
                 <p style={{ marginTop: '2px' }}>{balanceErrorMessage}</p>
                 {containerIp && (
                   <p style={{ marginTop: '4px', color: '#fef08a' }}>
-                    Active Container IP: <strong>{containerIp}</strong> (Whitelisted: 162.220.232.165/32)
+                    Active Outbound IP: <strong>{containerIp}</strong> — Please add <strong>{containerIp}/32</strong> to your White Info BD IP Whitelist (Previously whitelisted: 162.220.232.165/32).
                   </p>
                 )}
               </div>
