@@ -25,6 +25,7 @@ import {
   User,
   Sparkles,
   ExternalLink,
+  BadgePercent,
 } from 'lucide-react';
 import { clearAuthSession } from '@/lib/auth';
 
@@ -63,6 +64,7 @@ export function SuperadminSidebar() {
     { name: 'Schools', href: '/superadmin/schools', icon: Building2 },
     { name: 'Users', href: '/superadmin/users', icon: Users },
     { name: 'Subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
+    { name: 'Pricing Plans', href: '/superadmin/pricing', icon: BadgePercent },
     { name: 'Trash & Restore', href: '/superadmin/trash', icon: Trash2 },
   ];
 

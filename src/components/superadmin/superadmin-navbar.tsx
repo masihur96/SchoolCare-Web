@@ -67,6 +67,7 @@ export function SuperadminNavbar() {
     if (pathname.includes('/superadmin/schools')) return 'Schools Directory';
     if (pathname.includes('/superadmin/users')) return 'Global Users Management';
     if (pathname.includes('/superadmin/subscriptions')) return 'Subscription Management';
+    if (pathname.includes('/superadmin/pricing')) return 'Pricing Plans & Subscriptions';
     if (pathname.includes('/superadmin/trash')) return 'Trash & Entity Recovery';
     if (pathname.includes('/superadmin/sms/schools')) return 'School SMS Quotas & Controls';
     if (pathname.includes('/superadmin/sms/packages')) return 'SMS Pricing Packages';
