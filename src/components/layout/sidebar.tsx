@@ -8,7 +8,8 @@ import {
   Settings, Menu, X, GraduationCap, LogOut, UserCheck,
   Activity, Clock, MessageSquare, Book,
   BookMarked, PieChart, ChevronLeft, ChevronRight, MessageCircle,
-  MoreVertical, User, Key, Video, Send, CalendarDays, Inbox, Receipt
+  MoreVertical, User, Key, Video, Send, CalendarDays, Inbox, Receipt,
+  CreditCard
 } from 'lucide-react';
 import { useLanguage } from '@/components/language-provider';
 
@@ -39,6 +40,16 @@ export function Sidebar() {
       try {
         const token = getToken();
         if (!token) return;
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload && payload.role) {
+              setProfile((prev: any) => prev || { role: payload.role });
+            }
+          }
+        } catch (_) {}
+
         const res = await fetch('https://smart-school-backend-production.up.railway.app/auth/profile', {
           headers: { Authorization: `Bearer ${token}`, Accept: '*/*' }
         });
@@ -65,6 +76,9 @@ export function Sidebar() {
     };
   }, []);
 
+  const userRole = (profile?.role || '').toLowerCase();
+  const isSuperAdmin = !profile || ['admin', 'superadmin', 'super_admin'].includes(userRole);
+
   const navItems = [
     { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
     { name: t('nav.students'), href: '/students', icon: Users },
@@ -83,6 +97,7 @@ export function Sidebar() {
     { name: t('nav.academicBook'), href: '/academic-books', icon: BookMarked },
     { name: t('nav.feesManagement'), href: '/fees', icon: Receipt },
     { name: t('nav.bulkSms'), href: '/bulk-sms', icon: Send },
+    ...(isSuperAdmin ? [{ name: t('nav.pricing') || 'Pricing', href: '/pricing', icon: CreditCard }] : []),
     { name: t('nav.settings'), href: '/settings', icon: Settings },
   ];
 
@@ -161,7 +176,7 @@ export function Sidebar() {
                 <>
                   <div className="nd-profile-info">
                     <span className="nd-profile-name">{profile?.name || 'User'}</span>
-                    <span className="nd-profile-role">{profile?.role === 'admin' ? t('common.superAdmin') : (profile?.role || t('common.staff'))}</span>
+                    <span className="nd-profile-role">{['admin', 'superadmin', 'super_admin'].includes(userRole) ? t('common.superAdmin') : (profile?.role || t('common.staff'))}</span>
                   </div>
                   <button 
                     className="nd-profile-more-btn"
