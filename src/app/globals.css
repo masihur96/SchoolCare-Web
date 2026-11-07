@@ -4641,3 +4641,33 @@ html[lang="bn"] select {
 .marquee-action-btn:hover {
   background: var(--accent);
 }
+
+/* Superadmin Layout & Sidebar */
+.superadmin-sidebar {
+  width: 260px;
+  background: var(--card) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.superadmin-layout .main-content {
+  margin-left: 260px;
+  transition: margin-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.superadmin-layout.sidebar-collapsed .main-content {
+  margin-left: 76px;
+}
+
+@media (max-width: 768px) {
+  .superadmin-sidebar {
+    transform: translateX(-100%);
+  }
+  .superadmin-sidebar.open {
+    transform: translateX(0) !important;
+  }
+  .superadmin-layout .main-content {
+    margin-left: 0 !important;
+  }
+}

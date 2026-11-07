@@ -15,6 +15,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useLanguage } from '@/components/language-provider';
+import { getCachedUserRole } from '@/lib/auth';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -26,7 +27,12 @@ export default function LandingPage() {
     setMounted(true); 
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     if (token) {
-      router.replace('/dashboard');
+      const role = getCachedUserRole();
+      if (role === 'superadmin') {
+        router.replace('/superadmin/dashboard');
+      } else if (role === 'admin') {
+        router.replace('/dashboard');
+      }
     }
   }, [router]);
 
