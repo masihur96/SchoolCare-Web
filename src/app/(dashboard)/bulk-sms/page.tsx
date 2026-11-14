@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLanguage } from '@/components/language-provider';
 import {
   Send, Users, MessageSquare, Clock, AlertTriangle,
@@ -8,9 +8,53 @@ import {
   ShieldCheck, FileText, Calendar, CreditCard,
   Bell, GraduationCap, UserCheck,
   Layers, LayoutGrid, FileSpreadsheet, ChevronDown, ChevronLeft,
-  ChevronRight, X, Download, CheckCircle2, Eye, RotateCcw
+  ChevronRight, X, Download, CheckCircle2, Eye, RotateCcw,
+  Building2, Receipt, ArrowDownLeft, ArrowUpRight, PlusCircle, AlertCircle
 } from 'lucide-react';
 import { getPdfTools } from '@/lib/pdf';
+
+const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
+const DEFAULT_FALLBACK_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc5NDY2NDIzMiwiZXhwIjoxNzk0NzUwNjMyfQ.A4UUzOYiHC3F_UsgUlgFkDJ7qcLSS_4cB5QlSeNvbHk';
+
+const getApiToken = () => {
+  if (typeof window !== 'undefined') {
+    const token =
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('token') ||
+      sessionStorage.getItem('access_token');
+    if (token) return token;
+  }
+  return DEFAULT_FALLBACK_TOKEN;
+};
+
+interface SmsQuotaTransaction {
+  id: string;
+  schoolId: string;
+  type: string;
+  amount: number;
+  previousBalance: number;
+  newBalance: number;
+  referenceId: string | null;
+  description: string;
+  performedById: string | null;
+  createdAt: string;
+}
+
+interface SmsQuotaStatusData {
+  schoolId: string;
+  schoolName: string;
+  balance: number;
+  totalPurchased: number;
+  totalAllocated: number;
+  totalUsed: number;
+  isEnabled: boolean;
+  lowBalanceThreshold: number;
+  isLowBalance: boolean;
+  recentTransactions: SmsQuotaTransaction[];
+  updatedAt: string;
+}
 
 interface SMSCampaign {
   id: string;
@@ -166,9 +210,23 @@ const DYNAMIC_TAGS = [
 export default function BulkSMSPage() {
   const { t, language } = useLanguage();
   const [campaigns, setCampaigns] = useState<SMSCampaign[]>(INITIAL_CAMPAIGNS);
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'templates' | 'gateway'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'templates' | 'transactions' | 'gateway'>('campaigns');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
+
+  // SMS Quota Status State (from GET /sms/quota/status)
+  const [quotaData, setQuotaData] = useState<SmsQuotaStatusData | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState<boolean>(true);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [copiedSchoolId, setCopiedSchoolId] = useState(false);
+  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
+
+  // Transactions Tab Search, Filter & Pagination
+  const [txSearchTerm, setTxSearchTerm] = useState('');
+  const [txTypeFilter, setTxTypeFilter] = useState('ALL');
+  const [txPage, setTxPage] = useState(1);
+  const [txLimit, setTxLimit] = useState(10);
 
   // Helper for Bengali number conversion
   const formatNumber = (num: number | string) => {
@@ -180,6 +238,75 @@ export default function BulkSMSPage() {
       '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯'
     };
     return numStr.replace(/[0-9]/g, (w) => banglaDigits[w] || w);
+  };
+
+  const formatSingleLineDate = (dateString?: string) => {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    const datePart = d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timePart = d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${datePart} • ${timePart}`;
+  };
+
+  const fetchQuotaStatus = useCallback(async () => {
+    setQuotaLoading(true);
+    setQuotaError(null);
+    try {
+      const token = getApiToken();
+      const res = await fetch(`${API_BASE_URL}/sms/quota/status`, {
+        method: 'GET',
+        headers: {
+          accept: '*/*',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch SMS quota status (${res.status} ${res.statusText})`);
+      }
+
+      const json = await res.json();
+      if (json && json.data) {
+        setQuotaData(json.data);
+        if (typeof json.data.balance === 'number') {
+          setCreditsBalance(json.data.balance);
+        }
+        if (typeof json.data.totalUsed === 'number') {
+          setSentThisMonth(json.data.totalUsed);
+        }
+        setLastRefreshed(new Date());
+      }
+    } catch (err: any) {
+      console.error('Error fetching SMS quota status:', err);
+      setQuotaError(err?.message || 'Failed to load SMS quota details');
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchQuotaStatus();
+  }, [fetchQuotaStatus]);
+
+  const handleCopySchoolId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedSchoolId(true);
+    setTimeout(() => setCopiedSchoolId(false), 2000);
+  };
+
+  const handleCopyTxId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedTxId(id);
+    setTimeout(() => setCopiedTxId(null), 2000);
   };
 
   const getStatusLabel = (status: SMSCampaign['status']) => {
@@ -303,21 +430,64 @@ export default function BulkSMSPage() {
     return () => clearTimeout(timer);
   }, [bannerMessage]);
 
-  const formatSingleLineDate = (dateString?: string) => {
-    if (!dateString) return '—';
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
-    const datePart = d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+  // Filtered & Paginated transactions (from /sms/quota/status)
+  const filteredTransactions = useMemo(() => {
+    if (!quotaData?.recentTransactions) return [];
+    return quotaData.recentTransactions.filter(tx => {
+      const matchesSearch =
+        !txSearchTerm ||
+        tx.id.toLowerCase().includes(txSearchTerm.toLowerCase()) ||
+        (tx.description && tx.description.toLowerCase().includes(txSearchTerm.toLowerCase())) ||
+        (tx.referenceId && tx.referenceId.toLowerCase().includes(txSearchTerm.toLowerCase())) ||
+        tx.type.toLowerCase().includes(txSearchTerm.toLowerCase());
+
+      const matchesType = txTypeFilter === 'ALL' || tx.type.toUpperCase() === txTypeFilter.toUpperCase();
+      return matchesSearch && matchesType;
     });
-    const timePart = d.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-    return `${datePart} • ${timePart}`;
+  }, [quotaData?.recentTransactions, txSearchTerm, txTypeFilter]);
+
+  const totalTxPages = Math.max(1, Math.ceil(filteredTransactions.length / txLimit));
+  const paginatedTransactions = useMemo(() => {
+    const start = (txPage - 1) * txLimit;
+    return filteredTransactions.slice(start, start + txLimit);
+  }, [filteredTransactions, txPage, txLimit]);
+
+  const handleExportTransactionsCSV = () => {
+    if (!filteredTransactions.length) return;
+    const headers = [
+      '#',
+      'Transaction ID',
+      'Type',
+      'Amount',
+      'Previous Balance',
+      'New Balance',
+      'Description',
+      'Reference ID',
+      'Performed By',
+      'Date & Time'
+    ];
+    const rows = filteredTransactions.map((tx, idx) => [
+      idx + 1,
+      `"${tx.id}"`,
+      `"${tx.type}"`,
+      tx.amount > 0 ? `+${tx.amount}` : tx.amount,
+      tx.previousBalance,
+      tx.newBalance,
+      `"${(tx.description || '').replace(/"/g, '""')}"`,
+      `"${tx.referenceId || ''}"`,
+      `"${tx.performedById || 'System'}"`,
+      `"${formatSingleLineDate(tx.createdAt)}"`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sms_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Insert tag into message
@@ -348,10 +518,11 @@ export default function BulkSMSPage() {
       return;
     }
 
-    if (totalCreditsRequired > creditsBalance) {
+    const availableCredits = quotaData?.balance ?? creditsBalance;
+    if (totalCreditsRequired > availableCredits) {
       const errMsg = (t('bulkSms.alertInsufficientCredits') || 'Insufficient SMS credits. Required: {required}, Available: {available}. Please recharge.')
         .replace('{required}', formatNumber(totalCreditsRequired))
-        .replace('{available}', formatNumber(creditsBalance));
+        .replace('{available}', formatNumber(availableCredits));
       setBroadcastError(errMsg);
       return;
     }
@@ -378,6 +549,28 @@ export default function BulkSMSPage() {
 
       setCampaigns(prev => [newCampaign, ...prev]);
       setCreditsBalance(prev => Math.max(0, prev - totalCreditsRequired));
+      setQuotaData(prev => prev ? {
+        ...prev,
+        balance: Math.max(0, prev.balance - totalCreditsRequired),
+        totalUsed: prev.totalUsed + totalCreditsRequired,
+        isLowBalance: Math.max(0, prev.balance - totalCreditsRequired) <= prev.lowBalanceThreshold,
+        recentTransactions: [
+          {
+            id: `tx-${Date.now().toString(36)}`,
+            schoolId: prev.schoolId,
+            type: 'USAGE',
+            amount: -totalCreditsRequired,
+            previousBalance: prev.balance,
+            newBalance: Math.max(0, prev.balance - totalCreditsRequired),
+            referenceId: newId,
+            description: title,
+            performedById: 'admin',
+            createdAt: new Date().toISOString()
+          },
+          ...prev.recentTransactions
+        ]
+      } : null);
+
       if (scheduleType === 'instant') {
         setSentThisMonth(prev => prev + totalRecipients);
       }
@@ -394,6 +587,27 @@ export default function BulkSMSPage() {
   // Recharge credits simulation
   const handleRechargeCredits = (amount: number) => {
     setCreditsBalance(prev => prev + amount);
+    setQuotaData(prev => prev ? {
+      ...prev,
+      balance: prev.balance + amount,
+      totalPurchased: prev.totalPurchased + amount,
+      isLowBalance: (prev.balance + amount) <= prev.lowBalanceThreshold,
+      recentTransactions: [
+        {
+          id: `tx-recharge-${Date.now().toString(36)}`,
+          schoolId: prev.schoolId,
+          type: 'PURCHASE',
+          amount: amount,
+          previousBalance: prev.balance,
+          newBalance: prev.balance + amount,
+          referenceId: `PKG-${amount}`,
+          description: `SMS Package Top-Up (+${formatNumber(amount)} Credits)`,
+          performedById: 'admin',
+          createdAt: new Date().toISOString()
+        },
+        ...prev.recentTransactions
+      ]
+    } : null);
     setIsRechargeModalOpen(false);
     const rechargeMsg = (t('bulkSms.alertRecharged') || 'Successfully recharged {amount} SMS credits to account.')
       .replace('{amount}', formatNumber(amount));
@@ -595,10 +809,242 @@ export default function BulkSMSPage() {
   return (
     <div className="page-container animate-fade-in" style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto' }}>
 
-      {/* ── Top Metric Summary Cards (Directly at top without page title header) ── */}
+      {/* ── Top Page Header & School Quota Branding ── */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '1rem',
+        marginBottom: '1.5rem',
+        padding: '1.25rem 1.5rem',
+        background: 'var(--card)',
+        borderRadius: '1.25rem',
+        border: '1px solid var(--border)',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+            flexShrink: 0
+          }}>
+            <Building2 size={24} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--foreground)', margin: 0, lineHeight: 1.2 }}>
+                {quotaData?.schoolName || "Bismillah Ta'limul Quran Cadet Madrasah"}
+              </h1>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '0.15rem 0.55rem',
+                borderRadius: '999px',
+                background: quotaData?.isEnabled !== false ? 'rgba(22, 163, 74, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444',
+                border: quotaData?.isEnabled !== false ? '1px solid rgba(22, 163, 74, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
+              }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }} />
+                {quotaData?.isEnabled !== false ? (t('bulkSms.gatewayOnline') || 'SMS Gateway Active') : (t('bulkSms.gatewayOffline') || 'Gateway Suspended')}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', flexWrap: 'wrap' }}>
+              <span>{t('bulkSms.schoolId') || 'School ID'}: <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{quotaData?.schoolId ? `${quotaData.schoolId.slice(0, 14)}...` : '29f05edb...'}</code></span>
+              {quotaData?.schoolId && (
+                <button
+                  type="button"
+                  onClick={() => handleCopySchoolId(quotaData.schoolId)}
+                  title="Copy School ID"
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedSchoolId ? '#16a34a' : 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                >
+                  {copiedSchoolId ? <Check size={13} /> : <Copy size={13} />}
+                  <span style={{ fontSize: '0.72rem' }}>{copiedSchoolId ? 'Copied' : 'Copy'}</span>
+                </button>
+              )}
+              {lastRefreshed && (
+                <span>&bull; {t('bulkSms.lastSynced') || 'Last synced'}: <strong>{lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Header Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <button
+            type="button"
+            onClick={fetchQuotaStatus}
+            disabled={quotaLoading}
+            title={t('bulkSms.refreshStatus') || 'Refresh SMS Quota & Transactions'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              height: '38px',
+              padding: '0 0.85rem',
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              background: 'var(--background)',
+              color: 'var(--foreground)',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: quotaLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            <RefreshCw size={14} className={quotaLoading ? 'animate-spin' : ''} />
+            <span>{quotaLoading ? (t('bulkSms.syncing') || 'Syncing...') : (t('bulkSms.refreshQuota') || 'Refresh Quota')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsRechargeModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              height: '38px',
+              padding: '0 0.95rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #bbf7d0',
+              background: '#f0fdf4',
+              color: '#16a34a',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            <PlusCircle size={15} />
+            <span>{t('bulkSms.recharge') || 'Recharge'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setBroadcastError(null);
+              setIsComposeModalOpen(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              height: '38px',
+              padding: '0 1.1rem',
+              borderRadius: '0.75rem',
+              border: 'none',
+              background: '#4f46e5',
+              color: '#ffffff',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+              transition: 'all 0.15s'
+            }}
+          >
+            <Send size={14} />
+            <span>{t('bulkSms.newBroadcast') || 'New Broadcast'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Low Balance Alert Banner ── */}
+      {quotaData?.isLowBalance && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: '1rem',
+          background: 'rgba(234, 88, 12, 0.1)',
+          border: '1px solid rgba(234, 88, 12, 0.3)',
+          color: '#c2410c',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#9a3412' }}>
+                {t('bulkSms.lowQuotaAlertTitle') || 'Low SMS Quota Warning'}
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#c2410c', marginTop: '0.1rem' }}>
+                {t('bulkSms.lowQuotaAlertDesc') || `Your current balance is only ${formatNumber(quotaData.balance)} SMS credits (Safety threshold: ${formatNumber(quotaData.lowBalanceThreshold)} credits). Recharge soon to prevent delivery interruptions.`}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRechargeModalOpen(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: '0.65rem',
+              border: 'none',
+              background: '#ea580c',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+          >
+            <CreditCard size={14} />
+            <span>{t('bulkSms.rechargeNow') || 'Recharge Now'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Quota Error Banner (Retry Connection) ── */}
+      {quotaError && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: '1rem',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{quotaError}</div>
+              <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>Check telecom gateway connection or credentials.</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fetchQuotaStatus}
+            style={{ padding: '0.4rem 0.85rem', borderRadius: '0.55rem', border: '1px solid #ef4444', background: '#ffffff', color: '#b91c1c', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
+      {/* ── Top Metric Summary Cards (Live Quota Stats) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
-        {/* Available Credits Card */}
+        {/* Card 1: Available SMS Quota */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', minWidth: 0 }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -607,10 +1053,10 @@ export default function BulkSMSPage() {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance') || 'SMS Balance'}</div>
               <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-                {formatNumber(creditsBalance)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>{t('bulkSms.credits') || 'Credits'}</span>
+                {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.balance ?? creditsBalance)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>{t('bulkSms.credits') || 'Credits'}</span>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {t('bulkSms.masking') || 'Masking'}: <strong>SCHOOLCARE</strong>
+                {t('bulkSms.masking') || 'Masking'}: <strong>SCHOOLCARE</strong> &bull; Threshold: {formatNumber(quotaData?.lowBalanceThreshold ?? 50)}
               </div>
             </div>
           </div>
@@ -623,50 +1069,51 @@ export default function BulkSMSPage() {
           </button>
         </div>
 
-        {/* Sent This Month Card */}
+        {/* Card 2: Total SMS Used */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
           <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Send size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentThisMonth') || 'Sent This Month'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalSmsUsed') || 'Total SMS Used'}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {formatNumber(sentThisMonth)}
+              {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.totalUsed ?? sentThisMonth)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563eb' }}>SMS</span>
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              ↑ +{formatNumber('14.2')}% {t('bulkSms.vsLastMonth') || 'vs last month'}
+            <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
+              {quotaData?.totalPurchased ? `${formatNumber(((quotaData.totalUsed || 0) / (quotaData.totalPurchased || 1) * 100).toFixed(1))}% of purchased quota` : 'Lifetime usage'}
             </div>
           </div>
         </div>
 
-        {/* Delivery Rate Card */}
+        {/* Card 3: Total Purchased Quota */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CheckCircle2 size={26} />
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Layers size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.deliveryRate') || 'Delivery Rate'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalPurchasedQuota') || 'Purchased Quota'}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {formatNumber('99.4')}%
+              {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.totalPurchased ?? 500)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7c3aed' }}>{t('bulkSms.credits') || 'Credits'}</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              {formatNumber(24035)} {t('bulkSms.successfulDeliveries') || 'Successful deliveries'}
+              Allocated: <strong>{formatNumber(quotaData?.totalAllocated ?? 0)}</strong> {t('bulkSms.credits') || 'Credits'}
             </div>
           </div>
         </div>
 
-        {/* Scheduled Campaigns Card */}
+        {/* Card 4: Service Gateway Status */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.35rem', display: 'flex', alignItems: 'center', gap: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Clock size={26} />
+          <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: quotaData?.isEnabled !== false ? '#f0fdf4' : '#fef2f2', color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ShieldCheck size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.scheduledCampaigns') || 'Scheduled Campaigns'}</div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {formatNumber(campaigns.filter(c => c.status === 'scheduled').length)}
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.serviceStatus') || 'Service & Quota Status'}</div>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444', lineHeight: 1.2, marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }} />
+              {quotaData?.isEnabled !== false ? 'Operational' : 'Suspended'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              {t('bulkSms.nextScheduled') || 'Next'}: {language === 'bn' ? '১৫ মে • সকাল ৯:০০' : 'May 15 • 9:00 AM'}
+            <div style={{ fontSize: '0.75rem', color: quotaData?.isLowBalance ? '#ea580c' : '#16a34a', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
+              {quotaData?.isLowBalance ? `⚠️ Low balance (< ${formatNumber(quotaData?.lowBalanceThreshold ?? 50)})` : `✓ Healthy quota balance`}
             </div>
           </div>
         </div>
@@ -725,7 +1172,11 @@ export default function BulkSMSPage() {
                 <Search size={17} style={{ color: 'var(--muted-foreground)', marginRight: '0.625rem', flexShrink: 0 }} />
                 <input 
                   type="text" 
-                  placeholder={t('bulkSms.searchPlaceholder') || 'Search campaigns, ID, or audience...'} 
+                  placeholder={
+                    activeTab === 'transactions'
+                      ? 'Search description, type, reference, or ID...'
+                      : (t('bulkSms.searchPlaceholder') || 'Search campaigns, ID, or audience...')
+                  }
                   style={{ 
                     border: 'none', 
                     outline: 'none', 
@@ -734,12 +1185,25 @@ export default function BulkSMSPage() {
                     color: 'var(--foreground)',
                     fontSize: '0.9rem'
                   }}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={activeTab === 'transactions' ? txSearchTerm : searchTerm}
+                  onChange={(e) => {
+                    if (activeTab === 'transactions') {
+                      setTxSearchTerm(e.target.value);
+                      setTxPage(1);
+                    } else {
+                      setSearchTerm(e.target.value);
+                    }
+                  }}
                 />
-                {searchTerm && (
+                {((activeTab === 'transactions' ? txSearchTerm : searchTerm)) && (
                   <button 
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => {
+                      if (activeTab === 'transactions') {
+                        setTxSearchTerm('');
+                      } else {
+                        setSearchTerm('');
+                      }
+                    }}
                     style={{ background: 'none', border: 'none', padding: '0.25rem', cursor: 'pointer', color: 'var(--muted-foreground)' }}
                   >
                     <X size={15} />
@@ -751,7 +1215,7 @@ export default function BulkSMSPage() {
             {/* Toolbar Action Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
               
-              {/* Module Sub-Tabs (Campaigns, Templates, Gateway) */}
+              {/* Module Sub-Tabs (Campaigns, Templates, Transactions, Gateway) */}
               <div style={{ display: 'flex', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '3px', gap: '2px' }}>
                 <button
                   type="button"
@@ -797,6 +1261,41 @@ export default function BulkSMSPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setActiveTab('transactions')}
+                  style={{
+                    padding: '0 0.8rem',
+                    height: '34px',
+                    borderRadius: '0.55rem',
+                    border: 'none',
+                    background: activeTab === 'transactions' ? '#4f46e5' : 'transparent',
+                    color: activeTab === 'transactions' ? '#ffffff' : 'var(--muted-foreground)',
+                    fontSize: '0.82rem',
+                    fontWeight: activeTab === 'transactions' ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <Receipt size={14} />
+                  <span>{t('bulkSms.tabTransactions') || 'Audit Log'}</span>
+                  {quotaData?.recentTransactions && quotaData.recentTransactions.length > 0 && (
+                    <span style={{
+                      fontSize: '0.68rem',
+                      padding: '0.1rem 0.4rem',
+                      borderRadius: '999px',
+                      background: activeTab === 'transactions' ? 'rgba(255,255,255,0.25)' : 'var(--muted)',
+                      color: activeTab === 'transactions' ? '#ffffff' : 'var(--foreground)',
+                      fontWeight: 700,
+                      marginLeft: '0.15rem'
+                    }}>
+                      {formatNumber(quotaData.recentTransactions.length)}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setActiveTab('gateway')}
                   style={{
                     padding: '0 0.8rem',
@@ -817,6 +1316,69 @@ export default function BulkSMSPage() {
                   <ShieldCheck size={14} /> {t('bulkSms.tabGateway') || 'Gateway'}
                 </button>
               </div>
+
+              {/* Type Filter for Transactions */}
+              {activeTab === 'transactions' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                  <Filter size={14} style={{ color: 'var(--muted-foreground)' }} />
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Type:</span>
+                  <select
+                    value={txTypeFilter}
+                    onChange={(e) => { setTxTypeFilter(e.target.value); setTxPage(1); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    <option value="ALL">All Types</option>
+                    <option value="USAGE">USAGE (Deduction)</option>
+                    <option value="REFUND">REFUND (Reversal)</option>
+                    <option value="PURCHASE">PURCHASE (Top-up)</option>
+                    <option value="ALLOCATION">ALLOCATION</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Export Transactions CSV */}
+              {activeTab === 'transactions' && (
+                <button
+                  type="button"
+                  onClick={handleExportTransactionsCSV}
+                  disabled={filteredTransactions.length === 0}
+                  title="Export Transactions to CSV"
+                  style={{
+                    height: '42px',
+                    padding: '0 0.95rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--background)',
+                    color: 'var(--foreground)',
+                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    cursor: filteredTransactions.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: filteredTransactions.length === 0 ? 0.6 : 1
+                  }}
+                >
+                  <FileSpreadsheet size={15} style={{ color: '#16a34a' }} />
+                  <span>Export CSV</span>
+                </button>
+              )}
+
+              {/* Rows Per Page for Transactions */}
+              {activeTab === 'transactions' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('bulkSms.show') || 'Show:'}</span>
+                  <select 
+                    value={txLimit} 
+                    onChange={(e) => { setTxLimit(Number(e.target.value)); setTxPage(1); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    <option value={10}>{formatNumber(10)}</option>
+                    <option value={20}>{formatNumber(20)}</option>
+                    <option value={50}>{formatNumber(50)}</option>
+                  </select>
+                </div>
+              )}
 
               {/* Filters Toggle Button (for Campaigns tab) */}
               {activeTab === 'campaigns' && (
@@ -1622,9 +2184,267 @@ export default function BulkSMSPage() {
           </div>
         )}
 
-        {/* ── Tab Content 3: Gateway Configuration ─────────────── */}
+        {/* ── Tab Content 3: Recent Transactions Audit Log (from /sms/quota/status) ── */}
+        {activeTab === 'transactions' && (
+          filteredTransactions.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5.5rem 2rem', textAlign: 'center' }}>
+              <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.7 }}>
+                <Receipt size={32} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--foreground)' }}>
+                {quotaLoading ? 'Syncing Transaction Records...' : 'No Transactions Found'}
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', maxWidth: '440px', margin: 0 }}>
+                {quotaLoading
+                  ? 'Fetching live transaction audit log from telecom gateway...'
+                  : txSearchTerm || txTypeFilter !== 'ALL'
+                    ? 'No transaction records match your search query and filters.'
+                    : 'No SMS quota debit or credit transactions recorded for this school.'}
+              </p>
+              {(txSearchTerm || txTypeFilter !== 'ALL') && !quotaLoading && (
+                <button
+                  type="button"
+                  onClick={() => { setTxSearchTerm(''); setTxTypeFilter('ALL'); }}
+                  style={{ marginTop: '1.25rem', padding: '0.55rem 1.15rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Clear Search & Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, width: '48px' }}>#</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Transaction ID</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Type</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Description & Activity</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>Credits Impact</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>Balance Flow</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Reference</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTransactions.map((tx, idx) => {
+                    const globalIdx = (txPage - 1) * txLimit + idx + 1;
+                    const isDebit = tx.amount < 0;
+                    const isRefund = tx.type === 'REFUND';
+                    const isPurchase = tx.type === 'PURCHASE';
+
+                    return (
+                      <tr
+                        key={tx.id}
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          transition: 'background-color 0.15s ease'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        {/* Index */}
+                        <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.8rem', fontWeight: 600 }}>
+                          {formatNumber(globalIdx)}
+                        </td>
+
+                        {/* ID with Copy */}
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <code style={{ fontSize: '0.78rem', fontFamily: 'monospace', color: 'var(--foreground)', background: 'var(--background)', border: '1px solid var(--border)', padding: '0.15rem 0.4rem', borderRadius: '0.35rem' }}>
+                              {tx.id.slice(0, 8)}...
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyTxId(tx.id)}
+                              title="Copy Transaction ID"
+                              style={{ background: 'none', border: 'none', padding: '0.2rem', cursor: 'pointer', color: copiedTxId === tx.id ? '#16a34a' : 'var(--muted-foreground)' }}
+                            >
+                              {copiedTxId === tx.id ? <Check size={13} /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Type Badge */}
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.22rem 0.65rem',
+                            borderRadius: '999px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.02em',
+                            background: isRefund ? '#ecfdf5' : isPurchase ? '#f5f3ff' : isDebit ? '#fff1f2' : '#eff6ff',
+                            color: isRefund ? '#059669' : isPurchase ? '#7c3aed' : isDebit ? '#e11d48' : '#2563eb',
+                            border: `1px solid ${isRefund ? '#a7f3d0' : isPurchase ? '#ddd6fe' : isDebit ? '#fecdd3' : '#bfdbfe'}`
+                          }}>
+                            {isRefund ? (
+                              <RotateCcw size={12} />
+                            ) : isPurchase ? (
+                              <PlusCircle size={12} />
+                            ) : isDebit ? (
+                              <ArrowDownLeft size={12} />
+                            ) : (
+                              <Layers size={12} />
+                            )}
+                            <span>{tx.type}</span>
+                          </span>
+                        </td>
+
+                        {/* Description & Performed By */}
+                        <td style={{ padding: '1rem 1.25rem', maxWidth: '360px' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.86rem', lineHeight: 1.35 }}>
+                            {tx.description || 'SMS Gateway Broadcast'}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
+                            {tx.performedById ? (
+                              <span>Admin ID: <code style={{ fontFamily: 'monospace' }}>{tx.performedById.slice(0, 8)}...</code></span>
+                            ) : (
+                              <span style={{ color: '#059669', fontWeight: 600 }}>System Gateway Automated</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Amount */}
+                        <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
+                          <span style={{
+                            fontWeight: 800,
+                            fontSize: '0.95rem',
+                            fontFamily: 'monospace',
+                            color: isDebit ? '#e11d48' : '#059669'
+                          }}>
+                            {tx.amount > 0 ? `+${formatNumber(tx.amount)}` : formatNumber(tx.amount)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginLeft: '0.25rem' }}>
+                            Credits
+                          </span>
+                        </td>
+
+                        {/* Balance Flow */}
+                        <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'var(--background)', border: '1px solid var(--border)', padding: '0.25rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>
+                            <span style={{ color: 'var(--muted-foreground)' }}>{formatNumber(tx.previousBalance)}</span>
+                            <span style={{ color: 'var(--muted-foreground)', opacity: 0.5 }}>&rarr;</span>
+                            <span style={{ color: 'var(--foreground)', fontWeight: 800 }}>{formatNumber(tx.newBalance)}</span>
+                          </div>
+                        </td>
+
+                        {/* Reference */}
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          {tx.referenceId ? (
+                            <code style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--muted-foreground)', background: 'var(--background)', border: '1px solid var(--border)', padding: '0.15rem 0.4rem', borderRadius: '0.35rem' }}>
+                              {tx.referenceId.slice(0, 10)}...
+                            </code>
+                          ) : (
+                            <span style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem' }}>&mdash;</span>
+                          )}
+                        </td>
+
+                        {/* Timestamp */}
+                        <td style={{ padding: '1rem 1.25rem', whiteSpace: 'nowrap', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Clock size={13} style={{ opacity: 0.7 }} />
+                            <span>{formatSingleLineDate(tx.createdAt)}</span>
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* ── Tab Content 4: Gateway Configuration & School Quota ─────────────── */}
         {activeTab === 'gateway' && (
           <div style={{ padding: '1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+            
+            {/* School Quota Status Card */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building2 size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                      School Quota Profile
+                    </h3>
+                    <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                      Live quota allocation & balance
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchQuotaStatus}
+                  disabled={quotaLoading}
+                  style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem', fontWeight: 600 }}
+                >
+                  <RefreshCw size={13} className={quotaLoading ? 'animate-spin' : ''} />
+                  <span>Sync</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>School Name</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', textAlign: 'right', maxWidth: '220px' }}>
+                    {quotaData?.schoolName || "Bismillah Ta'limul Quran Cadet Madrasah"}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>School ID</span>
+                  <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {quotaData?.schoolId ? `${quotaData.schoolId.slice(0, 18)}...` : '29f05edb...'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Available Balance</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a' }}>
+                    {formatNumber(quotaData?.balance ?? creditsBalance)} Credits
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Purchased / Used</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    {formatNumber(quotaData?.totalPurchased ?? 500)} / {formatNumber(quotaData?.totalUsed ?? 2)} SMS
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Low Balance Threshold</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: quotaData?.isLowBalance ? '#ea580c' : 'var(--foreground)' }}>
+                    {formatNumber(quotaData?.lowBalanceThreshold ?? 50)} Credits {quotaData?.isLowBalance ? '(Low!)' : '(Safe)'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Service Active</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }}>
+                    {quotaData?.isEnabled !== false ? 'Enabled & Operational' : 'Disabled'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Last Gateway Sync</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                    {quotaData?.updatedAt ? formatSingleLineDate(quotaData.updatedAt) : 'Just now'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.65rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsRechargeModalOpen(true)}
+                  style={{ flex: 1, padding: '0.65rem 0', borderRadius: '0.65rem', border: 'none', background: '#16a34a', color: '#ffffff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                >
+                  <CreditCard size={15} /> Top Up Quota
+                </button>
+              </div>
+            </div>
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1.15rem', padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1708,7 +2528,7 @@ export default function BulkSMSPage() {
           </div>
         )}
 
-        {/* ── Table Footer & Pagination ─────────────────────────── */}
+        {/* ── Table Footer & Pagination for Campaigns ──────────── */}
         {activeTab === 'campaigns' && filteredCampaigns.length > 0 && (
           <div
             style={{
@@ -1761,6 +2581,69 @@ export default function BulkSMSPage() {
                   color: 'var(--foreground)',
                   cursor: page >= totalPages ? 'not-allowed' : 'pointer',
                   opacity: page >= totalPages ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Table Footer & Pagination for Transactions ─────────── */}
+        {activeTab === 'transactions' && filteredTransactions.length > 0 && (
+          <div
+            style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              fontSize: '0.85rem',
+              color: 'var(--muted-foreground)',
+            }}
+          >
+            <div>
+              {t('bulkSms.showing') || 'Showing'} <strong>{formatNumber(paginatedTransactions.length)}</strong> {t('bulkSms.of') || 'of'} <strong>{formatNumber(filteredTransactions.length)}</strong> audit transactions
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.82rem', marginRight: '0.5rem' }}>
+                Page {formatNumber(txPage)} of {formatNumber(totalTxPages)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                disabled={txPage <= 1}
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '0.55rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: txPage <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: txPage <= 1 ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTxPage(p => Math.min(totalTxPages, p + 1))}
+                disabled={txPage >= totalTxPages}
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '0.55rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: txPage >= totalTxPages ? 'not-allowed' : 'pointer',
+                  opacity: txPage >= totalTxPages ? 0.5 : 1,
                   display: 'flex',
                   alignItems: 'center',
                 }}
