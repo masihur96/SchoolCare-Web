@@ -15,7 +15,7 @@ import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const DEFAULT_FALLBACK_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc5NDcxNzY5NSwiZXhwIjoxNzk0ODA0MDk1fQ.tRKon7aVOCH0dmUD76M-MhvieFqWrMzo3djs4YWTwPE';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc5NDcyNzAxNywiZXhwIjoxNzk0ODEzNDE3fQ.5ck2EZ9QEW1c4Ah2HzOXMRWJIxWLAhbC5wR5Mb1JIL0';
 
 const getApiToken = () => {
   if (typeof window !== 'undefined') {
@@ -468,13 +468,15 @@ export default function BulkSMSPage() {
   const [selectedLog, setSelectedLog] = useState<SmsLogItem | null>(null);
 
   // Compose State
-  const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'teachers' | 'custom'>('all');
+  const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'teachers' | 'custom'>('custom');
+  const [recipientNumbers, setRecipientNumbers] = useState('01740719204');
   const [selectedClass, setSelectedClass] = useState('Class 9');
   const [selectedSection, setSelectedSection] = useState('All Sections');
-  const [senderId, setSenderId] = useState('SCHOOLCARE');
-  const [campaignTitle, setCampaignTitle] = useState('');
+  const [senderId, setSenderId] = useState('8809639228875');
+  const [isMasked, setIsMasked] = useState(false);
+  const [campaignTitle, setCampaignTitle] = useState('Emergency Weather Notice');
   const [message, setMessage] = useState(
-    'Dear Parent, your child {student_name} (Class: {class}, Roll: {roll_no}) is marked ABSENT today ({date}). Please inform the school if unexpected. - {school_name}'
+    'Notice: School will remain closed tomorrow due to heavy rain.'
   );
   const [scheduleType, setScheduleType] = useState<'instant' | 'scheduled'>('instant');
   const [scheduledDateTime, setScheduledDateTime] = useState('2026-05-15T09:00');
@@ -493,16 +495,23 @@ export default function BulkSMSPage() {
   const charsPerSMS = isUnicode ? 70 : 160;
   const smsParts = Math.max(1, Math.ceil(charLength / charsPerSMS));
 
-  const getRecipientCount = () => {
+  const parsedRecipientsList = useMemo(() => {
+    return recipientNumbers
+      .split(/[\n,; ]+/)
+      .map(n => n.trim().replace(/[^0-9+]/g, ''))
+      .filter(n => n.length >= 8);
+  }, [recipientNumbers]);
+
+  const totalRecipients = useMemo(() => {
+    if (parsedRecipientsList.length > 0) return parsedRecipientsList.length;
     switch (targetAudience) {
       case 'all': return 1350;
       case 'class': return 120;
       case 'teachers': return 68;
-      case 'custom': return 45;
+      case 'custom': return 1;
     }
-  };
+  }, [parsedRecipientsList.length, targetAudience]);
 
-  const totalRecipients = getRecipientCount();
   const totalCreditsRequired = totalRecipients * smsParts;
 
   // Render live preview replacing tags with samples
@@ -610,13 +619,20 @@ export default function BulkSMSPage() {
     setTimeout(() => setCopiedTemplateId(null), 2000);
   };
 
-  // Handle Send Broadcast (simulated dispatch — no live /sms/send endpoint yet)
-  const handleSendBroadcast = (e: React.FormEvent) => {
+  // Handle Send Broadcast using live POST /sms/send
+  const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     setBroadcastError(null);
 
-    if (!message.trim()) {
+    const trimmedMsg = message.trim();
+    if (!trimmedMsg) {
       setBroadcastError(t('bulkSms.alertEmptyMessage') || 'Please enter message content to broadcast.');
+      return;
+    }
+
+    const numbersToSend = parsedRecipientsList;
+    if (numbersToSend.length === 0) {
+      setBroadcastError('Please provide at least one valid recipient mobile number (e.g. 017XXXXXXXX).');
       return;
     }
 
@@ -630,18 +646,60 @@ export default function BulkSMSPage() {
     }
 
     setIsBroadcasting(true);
-    setTimeout(() => {
-      setIsBroadcasting(false);
-      setIsComposeModalOpen(false);
-      const title = campaignTitle.trim() || `Broadcast to ${targetAudience === 'all' ? 'All Parents' : targetAudience === 'class' ? selectedClass : 'Custom Audience'}`;
-      const successMsg = (t('bulkSms.alertQueued') || 'Campaign "{title}" successfully queued to {recipients} recipients ({credits} credits deducted).')
-        .replace('{title}', title)
-        .replace('{recipients}', formatNumber(totalRecipients))
-        .replace('{credits}', formatNumber(totalCreditsRequired));
+
+    try {
+      const token = getApiToken();
+      const payload = {
+        mobNumbers: numbersToSend,
+        numbers: numbersToSend,
+        message: trimmedMsg,
+        senderId: senderId.trim() || '8809639228875',
+        campaignName: campaignTitle.trim() || 'Emergency Weather Notice',
+        isMasked: isMasked,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/sms/send`, {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(json?.message || `SMS delivery failed (${res.status} ${res.statusText})`);
+      }
+
+      if (json?.data?.success === false) {
+        const gwMsg =
+          json.data.gatewayResponse?.message ||
+          json.data.errorMessage ||
+          json.message ||
+          'SMS delivery failed at gateway.';
+        throw new Error(gwMsg);
+      }
+
+      const resData = json?.data;
+      const batchId = resData?.batchId || resData?.gatewayResponse?.batch_id;
+      const deducted = resData?.creditsDeducted ?? (numbersToSend.length * smsParts);
+      const successMsg = `Campaign "${campaignTitle.trim() || 'Notice'}" dispatched successfully to ${formatNumber(numbersToSend.length)} recipient(s)! (Batch #${batchId || 'N/A'}, ${formatNumber(deducted)} credits deducted)`;
+
       setBannerMessage(successMsg);
-      // Refresh logs after sending
-      fetchSmsLogs(page, limit);
-    }, 1200);
+      setIsComposeModalOpen(false);
+
+      // Refresh live quota status and live logs
+      fetchQuotaStatus();
+      fetchSmsLogs(1, limit, debouncedSearch, statusFilter);
+    } catch (err: any) {
+      console.error('Error dispatching SMS broadcast:', err);
+      setBroadcastError(err?.message || 'Failed to dispatch SMS broadcast. Please check your credentials or gateway balance.');
+    } finally {
+      setIsBroadcasting(false);
+    }
   };
 
   // Fetch live SMS logs from GET /sms/logs (server-side pagination, search & status)
@@ -2694,22 +2752,84 @@ export default function BulkSMSPage() {
                       </select>
                     </div>
                   )}
+
+                  {/* Recipient Mobile Numbers Input */}
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        Recipient Mobile Number(s) <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <span style={{ fontSize: '0.72rem', color: parsedRecipientsList.length > 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
+                        {parsedRecipientsList.length} valid number{parsedRecipientsList.length === 1 ? '' : 's'} detected
+                      </span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. 01740719204, 01586335334 (separate by comma or newline)"
+                      value={recipientNumbers}
+                      onChange={e => setRecipientNumbers(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '0.65rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        resize: 'vertical',
+                        fontFamily: 'monospace',
+                        lineHeight: 1.4
+                      }}
+                      required
+                    />
+                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>Quick add:</span>
+                      {['01740719204', '01586335334'].map(sample => (
+                        <button
+                          key={sample}
+                          type="button"
+                          onClick={() => {
+                            if (!recipientNumbers.includes(sample)) {
+                              setRecipientNumbers(prev => prev ? `${prev.trim()}, ${sample}` : sample);
+                            }
+                          }}
+                          style={{
+                            fontSize: '0.7rem',
+                            fontFamily: 'monospace',
+                            padding: '0.12rem 0.45rem',
+                            borderRadius: '4px',
+                            border: '1px dashed var(--border)',
+                            background: 'var(--muted)',
+                            color: 'var(--foreground)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          + {sample}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Sender ID & Load Template */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                      {t('bulkSms.senderMaskingLabel') || 'Sender Masking'}
+                      {t('bulkSms.senderMaskingLabel') || 'Sender Masking / ID'}
                     </label>
                     <select
                       value={senderId}
-                      onChange={e => setSenderId(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setSenderId(val);
+                        setIsMasked(val !== '8809639228875');
+                      }}
                       style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                     >
-                      <option value="SCHOOLCARE">SCHOOLCARE ({t('bulkSms.masked') || 'Masked'})</option>
-                      <option value="EDUALERT">EDUALERT ({t('bulkSms.emergency') || 'Emergency'})</option>
-                      <option value="01888-XXXXXX">01888-XXXXXX ({t('bulkSms.nonMask') || 'Non-mask'})</option>
+                      <option value="8809639228875">8809639228875 (Verified Non-Masking)</option>
+                      <option value="SCHOOLCARE">SCHOOLCARE (Masked)</option>
+                      <option value="EDUALERT">EDUALERT (Emergency)</option>
                     </select>
                   </div>
 
