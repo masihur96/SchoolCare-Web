@@ -69,18 +69,37 @@ interface SmsQuotaStatusData {
   updatedAt: string;
 }
 
-interface SMSCampaign {
+// Live SMS log item from GET /sms/logs
+interface SmsLogItem {
   id: string;
-  title: string;
-  targetGroup: string;
-  recipientsCount: number;
-  smsCount: number;
-  totalCredits: number;
-  sentAt: string;
-  status: 'delivered' | 'processing' | 'scheduled' | 'failed';
-  deliveryRate: number;
+  schoolId: string;
   senderId: string;
-  messageText?: string;
+  campaignName: string;
+  targetAudience: string;
+  classId: string | null;
+  sectionId: string | null;
+  recipientCount: number;
+  smsParts: number;
+  creditsDeducted: number;
+  recipients: string[];
+  message: string;
+  status: 'PROCESSING' | 'FAILED' | 'SENT' | 'DELIVERED' | string;
+  batchId: string | null;
+  messageId: string | null;
+  responseCode: number | null;
+  rawResponse: Record<string, unknown> | null;
+  errorMessage: string | null;
+  sentById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SmsLogsApiResponse {
+  items: SmsLogItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 interface SMSTemplate {
@@ -91,86 +110,7 @@ interface SMSTemplate {
   charCount: number;
 }
 
-const INITIAL_CAMPAIGNS: SMSCampaign[] = [
-  {
-    id: 'CMP-2026-089',
-    title: 'Monthly Tuition Fee Reminder - May',
-    targetGroup: 'Unpaid Students (All Classes)',
-    recipientsCount: 342,
-    smsCount: 1,
-    totalCredits: 342,
-    sentAt: '2026-05-10T10:30:00',
-    status: 'delivered',
-    deliveryRate: 99.4,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Dear Parent, tuition fees for {student_name} of BDT {due_amount} for this month is pending. Kindly clear dues before {date} to avoid late fines. - SchoolCare Academy',
-  },
-  {
-    id: 'CMP-2026-088',
-    title: 'Class 10 Model Test Examination Schedule',
-    targetGroup: 'Class 10 (All Sections)',
-    recipientsCount: 180,
-    smsCount: 2,
-    totalCredits: 360,
-    sentAt: '2026-05-08T16:15:00',
-    status: 'delivered',
-    deliveryRate: 100,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Notice: Term Final Exam begins on {date}. Admit cards for {student_name} have been published. Check routine on the student portal. - SchoolCare Academy',
-  },
-  {
-    id: 'CMP-2026-087',
-    title: 'Daily Absentee Notification - May 08',
-    targetGroup: 'Absent Students (Daily)',
-    recipientsCount: 28,
-    smsCount: 1,
-    totalCredits: 28,
-    sentAt: '2026-05-08T11:00:00',
-    status: 'delivered',
-    deliveryRate: 96.4,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Dear Parent, your child {student_name} (Class: {class}, Roll: {roll_no}) is marked ABSENT today ({date}). Please inform the school if unexpected. - SchoolCare Academy',
-  },
-  {
-    id: 'CMP-2026-086',
-    title: 'Parent-Teacher Meeting (PTM) Invitation',
-    targetGroup: 'Class 6 - Class 8 Parents',
-    recipientsCount: 520,
-    smsCount: 1,
-    totalCredits: 520,
-    sentAt: '2026-05-05T14:00:00',
-    status: 'delivered',
-    deliveryRate: 98.8,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Dear Guardian, you are cordially invited to the Parent-Teacher Meeting for {student_name} on {date} at 10:00 AM. Your presence is vital. - SchoolCare Academy',
-  },
-  {
-    id: 'CMP-2026-085',
-    title: 'Urgent Weather Advisory - School Closes at 1 PM',
-    targetGroup: 'All Students & Staff',
-    recipientsCount: 1420,
-    smsCount: 1,
-    totalCredits: 1420,
-    sentAt: '2026-05-02T09:10:00',
-    status: 'delivered',
-    deliveryRate: 99.8,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Urgent: Due to unavoidable weather conditions, SchoolCare Academy will remain closed on {date}. Regular classes resume the following day.',
-  },
-  {
-    id: 'CMP-2026-084',
-    title: 'Summer Vacation Orientation Notice',
-    targetGroup: 'All Parents',
-    recipientsCount: 1350,
-    smsCount: 1,
-    totalCredits: 1350,
-    sentAt: '2026-05-15T09:00:00',
-    status: 'scheduled',
-    deliveryRate: 0,
-    senderId: 'SCHOOLCARE',
-    messageText: 'Dear Parents, please be advised that the annual Summer Vacation starts next week. Review holiday assignments on the student portal. - SchoolCare Academy',
-  },
-];
+
 
 const STATIC_TEMPLATES: SMSTemplate[] = [
   {
@@ -222,7 +162,14 @@ const DYNAMIC_TAGS = [
 
 export default function BulkSMSPage() {
   const { t, language } = useLanguage();
-  const [campaigns, setCampaigns] = useState<SMSCampaign[]>(INITIAL_CAMPAIGNS);
+
+  // Live SMS Logs (Campaigns) from GET /sms/logs
+  const [smsLogs, setSmsLogs] = useState<SmsLogItem[]>([]);
+  const [logsLoading, setLogsLoading] = useState<boolean>(true);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+
   const [activeTab, setActiveTab] = useState<'campaigns' | 'templates' | 'transactions' | 'gateway'>('campaigns');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
@@ -462,18 +409,13 @@ export default function BulkSMSPage() {
     setTimeout(() => setCopiedTxId(null), 2000);
   };
 
-  const getStatusLabel = (status: SMSCampaign['status']) => {
-    switch (status) {
-      case 'delivered':
-        return t('bulkSms.statusDelivered') || 'Delivered';
-      case 'scheduled':
-        return t('bulkSms.statusScheduled') || 'Scheduled';
-      case 'processing':
-        return t('bulkSms.statusProcessing') || 'Processing';
-      case 'failed':
-        return t('bulkSms.statusFailed') || 'Failed';
-      default:
-        return status;
+  const getLogStatusLabel = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'DELIVERED': return t('bulkSms.statusDelivered') || 'Delivered';
+      case 'PROCESSING': return t('bulkSms.statusProcessing') || 'Processing';
+      case 'FAILED': return t('bulkSms.statusFailed') || 'Failed';
+      case 'SENT': return 'Sent';
+      default: return status;
     }
   };
 
@@ -495,14 +437,21 @@ export default function BulkSMSPage() {
   };
 
   // Balance & KPIs
-  const [creditsBalance, setCreditsBalance] = useState(8450);
-  const [sentThisMonth, setSentThisMonth] = useState(24180);
+  const [creditsBalance, setCreditsBalance] = useState(0);
+  const [sentThisMonth, setSentThisMonth] = useState(0);
 
-  // Search & Filter state
+  // Search & Filter state for Campaigns tab
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [audienceFilter, setAudienceFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   // Export dropdown
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -510,13 +459,13 @@ export default function BulkSMSPage() {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(20);
 
   // Modals
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
   const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<SMSCampaign | null>(null);
+  const [selectedLog, setSelectedLog] = useState<SmsLogItem | null>(null);
 
   // Compose State
   const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'teachers' | 'custom'>('all');
@@ -661,7 +610,7 @@ export default function BulkSMSPage() {
     setTimeout(() => setCopiedTemplateId(null), 2000);
   };
 
-  // Handle Send Broadcast
+  // Handle Send Broadcast (simulated dispatch — no live /sms/send endpoint yet)
   const handleSendBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
     setBroadcastError(null);
@@ -683,280 +632,178 @@ export default function BulkSMSPage() {
     setIsBroadcasting(true);
     setTimeout(() => {
       setIsBroadcasting(false);
-
-      const newId = `CMP-2026-${String(campaigns.length + 90).padStart(3, '0')}`;
-      const title = campaignTitle.trim() || `Broadcast to ${targetAudience === 'all' ? 'All Parents' : targetAudience === 'class' ? selectedClass : 'Custom Audience'}`;
-      const newCampaign: SMSCampaign = {
-        id: newId,
-        title,
-        targetGroup: targetAudience === 'all' ? 'All Parents & Guardians' : targetAudience === 'class' ? `${selectedClass} (${selectedSection})` : 'Teachers & Staff',
-        recipientsCount: totalRecipients,
-        smsCount: smsParts,
-        totalCredits: totalCreditsRequired,
-        sentAt: scheduleType === 'scheduled' ? scheduledDateTime : new Date().toISOString(),
-        status: scheduleType === 'scheduled' ? 'scheduled' : 'delivered',
-        deliveryRate: scheduleType === 'scheduled' ? 0 : 99.6,
-        senderId,
-        messageText: message,
-      };
-
-      setCampaigns(prev => [newCampaign, ...prev]);
-      setCreditsBalance(prev => Math.max(0, prev - totalCreditsRequired));
-      setQuotaData(prev => prev ? {
-        ...prev,
-        balance: Math.max(0, prev.balance - totalCreditsRequired),
-        totalUsed: prev.totalUsed + totalCreditsRequired,
-        isLowBalance: Math.max(0, prev.balance - totalCreditsRequired) <= prev.lowBalanceThreshold,
-        recentTransactions: [
-          {
-            id: `tx-${Date.now().toString(36)}`,
-            schoolId: prev.schoolId,
-            type: 'USAGE',
-            amount: -totalCreditsRequired,
-            previousBalance: prev.balance,
-            newBalance: Math.max(0, prev.balance - totalCreditsRequired),
-            referenceId: newId,
-            description: title,
-            performedById: 'admin',
-            createdAt: new Date().toISOString()
-          },
-          ...prev.recentTransactions
-        ]
-      } : null);
-
-      if (scheduleType === 'instant') {
-        setSentThisMonth(prev => prev + totalRecipients);
-      }
-
       setIsComposeModalOpen(false);
+      const title = campaignTitle.trim() || `Broadcast to ${targetAudience === 'all' ? 'All Parents' : targetAudience === 'class' ? selectedClass : 'Custom Audience'}`;
       const successMsg = (t('bulkSms.alertQueued') || 'Campaign "{title}" successfully queued to {recipients} recipients ({credits} credits deducted).')
         .replace('{title}', title)
         .replace('{recipients}', formatNumber(totalRecipients))
         .replace('{credits}', formatNumber(totalCreditsRequired));
       setBannerMessage(successMsg);
+      // Refresh logs after sending
+      fetchSmsLogs(page, limit);
     }, 1200);
   };
 
-  // Recharge credits simulation
-  const handleRechargeCredits = (amount: number) => {
-    setCreditsBalance(prev => prev + amount);
-    setQuotaData(prev => prev ? {
-      ...prev,
-      balance: prev.balance + amount,
-      totalPurchased: prev.totalPurchased + amount,
-      isLowBalance: (prev.balance + amount) <= prev.lowBalanceThreshold,
-      recentTransactions: [
-        {
-          id: `tx-recharge-${Date.now().toString(36)}`,
-          schoolId: prev.schoolId,
-          type: 'PURCHASE',
-          amount: amount,
-          previousBalance: prev.balance,
-          newBalance: prev.balance + amount,
-          referenceId: `PKG-${amount}`,
-          description: `SMS Package Top-Up (+${formatNumber(amount)} Credits)`,
-          performedById: 'admin',
-          createdAt: new Date().toISOString()
-        },
-        ...prev.recentTransactions
-      ]
-    } : null);
-    setIsRechargeModalOpen(false);
-    const rechargeMsg = (t('bulkSms.alertRecharged') || 'Successfully recharged {amount} SMS credits to account.')
-      .replace('{amount}', formatNumber(amount));
-    setBannerMessage(rechargeMsg);
-  };
+  // Fetch live SMS logs from GET /sms/logs (server-side pagination, search & status)
+  const fetchSmsLogs = useCallback(async (p: number, lim: number, searchKeyword: string = '', st: string = 'all') => {
+    setLogsLoading(true);
+    setLogsError(null);
+    try {
+      const token = getApiToken();
+      const params = new URLSearchParams({
+        page: String(p),
+        limit: String(lim),
+      });
+      if (searchKeyword.trim()) {
+        params.append('search', searchKeyword.trim());
+      }
+      if (st && st !== 'all') {
+        params.append('status', st.toUpperCase());
+      }
+      const res = await fetch(`${API_BASE_URL}/sms/logs?${params.toString()}`, {
+        method: 'GET',
+        headers: { accept: '*/*', Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Failed to load SMS logs (${res.status} ${res.statusText})`);
+      const json = await res.json();
+      if (json?.data) {
+        const d: SmsLogsApiResponse = json.data;
+        setSmsLogs(d.items || []);
+        setLogsTotal(d.total || 0);
+        setLogsTotalPages(d.totalPages || 1);
+      }
+    } catch (err: any) {
+      console.error('Error fetching SMS logs:', err);
+      setLogsError(err?.message || 'Failed to load SMS campaign logs');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
 
-  // Filtered campaigns
-  const filteredCampaigns = useMemo(() => {
-    return campaigns.filter(c => {
-      const matchesSearch =
-        c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.targetGroup.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.senderId.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    fetchSmsLogs(page, limit, debouncedSearch, statusFilter);
+  }, [fetchSmsLogs, page, limit, debouncedSearch, statusFilter]);
 
-      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-      const matchesAudience = audienceFilter === 'all' || c.targetGroup.toLowerCase().includes(audienceFilter.toLowerCase());
-
-      return matchesSearch && matchesStatus && matchesAudience;
+  // Client-side safety filter on fetched page
+  const filteredLogs = useMemo(() => {
+    return smsLogs.filter(log => {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch = !q ||
+        log.campaignName.toLowerCase().includes(q) ||
+        log.id.toLowerCase().includes(q) ||
+        log.senderId.toLowerCase().includes(q) ||
+        log.targetAudience.toLowerCase().includes(q) ||
+        (log.message && log.message.toLowerCase().includes(q));
+      const matchesStatus = statusFilter === 'all' || log.status.toUpperCase() === statusFilter.toUpperCase();
+      return matchesSearch && matchesStatus;
     });
-  }, [campaigns, searchTerm, statusFilter, audienceFilter]);
+  }, [smsLogs, searchTerm, statusFilter]);
 
-  const activeFiltersCount = (statusFilter !== 'all' ? 1 : 0) + (audienceFilter !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
+  const activeFiltersCount = (statusFilter !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
+  const totalPages = logsTotalPages;
 
   const resetAllFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setStatusFilter('all');
-    setAudienceFilter('all');
     setPage(1);
   };
 
-  // Paginated campaigns
-  const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / limit));
-  const paginatedCampaigns = useMemo(() => {
-    const start = (page - 1) * limit;
-    return filteredCampaigns.slice(start, start + limit);
-  }, [filteredCampaigns, page, limit]);
-
-  // Export to CSV
+  // Export SMS logs to CSV
   const handleExportCSV = () => {
     setExportDropdownOpen(false);
-    if (filteredCampaigns.length === 0) return;
-
-    const headers = [
-      '#',
-      t('bulkSms.colCampaignId') || 'Campaign ID',
-      t('common.title') || 'Title',
-      t('bulkSms.colAudience') || 'Audience',
-      t('bulkSms.colRecipients') || 'Recipients',
-      t('bulkSms.parts') || 'SMS Parts',
-      t('bulkSms.colCredits') || 'Credits',
-      t('bulkSms.colDateTime') || 'Sent Date',
-      t('bulkSms.colStatus') || 'Status',
-      t('bulkSms.colDeliveryRate') || 'Delivery Rate'
-    ];
-    const rows = filteredCampaigns.map((c, idx) => [
-      formatNumber(idx + 1),
-      `"${c.id}"`,
-      `"${c.title.replace(/"/g, '""')}"`,
-      `"${c.targetGroup.replace(/"/g, '""')}"`,
-      formatNumber(c.recipientsCount),
-      formatNumber(c.smsCount),
-      formatNumber(c.totalCredits),
-      `"${formatSingleLineDate(c.sentAt)}"`,
-      `"${getStatusLabel(c.status)}"`,
-      `"${formatNumber(c.deliveryRate)}%"`
+    if (filteredLogs.length === 0) return;
+    const headers = ['#', 'Log ID', 'Campaign Name', 'Audience', 'Sender ID', 'Recipients', 'SMS Parts', 'Credits', 'Status', 'Batch ID', 'Response Code', 'Error', 'Date & Time'];
+    const rows = filteredLogs.map((log, idx) => [
+      idx + 1,
+      `"${log.id}"`,
+      `"${log.campaignName.replace(/"/g, '""')}"`,
+      `"${log.targetAudience}"`,
+      `"${log.senderId}"`,
+      log.recipientCount,
+      log.smsParts,
+      log.creditsDeducted,
+      `"${log.status}"`,
+      `"${log.batchId || ''}"`,
+      log.responseCode ?? '',
+      `"${(log.errorMessage || '').replace(/"/g, '""')}"`,
+      `"${formatSingleLineDate(log.createdAt)}"`,
     ]);
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `sms_campaigns_page_${page}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const a = document.createElement('a');
+    a.href = url; a.download = `sms_logs_page${page}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  // Export to PDF
+  // Export SMS logs to PDF
   const handleExportPDF = async () => {
     setExportDropdownOpen(false);
-    if (filteredCampaigns.length === 0) return;
-
+    if (filteredLogs.length === 0) return;
     const { jsPDF, autoTable } = await getPdfTools();
     const doc = new jsPDF('landscape');
-
-    doc.setFontSize(16);
-    doc.setTextColor(79, 70, 229);
-    doc.text('Bulk SMS Broadcasts & Campaigns Report', 14, 18);
-
-    doc.setFontSize(9);
-    doc.setTextColor(110, 110, 110);
-    const subtitle = `Total Campaigns: ${formatNumber(filteredCampaigns.length)} | Available Credits: ${formatNumber(creditsBalance)} | Date: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    doc.text(subtitle, 14, 25);
-
-    const tableColumn = ['#', 'Campaign ID', 'Title', 'Audience', 'Recipients', 'Credits', 'Date & Time', 'Status', 'Rate'];
-    const tableRows = filteredCampaigns.map((c, idx) => [
-      formatNumber(idx + 1),
-      c.id,
-      c.title,
-      c.targetGroup,
-      formatNumber(c.recipientsCount),
-      formatNumber(c.totalCredits),
-      formatSingleLineDate(c.sentAt),
-      c.status.toUpperCase(),
-      `${formatNumber(c.deliveryRate)}%`
-    ]);
-
+    doc.setFontSize(16); doc.setTextColor(79, 70, 229);
+    doc.text('Bulk SMS Campaign Logs Report', 14, 18);
+    doc.setFontSize(9); doc.setTextColor(110, 110, 110);
+    doc.text(`Total: ${formatNumber(logsTotal)} logs | Credits Balance: ${formatNumber(creditsBalance)} | ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, 14, 25);
     autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
+      head: [['#', 'Campaign Name', 'Audience', 'Sender', 'Recipients', 'Credits', 'Status', 'Batch ID', 'Date & Time']],
+      body: filteredLogs.map((log, i) => [
+        i + 1, log.campaignName, log.targetAudience, log.senderId,
+        log.recipientCount, log.creditsDeducted, log.status,
+        log.batchId || '—', formatSingleLineDate(log.createdAt),
+      ]),
       startY: 30,
       styles: { fontSize: 8.5, cellPadding: 2.5 },
       headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 249, 252] },
       didDrawPage: data => {
         const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
         doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
       }
     });
-
-    doc.save(`sms_campaigns_report.pdf`);
+    doc.save('sms_campaign_logs.pdf');
   };
 
-  // Download single campaign voucher / delivery report
-  const handleDownloadCampaignPDF = async (c: SMSCampaign) => {
-    const { jsPDF, autoTable } = await getPdfTools();
+  // Download single log detail as PDF
+  const handleDownloadLogPDF = async (log: SmsLogItem) => {
+    const { jsPDF } = await getPdfTools();
     const doc = new jsPDF('portrait');
-
     doc.setFillColor(79, 70, 229);
     doc.rect(0, 0, 210, 26, 'F');
-
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BULK SMS DISPATCH REPORT', 14, 16);
-
-    doc.setFontSize(9.5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`CAMPAIGN AUDIT VOUCHER • SENDER: ${c.senderId}`, 14, 22);
-
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(10.5);
-
-    const startY = 38;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Campaign Title:', 14, startY);
-    doc.setFont('helvetica', 'normal');
-    doc.text(c.title, 60, startY);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Campaign ID:', 14, startY + 10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(c.id, 60, startY + 10);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Target Audience:', 14, startY + 20);
-    doc.setFont('helvetica', 'normal');
-    doc.text(c.targetGroup, 60, startY + 20);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Dispatched At:', 14, startY + 30);
-    doc.setFont('helvetica', 'normal');
-    doc.text(formatSingleLineDate(c.sentAt), 60, startY + 30);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Recipients Count:', 14, startY + 40);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${formatNumber(c.recipientsCount)} Contacts (${formatNumber(c.smsCount)} SMS/recp)`, 60, startY + 40);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Credits Used:', 14, startY + 50);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${formatNumber(c.totalCredits)} Credits`, 60, startY + 50);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Delivery Success Rate:', 14, startY + 60);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${formatNumber(c.deliveryRate)}% (${formatNumber(Math.round((c.recipientsCount * c.deliveryRate) / 100))} Delivered)`, 60, startY + 60);
-
-    // Message box
-    doc.setFont('helvetica', 'bold');
-    doc.text('Dispatched Message:', 14, startY + 74);
-
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, startY + 80, 182, 36, 3, 3, 'F');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(70, 70, 70);
-    doc.text(c.messageText || 'Standard broadcast message transmitted via telecomm gateway.', 18, startY + 90, { maxWidth: 174 });
-
-    doc.save(`sms_campaign_${c.id}.pdf`);
+    doc.setFontSize(16); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+    doc.text('SMS DISPATCH LOG DETAIL', 14, 16);
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal');
+    doc.text(`SENDER: ${log.senderId} • BATCH: ${log.batchId || 'N/A'}`, 14, 22);
+    doc.setTextColor(50, 50, 50); doc.setFontSize(10.5);
+    const y = 38;
+    const field = (label: string, value: string, row: number) => {
+      doc.setFont('helvetica', 'bold'); doc.text(label, 14, y + row * 11);
+      doc.setFont('helvetica', 'normal'); doc.text(value, 65, y + row * 11);
+    };
+    field('Campaign:', log.campaignName, 0);
+    field('Log ID:', log.id.slice(0, 28) + '…', 1);
+    field('Audience:', log.targetAudience, 2);
+    field('Recipients:', String(log.recipientCount), 3);
+    field('SMS Parts:', String(log.smsParts), 4);
+    field('Credits Used:', String(log.creditsDeducted), 5);
+    field('Status:', log.status, 6);
+    field('Response Code:', String(log.responseCode ?? 'N/A'), 7);
+    field('Sent At:', formatSingleLineDate(log.createdAt), 8);
+    if (log.errorMessage) {
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(185, 28, 28);
+      doc.text('Error:', 14, y + 9 * 11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(log.errorMessage.slice(0, 100), 65, y + 9 * 11, { maxWidth: 130 });
+    }
+    doc.setFillColor(248, 250, 252); doc.setTextColor(50, 50, 50);
+    doc.roundedRect(14, y + 108, 182, 36, 3, 3, 'F');
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal');
+    doc.text(log.message || '—', 18, y + 118, { maxWidth: 174 });
+    doc.save(`sms_log_${log.id.slice(0, 8)}.pdf`);
   };
 
   return (
@@ -1036,9 +883,12 @@ export default function BulkSMSPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             type="button"
-            onClick={fetchQuotaStatus}
-            disabled={quotaLoading}
-            title={t('bulkSms.refreshStatus') || 'Refresh SMS Quota & Transactions'}
+            onClick={() => {
+              fetchQuotaStatus();
+              fetchSmsLogs(page, limit, debouncedSearch, statusFilter);
+            }}
+            disabled={quotaLoading || logsLoading}
+            title={t('bulkSms.refreshStatus') || 'Refresh SMS Quota & Campaign Logs'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1051,12 +901,12 @@ export default function BulkSMSPage() {
               color: 'var(--foreground)',
               fontSize: '0.82rem',
               fontWeight: 600,
-              cursor: quotaLoading ? 'not-allowed' : 'pointer',
+              cursor: (quotaLoading || logsLoading) ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s'
             }}
           >
-            <RefreshCw size={14} className={quotaLoading ? 'animate-spin' : ''} />
-            <span>{quotaLoading ? (t('bulkSms.syncing') || 'Syncing...') : (t('bulkSms.refreshQuota') || 'Refresh Quota')}</span>
+            <RefreshCw size={14} className={(quotaLoading || logsLoading) ? 'animate-spin' : ''} />
+            <span>{(quotaLoading || logsLoading) ? (t('bulkSms.syncing') || 'Syncing...') : (t('bulkSms.refreshQuota') || 'Refresh Data')}</span>
           </button>
 
           <button
@@ -1533,6 +1383,22 @@ export default function BulkSMSPage() {
                 </div>
               )}
 
+              {/* Rows Per Page for Campaigns */}
+              {activeTab === 'campaigns' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('bulkSms.show') || 'Show:'}</span>
+                  <select 
+                    value={limit} 
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    <option value={10}>{formatNumber(10)}</option>
+                    <option value={20}>{formatNumber(20)}</option>
+                    <option value={50}>{formatNumber(50)}</option>
+                  </select>
+                </div>
+              )}
+
               {/* Filters Toggle Button (for Campaigns tab) */}
               {activeTab === 'campaigns' && (
                 <button 
@@ -1623,7 +1489,7 @@ export default function BulkSMSPage() {
                   <button 
                     type="button"
                     onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                    disabled={filteredCampaigns.length === 0}
+                    disabled={filteredLogs.length === 0}
                     title={t('bulkSms.export') || 'Export Options'}
                     style={{ 
                       background: exportDropdownOpen ? 'var(--muted)' : 'var(--background)', 
@@ -1637,8 +1503,8 @@ export default function BulkSMSPage() {
                       borderRadius: '0.75rem',
                       fontWeight: 500,
                       fontSize: '0.86rem',
-                      opacity: filteredCampaigns.length === 0 ? 0.6 : 1,
-                      cursor: filteredCampaigns.length === 0 ? 'not-allowed' : 'pointer'
+                      opacity: filteredLogs.length === 0 ? 0.6 : 1,
+                      cursor: filteredLogs.length === 0 ? 'not-allowed' : 'pointer'
                     }}
                   >
                     <Download size={15} />
@@ -1813,27 +1679,10 @@ export default function BulkSMSPage() {
                   style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                 >
                   <option value="all">{t('bulkSms.allStatuses') || 'All Statuses'}</option>
-                  <option value="delivered">{t('bulkSms.statusDelivered') || 'Delivered'}</option>
-                  <option value="scheduled">{t('bulkSms.statusScheduled') || 'Scheduled'}</option>
-                  <option value="processing">{t('bulkSms.statusProcessing') || 'Processing'}</option>
-                  <option value="failed">{t('bulkSms.statusFailed') || 'Failed'}</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                  {t('bulkSms.filterAudience') || 'Audience Group'}
-                </label>
-                <select
-                  value={audienceFilter}
-                  onChange={e => { setAudienceFilter(e.target.value); setPage(1); }}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
-                >
-                  <option value="all">{t('bulkSms.allAudiences') || 'All Audiences'}</option>
-                  <option value="Parents">{t('bulkSms.audParents') || 'Parents & Guardians'}</option>
-                  <option value="Class">{t('bulkSms.audClass') || 'Specific Classes'}</option>
-                  <option value="Staff">{t('bulkSms.audStaff') || 'Staff & Teachers'}</option>
-                  <option value="Absent">{t('bulkSms.audAbsent') || 'Absent Students'}</option>
+                  <option value="DELIVERED">Delivered</option>
+                  <option value="SENT">Sent</option>
+                  <option value="PROCESSING">Processing</option>
+                  <option value="FAILED">Failed</option>
                 </select>
               </div>
 
@@ -1874,15 +1723,8 @@ export default function BulkSMSPage() {
 
               {statusFilter !== 'all' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#f0fdf4', color: '#16a34a', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  {t('bulkSms.filterLabelStatus') || 'Status:'} {getStatusLabel(statusFilter as SMSCampaign['status'])}
+                  {t('bulkSms.filterLabelStatus') || 'Status:'} {statusFilter}
                   <button onClick={() => setStatusFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#16a34a', display: 'flex' }}><X size={12} /></button>
-                </span>
-              )}
-
-              {audienceFilter !== 'all' && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.65rem', background: '#fff7ed', color: '#ea580c', borderRadius: '99px', fontSize: '0.76rem', fontWeight: 600 }}>
-                  {t('bulkSms.filterLabelAudience') || 'Audience:'} {audienceFilter}
-                  <button onClick={() => setAudienceFilter('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#ea580c', display: 'flex' }}><X size={12} /></button>
                 </span>
               )}
 
@@ -1899,342 +1741,243 @@ export default function BulkSMSPage() {
 
         {/* ── Tab Content 1: Campaigns & Logs ──────────────────── */}
         {activeTab === 'campaigns' && (
-          filteredCampaigns.length === 0 ? (
+          logsLoading && smsLogs.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center', gap: '1rem' }}>
+              <RefreshCw size={36} className="animate-spin" style={{ color: '#4f46e5', opacity: 0.5 }} />
+              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem' }}>Loading SMS campaign logs…</p>
+            </div>
+          ) : logsError ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center', gap: '1rem' }}>
+              <AlertCircle size={36} style={{ color: '#ef4444', opacity: 0.6 }} />
+              <p style={{ color: '#b91c1c', fontWeight: 600 }}>{logsError}</p>
+              <button type="button" onClick={() => fetchSmsLogs(page, limit)} style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+            </div>
+          ) : filteredLogs.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center' }}>
               <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', opacity: 0.7 }}>
                 <MessageSquare size={36} />
               </div>
               <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
-                {t('bulkSms.noCampaignsFound') || 'No SMS Campaigns Found'}
+                {t('bulkSms.noCampaignsFound') || 'No SMS Campaign Logs Found'}
               </h3>
               <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '420px' }}>
-                {t('bulkSms.noCampaignsDesc') || 'No broadcast records match your search query or filter parameters.'}
+                {t('bulkSms.noCampaignsDesc') || 'No broadcast records match your search or filter.'}
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-                <button
-                  type="button"
-                  onClick={resetAllFilters}
-                  style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}
-                >
+                <button type="button" onClick={resetAllFilters} style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}>
                   {t('bulkSms.resetFilters') || 'Reset Filters'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsComposeModalOpen(true)}
-                  style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                >
+                <button type="button" onClick={() => setIsComposeModalOpen(true)} style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Plus size={16} /> {t('bulkSms.newBroadcast') || 'New Broadcast'}
                 </button>
               </div>
             </div>
           ) : viewMode === 'table' ? (
-            /* Table View */
+            /* ── Table View ── */
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.9rem 1.25rem', width: '45px' }}>#</th>
                     <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('bulkSms.colDateTime') || 'Date & Time'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colCampaignId') || 'Campaign & ID'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colAudience') || 'Target Audience'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colRecipients') || 'Recipients'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colCredits') || 'Credits'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colDeliveryRate') || 'Delivery Rate'}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Campaign & Sender</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Audience / Recipients</th>
+                    <th style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>Credits</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>Batch / Msg ID</th>
                     <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colStatus') || 'Status'}</th>
                     <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>{t('bulkSms.colActions') || 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedCampaigns.map((cmp, idx) => (
-                    <tr
-                      key={cmp.id}
-                      style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.015)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      {/* Index */}
-                      <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
-                        {formatNumber((page - 1) * limit + idx + 1)}
-                      </td>
-
-                      {/* Date & Time - Strictly Single Line */}
-                      <td style={{ padding: '1rem 1.25rem', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
-                          <Calendar size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
-                          <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(cmp.sentAt)}</span>
-                        </div>
-                      </td>
-
-                      {/* Campaign Title & Masking */}
-                      <td style={{ padding: '1rem 1rem', minWidth: '200px' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                          {cmp.title}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
-                            {cmp.id}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.45rem', borderRadius: '4px', background: 'var(--muted)', color: 'var(--muted-foreground)', fontWeight: 600 }}>
-                            {cmp.senderId}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Target Audience */}
-                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: '99px',
-                          background: 'rgba(79, 70, 229, 0.08)',
-                          color: '#4f46e5',
-                          fontSize: '0.76rem',
-                          fontWeight: 700,
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {cmp.targetGroup}
-                        </span>
-                      </td>
-
-                      {/* Recipients & SMS Parts */}
-                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                          {formatNumber(cmp.recipientsCount)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
-                          {formatNumber(cmp.smsCount)} {t('bulkSms.smsPerRecipient') || 'SMS / recipient'}
-                        </div>
-                      </td>
-
-                      {/* Credits */}
-                      <td style={{ padding: '1rem 1rem', fontWeight: 800, color: '#4f46e5', whiteSpace: 'nowrap' }}>
-                        {formatNumber(cmp.totalCredits)}
-                      </td>
-
-                      {/* Delivery Rate */}
-                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
-                        {cmp.status === 'scheduled' ? (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.statusPending') || 'Pending'}</span>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <div style={{ width: '56px', height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
-                              <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
-                            </div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>{formatNumber(cmp.deliveryRate)}%</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Status */}
-                      <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
-                        {cmp.status === 'delivered' && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <CheckCircle2 size={12} /> {t('bulkSms.statusDelivered') || 'Delivered'}
-                          </span>
-                        )}
-                        {cmp.status === 'scheduled' && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <Clock size={12} /> {t('bulkSms.statusScheduled') || 'Scheduled'}
-                          </span>
-                        )}
-                        {cmp.status === 'processing' && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <RefreshCw size={12} className="animate-spin" /> {t('bulkSms.statusProcessing') || 'Processing'}
-                          </span>
-                        )}
-                        {cmp.status === 'failed' && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            <AlertTriangle size={12} /> {t('bulkSms.statusFailed') || 'Failed'}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <button
-                            type="button"
-                            title={t('bulkSms.viewReport') || 'View Report & Log'}
-                            onClick={() => {
-                              setSelectedCampaign(cmp);
-                              setDetailsModalOpen(true);
-                            }}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '0.5rem',
-                              border: '1px solid var(--border)',
-                              background: 'var(--background)',
-                              color: 'var(--foreground)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
+                  {logsLoading
+                    ? Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                          {Array.from({ length: 8 }).map((__, j) => (
+                            <td key={j} style={{ padding: '1rem 1.25rem' }}>
+                              <div style={{ height: '14px', background: 'var(--muted)', borderRadius: '4px', opacity: 0.5, width: j === 2 ? '140px' : j === 3 ? '100px' : '60px' }} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    : filteredLogs.map((log, idx) => {
+                        const statusUp = log.status.toUpperCase();
+                        const isDelivered = statusUp === 'DELIVERED' || statusUp === 'SENT';
+                        const isFailed = statusUp === 'FAILED';
+                        const isProcessing = statusUp === 'PROCESSING';
+                        return (
+                          <tr
+                            key={log.id}
+                            style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.015)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                           >
-                            <Eye size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            title={t('bulkSms.cloneResend') || 'Clone & Resend'}
-                            onClick={() => {
-                              setMessage(cmp.messageText || cmp.title);
-                              setCampaignTitle(`Copy of ${cmp.title}`);
-                              setIsComposeModalOpen(true);
-                            }}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '0.5rem',
-                              border: '1px solid var(--border)',
-                              background: 'var(--background)',
-                              color: '#4f46e5',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = '#eef2ff')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}
-                          >
-                            <RotateCcw size={14} />
-                          </button>
-                        </div>
-                      </td>
-
-                    </tr>
-                  ))}
+                            <td style={{ padding: '1rem 1.25rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
+                              {formatNumber((page - 1) * limit + idx + 1)}
+                            </td>
+                            <td style={{ padding: '1rem 1.25rem', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                                <Calendar size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                                <span>{formatSingleLineDate(log.createdAt)}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem 1rem', minWidth: '200px' }}>
+                              <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{log.campaignName}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>{log.id.slice(0, 18)}…</span>
+                                <span style={{ fontSize: '0.69rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'var(--muted)', color: 'var(--muted-foreground)', fontWeight: 600 }}>{log.senderId}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                              <span style={{ display: 'inline-block', padding: '0.18rem 0.6rem', borderRadius: '99px', background: 'rgba(79,70,229,0.08)', color: '#4f46e5', fontSize: '0.73rem', fontWeight: 700 }}>
+                                {log.targetAudience}
+                              </span>
+                              <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.2rem' }}>
+                                {formatNumber(log.recipientCount)} <span style={{ fontWeight: 400, color: 'var(--muted-foreground)', fontSize: '0.7rem' }}>rcpt · {log.smsParts} SMS/ea</span>
+                              </div>
+                              {log.recipients.length > 0 && (
+                                <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', marginTop: '0.1rem', fontFamily: 'monospace' }}>
+                                  {log.recipients[0]}{log.recipients.length > 1 ? ` +${log.recipients.length - 1}` : ''}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem 1rem', fontWeight: 800, color: '#4f46e5', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              {formatNumber(log.creditsDeducted)}
+                            </td>
+                            <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                              {log.batchId ? (
+                                <div>
+                                  <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--foreground)', fontFamily: 'monospace' }}>Batch: {log.batchId}</div>
+                                  {log.messageId && <div style={{ fontSize: '0.69rem', color: 'var(--muted-foreground)' }}>{log.messageId}</div>}
+                                </div>
+                              ) : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
+                              {isDelivered && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.74rem', fontWeight: 700 }}>
+                                  <CheckCircle2 size={12} /> {log.status}
+                                </span>
+                              )}
+                              {isProcessing && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.74rem', fontWeight: 700 }}>
+                                  <RefreshCw size={12} className="animate-spin" /> Processing
+                                </span>
+                              )}
+                              {isFailed && (
+                                <div>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.74rem', fontWeight: 700 }}>
+                                    <AlertTriangle size={12} /> Failed
+                                  </span>
+                                  {log.responseCode && <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.15rem' }}>Code: {log.responseCode}</div>}
+                                </div>
+                              )}
+                              {!isDelivered && !isProcessing && !isFailed && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: 'var(--muted)', color: 'var(--foreground)', fontSize: '0.74rem', fontWeight: 700 }}>
+                                  {log.status}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem 1.25rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <button type="button" title="View Detail"
+                                  onClick={() => { setSelectedLog(log); setDetailsModalOpen(true); }}
+                                  style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}>
+                                  <Eye size={14} />
+                                </button>
+                                <button type="button" title="Clone & Resend"
+                                  onClick={() => { setMessage(log.message); setCampaignTitle(`Copy of ${log.campaignName}`); setIsComposeModalOpen(true); }}
+                                  style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#eef2ff')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}>
+                                  <RotateCcw size={14} />
+                                </button>
+                                <button type="button" title="Download PDF"
+                                  onClick={() => handleDownloadLogPDF(log)}
+                                  style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#f0fdf4')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}>
+                                  <Download size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  }
                 </tbody>
               </table>
             </div>
           ) : (
-            /* Cards View */
+            /* ── Cards View ── */
             <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-              {paginatedCampaigns.map(cmp => (
-                <div
-                  key={cmp.id}
-                  style={{
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '1rem',
-                    padding: '1.25rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.85rem',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                    transition: 'transform 0.15s, box-shadow 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.02)';
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '99px',
-                      background: 'rgba(79, 70, 229, 0.08)',
-                      color: '#4f46e5',
-                      fontSize: '0.74rem',
-                      fontWeight: 700
-                    }}>
-                      {cmp.targetGroup}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
-                      {cmp.id}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.35rem', color: 'var(--foreground)' }}>
-                      {cmp.title}
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
-                      <Calendar size={13} style={{ flexShrink: 0 }} />
-                      <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(cmp.sentAt)}</span>
-                    </div>
-                  </div>
-
-                  {/* Delivery Progress Bar */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
-                      <span style={{ color: 'var(--muted-foreground)' }}>{t('bulkSms.deliveryRate') || 'Delivery Rate'}:</span>
-                      <strong style={{ color: 'var(--foreground)' }}>{formatNumber(cmp.deliveryRate)}%</strong>
-                    </div>
-                    <div style={{ height: '6px', width: '100%', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ width: `${cmp.deliveryRate}%`, height: '100%', background: cmp.deliveryRate > 95 ? '#10b981' : '#f59e0b' }} />
-                    </div>
-                  </div>
-
-                  {/* Footer Stats & Actions */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.recipientsCredits') || 'Recipients / Credits'}</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                        {formatNumber(cmp.recipientsCount)} <span style={{ color: '#4f46e5' }}>({formatNumber(cmp.totalCredits)} {t('bulkSms.crShort') || 'cr'})</span>
+              {logsLoading
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '1rem', padding: '1.25rem', height: '200px', opacity: 0.4 }} />
+                  ))
+                : filteredLogs.map(log => {
+                    const statusUp = log.status.toUpperCase();
+                    const isDelivered = statusUp === 'DELIVERED' || statusUp === 'SENT';
+                    const isFailed = statusUp === 'FAILED';
+                    return (
+                      <div
+                        key={log.id}
+                        style={{ background: 'var(--card)', border: `1px solid ${isFailed ? 'rgba(220,38,38,0.2)' : 'var(--border)'}`, borderRadius: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.02)'; }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', background: 'rgba(79,70,229,0.08)', color: '#4f46e5', fontSize: '0.74rem', fontWeight: 700 }}>
+                            {log.targetAudience}
+                          </span>
+                          {isDelivered && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700 }}><CheckCircle2 size={11} /> {log.status}</span>}
+                          {isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.72rem', fontWeight: 700 }}><AlertTriangle size={11} /> Failed</span>}
+                          {!isDelivered && !isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700 }}><RefreshCw size={11} /> {log.status}</span>}
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.3rem', color: 'var(--foreground)' }}>{log.campaignName}</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                            <Calendar size={13} style={{ flexShrink: 0 }} /><span>{formatSingleLineDate(log.createdAt)}</span>
+                          </div>
+                          {log.message && (
+                            <p style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', margin: '0.4rem 0 0', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {log.message}
+                            </p>
+                          )}
+                        </div>
+                        {isFailed && log.errorMessage && (
+                          <div style={{ padding: '0.5rem 0.75rem', borderRadius: '0.5rem', background: '#fef2f2', border: '1px solid rgba(220,38,38,0.15)', fontSize: '0.74rem', color: '#b91c1c', lineHeight: 1.4 }}>
+                            ⚠ {log.errorMessage.slice(0, 100)}{log.errorMessage.length > 100 ? '…' : ''}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Recipients / Credits</div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                              {formatNumber(log.recipientCount)} <span style={{ color: '#4f46e5' }}>({formatNumber(log.creditsDeducted)} cr)</span>
+                            </div>
+                            {log.batchId && <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', fontFamily: 'monospace', marginTop: '0.1rem' }}>Batch: {log.batchId}</div>}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button type="button" title="View Detail" onClick={() => { setSelectedLog(log); setDetailsModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                              <Eye size={14} />
+                            </button>
+                            <button type="button" title="Clone & Resend" onClick={() => { setMessage(log.message); setCampaignTitle(`Copy of ${log.campaignName}`); setIsComposeModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                              <RotateCcw size={14} />
+                            </button>
+                            <button type="button" title="Download PDF" onClick={() => handleDownloadLogPDF(log)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                              <Download size={14} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <button
-                        type="button"
-                        title={t('bulkSms.viewReport') || 'View Report & Log'}
-                        onClick={() => {
-                          setSelectedCampaign(cmp);
-                          setDetailsModalOpen(true);
-                        }}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '0.5rem',
-                          border: '1px solid var(--border)',
-                          background: 'var(--background)',
-                          color: 'var(--foreground)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Eye size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        title={t('bulkSms.cloneResend') || 'Clone & Resend'}
-                        onClick={() => {
-                          setMessage(cmp.messageText || cmp.title);
-                          setCampaignTitle(`Copy of ${cmp.title}`);
-                          setIsComposeModalOpen(true);
-                        }}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '0.5rem',
-                          border: '1px solid var(--border)',
-                          background: 'var(--background)',
-                          color: '#4f46e5',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    );
+                  })
+              }
             </div>
           )
         )}
+
 
         {/* ── Tab Content 2: Pre-approved Templates ────────────── */}
         {activeTab === 'templates' && (
@@ -2682,7 +2425,7 @@ export default function BulkSMSPage() {
         )}
 
         {/* ── Table Footer & Pagination for Campaigns ──────────── */}
-        {activeTab === 'campaigns' && filteredCampaigns.length > 0 && (
+        {activeTab === 'campaigns' && (filteredLogs.length > 0 || logsTotal > 0) && (
           <div
             style={{
               padding: '1rem 1.5rem',
@@ -2697,7 +2440,7 @@ export default function BulkSMSPage() {
             }}
           >
             <div>
-              {t('bulkSms.showing') || 'Showing'} <strong>{formatNumber(paginatedCampaigns.length)}</strong> {t('bulkSms.of') || 'of'} <strong>{formatNumber(filteredCampaigns.length)}</strong> {t('bulkSms.campaignsCount') || 'campaigns'}
+              {t('bulkSms.showing') || 'Showing'} <strong>{formatNumber(filteredLogs.length)}</strong> {t('bulkSms.of') || 'of'} <strong>{formatNumber(logsTotal)}</strong> {t('bulkSms.campaignsCount') || 'campaign logs'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -3228,7 +2971,7 @@ export default function BulkSMSPage() {
       )}
 
       {/* ── Modal: Campaign Report & Details ─────────────────────── */}
-      {detailsModalOpen && selectedCampaign && (
+      {detailsModalOpen && selectedLog && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -3247,8 +2990,9 @@ export default function BulkSMSPage() {
               border: '1px solid var(--border)',
               borderRadius: '1.25rem',
               width: '100%',
-              maxWidth: '520px',
-              overflow: 'hidden',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
               display: 'flex',
               flexDirection: 'column'
@@ -3264,10 +3008,10 @@ export default function BulkSMSPage() {
             }}>
               <div>
                 <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.9, fontWeight: 700 }}>
-                  {t('bulkSms.campaignReport') || 'Campaign Report'} &bull; {selectedCampaign.senderId}
+                  {t('bulkSms.campaignReport') || 'Campaign Log Detail'} &bull; {selectedLog.senderId}
                 </span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0.15rem 0 0' }}>
-                  {selectedCampaign.title}
+                  {selectedLog.campaignName}
                 </h3>
               </div>
               <button
@@ -3282,52 +3026,84 @@ export default function BulkSMSPage() {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '0.85rem', background: 'var(--background)', borderRadius: '0.75rem', border: '1px solid var(--border)' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colCampaignId') || 'Campaign ID'}</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {selectedCampaign.id}
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Log ID</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem', wordBreak: 'break-all' }}>
+                    {selectedLog.id}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.targetGroup') || 'Target Group'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.targetGroup') || 'Audience'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {selectedCampaign.targetGroup}
+                    {selectedLog.targetAudience}
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colRecipients') || 'Recipients'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {formatNumber(selectedCampaign.recipientsCount)} {t('bulkSms.contacts') || 'Contacts'} ({formatNumber(selectedCampaign.smsCount)} {t('bulkSms.smsPerRecipient') || 'SMS/recp'})
+                    {formatNumber(selectedLog.recipientCount)} {t('bulkSms.contacts') || 'Contacts'} ({formatNumber(selectedLog.smsParts)} {t('bulkSms.smsPerRecipient') || 'SMS/recp'})
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.creditsDeducted') || 'Credits Deducted'}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4f46e5', marginTop: '0.15rem' }}>
-                    {formatNumber(selectedCampaign.totalCredits)} {t('bulkSms.credits') || 'Credits'}
+                    {formatNumber(selectedLog.creditsDeducted)} {t('bulkSms.credits') || 'Credits'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Status & Response</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: selectedLog.status.toUpperCase() === 'FAILED' ? '#dc2626' : '#16a34a', marginTop: '0.15rem' }}>
+                    {selectedLog.status} {selectedLog.responseCode ? `(${selectedLog.responseCode})` : ''}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Batch / Message ID</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
+                    {selectedLog.batchId ? `#${selectedLog.batchId}` : '—'} {selectedLog.messageId ? `· ${selectedLog.messageId}` : ''}
                   </div>
                 </div>
               </div>
+
+              {selectedLog.recipients && selectedLog.recipients.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recipient Numbers</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {selectedLog.recipients.map((num, i) => (
+                      <span key={i} style={{ fontSize: '0.75rem', fontFamily: 'monospace', padding: '0.15rem 0.5rem', background: 'var(--muted)', borderRadius: '4px', color: 'var(--foreground)' }}>
+                        {num}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentDateTime') || 'Sent Date & Time'}</div>
                 <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
                   <Calendar size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
-                  <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(selectedCampaign.sentAt)}</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(selectedLog.createdAt)}</span>
                 </div>
               </div>
 
-              {selectedCampaign.messageText && (
+              {selectedLog.message && (
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.broadcastMessage') || 'Broadcast Message'}</div>
                   <div style={{ fontSize: '0.84rem', color: 'var(--foreground)', marginTop: '0.2rem', padding: '0.75rem', background: 'var(--muted)', borderRadius: '0.5rem', lineHeight: 1.45 }}>
-                    {selectedCampaign.messageText}
+                    {selectedLog.message}
                   </div>
+                </div>
+              )}
+
+              {selectedLog.errorMessage && (
+                <div style={{ padding: '0.75rem', borderRadius: '0.5rem', background: '#fef2f2', border: '1px solid rgba(220,38,38,0.2)', fontSize: '0.8rem', color: '#b91c1c' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>Error Detail:</div>
+                  <div>{selectedLog.errorMessage}</div>
                 </div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                 <button
                   type="button"
-                  onClick={() => handleDownloadCampaignPDF(selectedCampaign)}
+                  onClick={() => handleDownloadLogPDF(selectedLog)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
