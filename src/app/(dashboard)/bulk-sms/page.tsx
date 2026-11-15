@@ -1136,24 +1136,24 @@ export default function BulkSMSPage() {
                 border: quotaData?.isEnabled !== false ? '1px solid rgba(22, 163, 74, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
               }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }} />
-                {quotaData?.isEnabled !== false ? (t('bulkSms.gatewayOnline') || 'SMS Gateway Active') : (t('bulkSms.gatewayOffline') || 'Gateway Suspended')}
+                {quotaData?.isEnabled !== false ? t('bulkSms.gatewayOnline', 'SMS Gateway Active') : t('bulkSms.gatewayOffline', 'Gateway Suspended')}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.78rem', color: 'var(--muted-foreground)', flexWrap: 'wrap' }}>
-              <span>{t('bulkSms.schoolId') || 'School ID'}: <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{quotaData?.schoolId ? `${quotaData.schoolId.slice(0, 14)}...` : '29f05edb...'}</code></span>
+              <span>{t('bulkSms.schoolId', 'School ID')}: <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{quotaData?.schoolId ? `${quotaData.schoolId.slice(0, 14)}...` : '29f05edb...'}</code></span>
               {quotaData?.schoolId && (
                 <button
                   type="button"
                   onClick={() => handleCopySchoolId(quotaData.schoolId)}
-                  title="Copy School ID"
+                  title={copiedSchoolId ? t('bulkSms.copied', 'Copied') : t('bulkSms.copy', 'Copy')}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedSchoolId ? '#16a34a' : 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
                 >
                   {copiedSchoolId ? <Check size={13} /> : <Copy size={13} />}
-                  <span style={{ fontSize: '0.72rem' }}>{copiedSchoolId ? 'Copied' : 'Copy'}</span>
+                  <span style={{ fontSize: '0.72rem' }}>{copiedSchoolId ? t('bulkSms.copied', 'Copied') : t('bulkSms.copy', 'Copy')}</span>
                 </button>
               )}
               {lastRefreshed && (
-                <span>&bull; {t('bulkSms.lastSynced') || 'Last synced'}: <strong>{lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
+                <span>&bull; {t('bulkSms.lastSynced', 'Last synced')}: <strong>{lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
               )}
             </div>
           </div>
@@ -1168,7 +1168,7 @@ export default function BulkSMSPage() {
               fetchSmsLogs(page, limit, debouncedSearch, statusFilter);
             }}
             disabled={quotaLoading || logsLoading}
-            title={t('bulkSms.refreshStatus') || 'Refresh SMS Quota & Campaign Logs'}
+            title={t('bulkSms.refreshStatus', 'Refresh SMS Quota & Campaign Logs')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1186,7 +1186,7 @@ export default function BulkSMSPage() {
             }}
           >
             <RefreshCw size={14} className={(quotaLoading || logsLoading) ? 'animate-spin' : ''} />
-            <span>{(quotaLoading || logsLoading) ? (t('bulkSms.syncing') || 'Syncing...') : (t('bulkSms.refreshQuota') || 'Refresh Data')}</span>
+            <span>{(quotaLoading || logsLoading) ? t('bulkSms.syncing', 'Syncing...') : t('bulkSms.refreshQuota', 'Refresh Data')}</span>
           </button>
 
           <button
@@ -1209,7 +1209,7 @@ export default function BulkSMSPage() {
             }}
           >
             <PlusCircle size={15} />
-            <span>{t('bulkSms.recharge') || 'Recharge'}</span>
+            <span>{t('bulkSms.recharge', 'Recharge')}</span>
           </button>
 
           <button
@@ -1236,7 +1236,7 @@ export default function BulkSMSPage() {
             }}
           >
             <Send size={14} />
-            <span>{t('bulkSms.newBroadcast') || 'New Broadcast'}</span>
+            <span>{t('bulkSms.newBroadcast', 'New Broadcast')}</span>
           </button>
         </div>
       </div>
@@ -1262,10 +1262,12 @@ export default function BulkSMSPage() {
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#9a3412' }}>
-                {t('bulkSms.lowQuotaAlertTitle') || 'Low SMS Quota Warning'}
+                {t('bulkSms.lowQuotaAlertTitle', 'Low SMS Quota Warning')}
               </div>
               <div style={{ fontSize: '0.82rem', color: '#c2410c', marginTop: '0.1rem' }}>
-                {t('bulkSms.lowQuotaAlertDesc') || `Your current balance is only ${formatNumber(quotaData.balance)} SMS credits (Safety threshold: ${formatNumber(quotaData.lowBalanceThreshold)} credits). Recharge soon to prevent delivery interruptions.`}
+                {t('bulkSms.lowQuotaAlertDesc', 'Your current balance is only {balance} SMS credits (Safety threshold: {threshold} credits). Recharge soon to prevent delivery interruptions.')
+                  .replace('{balance}', formatNumber(quotaData.balance))
+                  .replace('{threshold}', formatNumber(quotaData.lowBalanceThreshold))}
               </div>
             </div>
           </div>
@@ -1287,7 +1289,7 @@ export default function BulkSMSPage() {
             }}
           >
             <CreditCard size={14} />
-            <span>{t('bulkSms.rechargeNow') || 'Recharge Now'}</span>
+            <span>{t('bulkSms.rechargeNow', 'Recharge Now')}</span>
           </button>
         </div>
       )}
@@ -1311,7 +1313,7 @@ export default function BulkSMSPage() {
             <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{quotaError}</div>
-              <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>Check telecom gateway connection or credentials.</div>
+              <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>{t('bulkSms.checkConnection', 'Check telecom gateway connection or credentials.')}</div>
             </div>
           </div>
           <button
@@ -1319,7 +1321,7 @@ export default function BulkSMSPage() {
             onClick={fetchQuotaStatus}
             style={{ padding: '0.4rem 0.85rem', borderRadius: '0.55rem', border: '1px solid #ef4444', background: '#ffffff', color: '#b91c1c', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
           >
-            Retry Connection
+            {t('bulkSms.retryConnection', 'Retry Connection')}
           </button>
         </div>
       )}
@@ -1334,12 +1336,12 @@ export default function BulkSMSPage() {
               <CreditCard size={26} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance') || 'SMS Balance'}</div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.balance', 'SMS Balance')}</div>
               <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-                {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.balance ?? creditsBalance)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>{t('bulkSms.credits') || 'Credits'}</span>
+                {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.balance ?? creditsBalance)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a' }}>{t('bulkSms.credits', 'Credits')}</span>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {t('bulkSms.masking') || 'Masking'}: <strong>SCHOOLCARE</strong> &bull; Threshold: {formatNumber(quotaData?.lowBalanceThreshold ?? 50)}
+                {t('bulkSms.masking', 'Masking')}: <strong>SCHOOLCARE</strong> &bull; {t('bulkSms.lowThreshold', 'Threshold')}: {formatNumber(quotaData?.lowBalanceThreshold ?? 50)}
               </div>
             </div>
           </div>
@@ -1348,7 +1350,7 @@ export default function BulkSMSPage() {
             onClick={() => setIsRechargeModalOpen(true)}
             style={{ padding: '0.35rem 0.65rem', borderRadius: '0.55rem', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
-            {t('bulkSms.topUp') || '+ Top Up'}
+            {t('bulkSms.topUp', '+ Top Up')}
           </button>
         </div>
 
@@ -1358,12 +1360,12 @@ export default function BulkSMSPage() {
             <Send size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalSmsUsed') || 'Total SMS Used'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalSmsUsed', 'Total SMS Used')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
               {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.totalUsed ?? sentThisMonth)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563eb' }}>SMS</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              {quotaData?.totalPurchased ? `${formatNumber(((quotaData.totalUsed || 0) / (quotaData.totalPurchased || 1) * 100).toFixed(1))}% of purchased quota` : 'Lifetime usage'}
+              {quotaData?.totalPurchased ? `${formatNumber(((quotaData.totalUsed || 0) / (quotaData.totalPurchased || 1) * 100).toFixed(1))}% ${t('bulkSms.ofPurchasedQuota', 'of purchased quota')}` : t('bulkSms.lifetimeUsage', 'Lifetime usage')}
             </div>
           </div>
         </div>
@@ -1374,12 +1376,12 @@ export default function BulkSMSPage() {
             <Layers size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalPurchasedQuota') || 'Purchased Quota'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.totalPurchasedQuota', 'Purchased Quota')}</div>
             <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.15, marginTop: '0.15rem' }}>
-              {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.totalPurchased ?? 500)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7c3aed' }}>{t('bulkSms.credits') || 'Credits'}</span>
+              {quotaLoading && !quotaData ? '...' : formatNumber(quotaData?.totalPurchased ?? 500)} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7c3aed' }}>{t('bulkSms.credits', 'Credits')}</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              Allocated: <strong>{formatNumber(quotaData?.totalAllocated ?? 0)}</strong> {t('bulkSms.credits') || 'Credits'}
+              {t('bulkSms.allocated', 'Allocated')}: <strong>{formatNumber(quotaData?.totalAllocated ?? 0)}</strong> {t('bulkSms.credits', 'Credits')}
             </div>
           </div>
         </div>
@@ -1390,13 +1392,13 @@ export default function BulkSMSPage() {
             <ShieldCheck size={26} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.serviceStatus') || 'Service & Quota Status'}</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.serviceStatus', 'Service & Quota Status')}</div>
             <div style={{ fontSize: '1.35rem', fontWeight: 800, color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444', lineHeight: 1.2, marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }} />
-              {quotaData?.isEnabled !== false ? 'Operational' : 'Suspended'}
+              {quotaData?.isEnabled !== false ? t('bulkSms.statusOperational', 'Operational') : t('bulkSms.statusSuspended', 'Suspended')}
             </div>
             <div style={{ fontSize: '0.75rem', color: quotaData?.isLowBalance ? '#ea580c' : '#16a34a', fontWeight: 600, marginTop: '0.2rem', whiteSpace: 'nowrap' }}>
-              {quotaData?.isLowBalance ? `⚠️ Low balance (< ${formatNumber(quotaData?.lowBalanceThreshold ?? 50)})` : `✓ Healthy quota balance`}
+              {quotaData?.isLowBalance ? `⚠️ ${t('bulkSms.lowBalanceWarning', 'Low balance')} (< ${formatNumber(quotaData?.lowBalanceThreshold ?? 50)})` : `✓ ${t('bulkSms.healthyBalance', 'Healthy quota balance')}`}
             </div>
           </div>
         </div>
@@ -1457,8 +1459,8 @@ export default function BulkSMSPage() {
                   type="text" 
                   placeholder={
                     activeTab === 'transactions'
-                      ? 'Search description, type, reference, or ID...'
-                      : (t('bulkSms.searchPlaceholder') || 'Search campaigns, ID, or audience...')
+                      ? t('bulkSms.searchTxPlaceholder', 'Search description, type, reference, or ID...')
+                      : t('bulkSms.searchPlaceholder', 'Search campaigns, ID, or audience...')
                   }
                   style={{ 
                     border: 'none', 
@@ -1519,7 +1521,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <Clock size={14} /> {t('bulkSms.tabCampaigns') || 'Campaigns'}
+                  <Clock size={14} /> {t('bulkSms.tabCampaigns', 'Campaigns')}
                 </button>
                 <button
                   type="button"
@@ -1540,7 +1542,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <FileText size={14} /> {t('bulkSms.tabTemplates') || 'Templates'}
+                  <FileText size={14} /> {t('bulkSms.tabTemplates', 'Templates')}
                 </button>
                 <button
                   type="button"
@@ -1562,7 +1564,7 @@ export default function BulkSMSPage() {
                   }}
                 >
                   <Receipt size={14} />
-                  <span>{t('bulkSms.tabTransactions') || 'Audit Log'}</span>
+                  <span>{t('bulkSms.tabTransactions', 'Audit Log')}</span>
                   {quotaData?.recentTransactions && quotaData.recentTransactions.length > 0 && (
                     <span style={{
                       fontSize: '0.68rem',
@@ -1596,7 +1598,7 @@ export default function BulkSMSPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <ShieldCheck size={14} /> {t('bulkSms.tabGateway') || 'Gateway'}
+                  <ShieldCheck size={14} /> {t('bulkSms.tabGateway', 'Gateway')}
                 </button>
               </div>
 
@@ -1604,17 +1606,17 @@ export default function BulkSMSPage() {
               {activeTab === 'transactions' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid var(--border)', borderRadius: '0.75rem', height: '42px', padding: '0 0.75rem', background: 'var(--background)' }}>
                   <Filter size={14} style={{ color: 'var(--muted-foreground)' }} />
-                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>Type:</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{t('bulkSms.txType', 'Type:')}</span>
                   <select
                     value={txTypeFilter}
                     onChange={(e) => { setTxTypeFilter(e.target.value); setTxPage(1); }}
                     style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--foreground)', cursor: 'pointer', fontWeight: 600 }}
                   >
-                    <option value="ALL">All Types</option>
-                    <option value="USAGE">USAGE (Deduction)</option>
-                    <option value="REFUND">REFUND (Reversal)</option>
-                    <option value="PURCHASE">PURCHASE (Top-up)</option>
-                    <option value="ALLOCATION">ALLOCATION</option>
+                    <option value="ALL">{t('bulkSms.allTypes', 'All Types')}</option>
+                    <option value="USAGE">{t('bulkSms.typeUsage', 'USAGE (Deduction)')}</option>
+                    <option value="REFUND">{t('bulkSms.typeRefund', 'REFUND (Reversal)')}</option>
+                    <option value="PURCHASE">{t('bulkSms.typePurchase', 'PURCHASE (Top-up)')}</option>
+                    <option value="ALLOCATION">{t('bulkSms.typeAllocation', 'ALLOCATION')}</option>
                   </select>
                 </div>
               )}
@@ -1625,7 +1627,7 @@ export default function BulkSMSPage() {
                   type="button"
                   onClick={handleExportTransactionsCSV}
                   disabled={filteredTransactions.length === 0}
-                  title="Export Transactions to CSV"
+                  title={t('bulkSms.exportCSV', 'Export CSV')}
                   style={{
                     height: '42px',
                     padding: '0 0.95rem',
@@ -1643,7 +1645,7 @@ export default function BulkSMSPage() {
                   }}
                 >
                   <FileSpreadsheet size={15} style={{ color: '#16a34a' }} />
-                  <span>Export CSV</span>
+                  <span>{t('bulkSms.exportCSV', 'Export CSV')}</span>
                 </button>
               )}
 
@@ -2024,13 +2026,13 @@ export default function BulkSMSPage() {
           logsLoading && smsLogs.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center', gap: '1rem' }}>
               <RefreshCw size={36} className="animate-spin" style={{ color: '#4f46e5', opacity: 0.5 }} />
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem' }}>Loading SMS campaign logs…</p>
+              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem' }}>{t('bulkSms.loadingLogs', 'Loading SMS campaign logs…')}</p>
             </div>
           ) : logsError ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center', gap: '1rem' }}>
               <AlertCircle size={36} style={{ color: '#ef4444', opacity: 0.6 }} />
               <p style={{ color: '#b91c1c', fontWeight: 600 }}>{logsError}</p>
-              <button type="button" onClick={() => fetchSmsLogs(page, limit)} style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+              <button type="button" onClick={() => fetchSmsLogs(page, limit)} style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>{t('bulkSms.retryConnection', 'Retry')}</button>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6.5rem 2rem', textAlign: 'center' }}>
@@ -2038,17 +2040,17 @@ export default function BulkSMSPage() {
                 <MessageSquare size={36} />
               </div>
               <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
-                {t('bulkSms.noCampaignsFound') || 'No SMS Campaign Logs Found'}
+                {t('bulkSms.noCampaignsFound', 'No SMS Campaign Logs Found')}
               </h3>
               <p style={{ color: 'var(--muted-foreground)', marginTop: '0.4rem', fontSize: '0.9rem', maxWidth: '420px' }}>
-                {t('bulkSms.noCampaignsDesc') || 'No broadcast records match your search or filter.'}
+                {t('bulkSms.noCampaignsDesc', 'No broadcast records match your search or filter.')}
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
                 <button type="button" onClick={resetAllFilters} style={{ padding: '0.65rem 1.25rem', background: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer' }}>
-                  {t('bulkSms.resetFilters') || 'Reset Filters'}
+                  {t('bulkSms.resetFilters', 'Reset Filters')}
                 </button>
                 <button type="button" onClick={() => setIsComposeModalOpen(true)} style={{ padding: '0.65rem 1.25rem', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.86rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Plus size={16} /> {t('bulkSms.newBroadcast') || 'New Broadcast'}
+                  <Plus size={16} /> {t('bulkSms.newBroadcast', 'New Broadcast')}
                 </button>
               </div>
             </div>
@@ -2059,13 +2061,13 @@ export default function BulkSMSPage() {
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.9rem 1.25rem', width: '45px' }}>#</th>
-                    <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('bulkSms.colDateTime') || 'Date & Time'}</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Campaign & Sender</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Audience / Recipients</th>
-                    <th style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>Credits</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>Batch / Msg ID</th>
-                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colStatus') || 'Status'}</th>
-                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>{t('bulkSms.colActions') || 'Actions'}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', whiteSpace: 'nowrap' }}>{t('bulkSms.colDateTime', 'Date & Time')}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colCampaignSender', 'Campaign & Sender')}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colAudienceRecipients', 'Audience / Recipients')}</th>
+                    <th style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>{t('bulkSms.colCredits', 'Credits')}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colBatchMsgId', 'Batch / Msg ID')}</th>
+                    <th style={{ padding: '0.9rem 1rem' }}>{t('bulkSms.colStatus', 'Status')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', width: '120px' }}>{t('bulkSms.colActions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2112,7 +2114,7 @@ export default function BulkSMSPage() {
                                 {log.targetAudience}
                               </span>
                               <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.2rem' }}>
-                                {formatNumber(log.recipientCount)} <span style={{ fontWeight: 400, color: 'var(--muted-foreground)', fontSize: '0.7rem' }}>rcpt · {log.smsParts} SMS/ea</span>
+                                {formatNumber(log.recipientCount)} <span style={{ fontWeight: 400, color: 'var(--muted-foreground)', fontSize: '0.7rem' }}>{t('bulkSms.rcpt', 'rcpt')} · {formatNumber(log.smsParts)} {t('bulkSms.smsPart', 'SMS/ea')}</span>
                               </div>
                               {log.recipients.length > 0 && (
                                 <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', marginTop: '0.1rem', fontFamily: 'monospace' }}>
@@ -2134,45 +2136,45 @@ export default function BulkSMSPage() {
                             <td style={{ padding: '1rem 1rem', whiteSpace: 'nowrap' }}>
                               {isDelivered && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.74rem', fontWeight: 700 }}>
-                                  <CheckCircle2 size={12} /> {log.status}
+                                  <CheckCircle2 size={12} /> {getLogStatusLabel(log.status)}
                                 </span>
                               )}
                               {isProcessing && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.74rem', fontWeight: 700 }}>
-                                  <RefreshCw size={12} className="animate-spin" /> Processing
+                                  <RefreshCw size={12} className="animate-spin" /> {getLogStatusLabel('PROCESSING')}
                                 </span>
                               )}
                               {isFailed && (
                                 <div>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.74rem', fontWeight: 700 }}>
-                                    <AlertTriangle size={12} /> Failed
+                                    <AlertTriangle size={12} /> {getLogStatusLabel('FAILED')}
                                   </span>
                                   {log.responseCode && <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: '0.15rem' }}>Code: {log.responseCode}</div>}
                                 </div>
                               )}
                               {!isDelivered && !isProcessing && !isFailed && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.6rem', borderRadius: '99px', background: 'var(--muted)', color: 'var(--foreground)', fontSize: '0.74rem', fontWeight: 700 }}>
-                                  {log.status}
+                                  {getLogStatusLabel(log.status)}
                                 </span>
                               )}
                             </td>
                             <td style={{ padding: '1rem 1.25rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <button type="button" title="View Detail"
+                                <button type="button" title={t('bulkSms.viewDetail', 'View Detail')}
                                   onClick={() => { setSelectedLog(log); setDetailsModalOpen(true); }}
                                   style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
                                   onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}>
                                   <Eye size={14} />
                                 </button>
-                                <button type="button" title="Clone & Resend"
-                                  onClick={() => { setMessage(log.message); setCampaignTitle(`Copy of ${log.campaignName}`); setIsComposeModalOpen(true); }}
+                                <button type="button" title={t('bulkSms.cloneResend', 'Clone & Resend')}
+                                  onClick={() => { setMessage(log.message); setCampaignTitle(`${t('bulkSms.copyOf', 'Copy of')} ${log.campaignName}`); setIsComposeModalOpen(true); }}
                                   style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                   onMouseEnter={e => (e.currentTarget.style.background = '#eef2ff')}
                                   onMouseLeave={e => (e.currentTarget.style.background = 'var(--background)')}>
                                   <RotateCcw size={14} />
                                 </button>
-                                <button type="button" title="Download PDF"
+                                <button type="button" title={t('bulkSms.downloadPDF', 'Download PDF')}
                                   onClick={() => handleDownloadLogPDF(log)}
                                   style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                   onMouseEnter={e => (e.currentTarget.style.background = '#f0fdf4')}
@@ -2210,9 +2212,9 @@ export default function BulkSMSPage() {
                           <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', background: 'rgba(79,70,229,0.08)', color: '#4f46e5', fontSize: '0.74rem', fontWeight: 700 }}>
                             {log.targetAudience}
                           </span>
-                          {isDelivered && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700 }}><CheckCircle2 size={11} /> {log.status}</span>}
-                          {isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.72rem', fontWeight: 700 }}><AlertTriangle size={11} /> Failed</span>}
-                          {!isDelivered && !isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700 }}><RefreshCw size={11} /> {log.status}</span>}
+                          {isDelivered && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#f0fdf4', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700 }}><CheckCircle2 size={11} /> {getLogStatusLabel(log.status)}</span>}
+                          {isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fef2f2', color: '#dc2626', fontSize: '0.72rem', fontWeight: 700 }}><AlertTriangle size={11} /> {getLogStatusLabel('FAILED')}</span>}
+                          {!isDelivered && !isFailed && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.55rem', borderRadius: '99px', background: '#fff7ed', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700 }}><RefreshCw size={11} /> {getLogStatusLabel(log.status)}</span>}
                         </div>
                         <div>
                           <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.3rem', color: 'var(--foreground)' }}>{log.campaignName}</h4>
@@ -2232,20 +2234,20 @@ export default function BulkSMSPage() {
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
                           <div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>Recipients / Credits</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.recipientsCredits', 'Recipients / Credits')}</div>
                             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                              {formatNumber(log.recipientCount)} <span style={{ color: '#4f46e5' }}>({formatNumber(log.creditsDeducted)} cr)</span>
+                              {formatNumber(log.recipientCount)} <span style={{ color: '#4f46e5' }}>({formatNumber(log.creditsDeducted)} {t('bulkSms.crShort', 'cr')})</span>
                             </div>
                             {log.batchId && <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)', fontFamily: 'monospace', marginTop: '0.1rem' }}>Batch: {log.batchId}</div>}
                           </div>
                           <div style={{ display: 'flex', gap: '0.35rem' }}>
-                            <button type="button" title="View Detail" onClick={() => { setSelectedLog(log); setDetailsModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <button type="button" title={t('bulkSms.viewDetail', 'View Detail')} onClick={() => { setSelectedLog(log); setDetailsModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                               <Eye size={14} />
                             </button>
-                            <button type="button" title="Clone & Resend" onClick={() => { setMessage(log.message); setCampaignTitle(`Copy of ${log.campaignName}`); setIsComposeModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <button type="button" title={t('bulkSms.cloneResend', 'Clone & Resend')} onClick={() => { setMessage(log.message); setCampaignTitle(`${t('bulkSms.copyOf', 'Copy of')} ${log.campaignName}`); setIsComposeModalOpen(true); }} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                               <RotateCcw size={14} />
                             </button>
-                            <button type="button" title="Download PDF" onClick={() => handleDownloadLogPDF(log)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <button type="button" title={t('bulkSms.downloadPDF', 'Download PDF')} onClick={() => handleDownloadLogPDF(log)} style={{ width: '32px', height: '32px', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                               <Download size={14} />
                             </button>
                           </div>
@@ -2368,14 +2370,14 @@ export default function BulkSMSPage() {
                 <Receipt size={32} />
               </div>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--foreground)' }}>
-                {quotaLoading ? 'Syncing Transaction Records...' : 'No Transactions Found'}
+                {quotaLoading ? t('bulkSms.syncingTransactions', 'Syncing Transaction Records...') : t('bulkSms.noTransactionsFound', 'No Transactions Found')}
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', maxWidth: '440px', margin: 0 }}>
                 {quotaLoading
-                  ? 'Fetching live transaction audit log from telecom gateway...'
+                  ? t('bulkSms.syncingTransactions', 'Fetching live transaction audit log from telecom gateway...')
                   : txSearchTerm || txTypeFilter !== 'ALL'
-                    ? 'No transaction records match your search query and filters.'
-                    : 'No SMS quota debit or credit transactions recorded for this school.'}
+                    ? t('bulkSms.noTransactionsFiltered', 'No transaction records match your search query and filters.')
+                    : t('bulkSms.noTransactionsDesc', 'No SMS quota debit or credit transactions recorded for this school.')}
               </p>
               {(txSearchTerm || txTypeFilter !== 'ALL') && !quotaLoading && (
                 <button
@@ -2383,7 +2385,7 @@ export default function BulkSMSPage() {
                   onClick={() => { setTxSearchTerm(''); setTxTypeFilter('ALL'); }}
                   style={{ marginTop: '1.25rem', padding: '0.55rem 1.15rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Clear Search & Filters
+                  {t('bulkSms.clearSearchFilters', 'Clear Search & Filters')}
                 </button>
               )}
             </div>
@@ -2393,13 +2395,13 @@ export default function BulkSMSPage() {
                 <thead>
                   <tr style={{ background: 'var(--muted)', borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, width: '48px' }}>#</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Transaction ID</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Type</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Description & Activity</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>Credits Impact</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>Balance Flow</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Reference</th>
-                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>Timestamp</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>{t('bulkSms.colTxId', 'Transaction ID')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>{t('bulkSms.colTxType', 'Type')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>{t('bulkSms.colTxDesc', 'Description & Activity')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>{t('bulkSms.colTxImpact', 'Credits Impact')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700, textAlign: 'center' }}>{t('bulkSms.colTxFlow', 'Balance Flow')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>{t('bulkSms.colTxRef', 'Reference')}</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>{t('bulkSms.colTxTime', 'Timestamp')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2476,9 +2478,9 @@ export default function BulkSMSPage() {
                           </div>
                           <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
                             {tx.performedById ? (
-                              <span>Admin ID: <code style={{ fontFamily: 'monospace' }}>{tx.performedById.slice(0, 8)}...</code></span>
+                              <span>{t('bulkSms.adminId', 'Admin ID')}: <code style={{ fontFamily: 'monospace' }}>{tx.performedById.slice(0, 8)}...</code></span>
                             ) : (
-                              <span style={{ color: '#059669', fontWeight: 600 }}>System Gateway Automated</span>
+                              <span style={{ color: '#059669', fontWeight: 600 }}>{t('bulkSms.sysGatewayAutomated', 'System Gateway Automated')}</span>
                             )}
                           </div>
                         </td>
@@ -2494,7 +2496,7 @@ export default function BulkSMSPage() {
                             {tx.amount > 0 ? `+${formatNumber(tx.amount)}` : formatNumber(tx.amount)}
                           </span>
                           <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginLeft: '0.25rem' }}>
-                            Credits
+                            {t('bulkSms.credits', 'Credits')}
                           </span>
                         </td>
 
@@ -2548,10 +2550,10 @@ export default function BulkSMSPage() {
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                      School Quota Profile
+                      {t('bulkSms.quotaProfile', 'School Quota Profile')}
                     </h3>
                     <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
-                      Live quota allocation & balance
+                      {t('bulkSms.quotaProfileDesc', 'Live quota allocation & balance')}
                     </p>
                   </div>
                 </div>
@@ -2562,51 +2564,51 @@ export default function BulkSMSPage() {
                   style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem', fontWeight: 600 }}
                 >
                   <RefreshCw size={13} className={quotaLoading ? 'animate-spin' : ''} />
-                  <span>Sync</span>
+                  <span>{t('bulkSms.refreshQuota', 'Sync')}</span>
                 </button>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>School Name</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.schoolName', 'School Name')}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', textAlign: 'right', maxWidth: '220px' }}>
                     {quotaData?.schoolName || "Bismillah Ta'limul Quran Cadet Madrasah"}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>School ID</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.schoolId', 'School ID')}</span>
                   <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--foreground)' }}>
                     {quotaData?.schoolId ? `${quotaData.schoolId.slice(0, 18)}...` : '29f05edb...'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Available Balance</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.availableBalance', 'Available Balance')}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a' }}>
-                    {formatNumber(quotaData?.balance ?? creditsBalance)} Credits
+                    {formatNumber(quotaData?.balance ?? creditsBalance)} {t('bulkSms.credits', 'Credits')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Purchased / Used</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.purchasedUsed', 'Purchased / Used')}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                     {formatNumber(quotaData?.totalPurchased ?? 500)} / {formatNumber(quotaData?.totalUsed ?? 2)} SMS
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Low Balance Threshold</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.lowThreshold', 'Low Balance Threshold')}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: quotaData?.isLowBalance ? '#ea580c' : 'var(--foreground)' }}>
-                    {formatNumber(quotaData?.lowBalanceThreshold ?? 50)} Credits {quotaData?.isLowBalance ? '(Low!)' : '(Safe)'}
+                    {formatNumber(quotaData?.lowBalanceThreshold ?? 50)} {t('bulkSms.credits', 'Credits')} {quotaData?.isLowBalance ? `(${t('bulkSms.low', 'Low!')})` : `(${t('bulkSms.safe', 'Safe')})`}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Service Active</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.serviceActive', 'Service Active')}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: quotaData?.isEnabled !== false ? '#16a34a' : '#ef4444' }}>
-                    {quotaData?.isEnabled !== false ? 'Enabled & Operational' : 'Disabled'}
+                    {quotaData?.isEnabled !== false ? t('bulkSms.enabledOperational', 'Enabled & Operational') : t('bulkSms.disabled', 'Disabled')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>Last Gateway Sync</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.lastGatewaySync', 'Last Gateway Sync')}</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    {quotaData?.updatedAt ? formatSingleLineDate(quotaData.updatedAt) : 'Just now'}
+                    {quotaData?.updatedAt ? formatSingleLineDate(quotaData.updatedAt) : t('bulkSms.justNow', 'Just now')}
                   </span>
                 </div>
               </div>
@@ -2617,7 +2619,7 @@ export default function BulkSMSPage() {
                   onClick={() => setIsRechargeModalOpen(true)}
                   style={{ flex: 1, padding: '0.65rem 0', borderRadius: '0.65rem', border: 'none', background: '#16a34a', color: '#ffffff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                 >
-                  <CreditCard size={15} /> Top Up Quota
+                  <CreditCard size={15} /> {t('bulkSms.topUpQuota', 'Top Up Quota')}
                 </button>
               </div>
             </div>
@@ -2783,12 +2785,12 @@ export default function BulkSMSPage() {
             }}
           >
             <div>
-              {t('bulkSms.showing') || 'Showing'} <strong>{formatNumber(paginatedTransactions.length)}</strong> {t('bulkSms.of') || 'of'} <strong>{formatNumber(filteredTransactions.length)}</strong> audit transactions
+              {t('bulkSms.showing', 'Showing')} <strong>{formatNumber(paginatedTransactions.length)}</strong> {t('bulkSms.of', 'of')} <strong>{formatNumber(filteredTransactions.length)}</strong> {t('bulkSms.auditTransactions', 'audit transactions')}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.82rem', marginRight: '0.5rem' }}>
-                Page {formatNumber(txPage)} of {formatNumber(totalTxPages)}
+                {t('bulkSms.page', 'Page')} {formatNumber(txPage)} {t('bulkSms.of', 'of')} {formatNumber(totalTxPages)}
               </span>
               <button
                 type="button"
@@ -2916,18 +2918,18 @@ export default function BulkSMSPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                      {t('bulkSms.targetAudienceLabel') || 'Target Audience'} <span style={{ color: '#ef4444' }}>*</span>
+                      {t('bulkSms.targetAudienceLabel', 'Target Audience')} <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
-                      Select audience to auto-populate phone numbers
+                      {t('bulkSms.audienceHint', 'Select audience to auto-populate phone numbers')}
                     </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                     {[
-                      { id: 'all', label: t('bulkSms.audAllParents') || 'All Parents', count: formatNumber(allParentsCount), icon: Users },
-                      { id: 'class', label: t('bulkSms.audClassOption') || 'Class', count: formatNumber(classCount), icon: GraduationCap },
-                      { id: 'teachers', label: t('bulkSms.audStaffOption') || 'Staff', count: formatNumber(staffCount), icon: UserCheck },
-                      { id: 'custom', label: t('bulkSms.audCustomOption') || 'Custom', count: formatNumber(selectedContactIds.length || parsedRecipientsList.length), icon: Smartphone },
+                      { id: 'all', label: t('bulkSms.audAllParents', 'All Parents'), count: formatNumber(allParentsCount), icon: Users },
+                      { id: 'class', label: t('bulkSms.audClassOption', 'Class'), count: formatNumber(classCount), icon: GraduationCap },
+                      { id: 'teachers', label: t('bulkSms.audStaffOption', 'Staff'), count: formatNumber(staffCount), icon: UserCheck },
+                      { id: 'custom', label: t('bulkSms.audCustomOption', 'Custom'), count: formatNumber(selectedContactIds.length || parsedRecipientsList.length), icon: Smartphone },
                     ].map(aud => {
                       const isSelected = targetAudience === aud.id;
                       return (
@@ -2962,7 +2964,7 @@ export default function BulkSMSPage() {
                     <div style={{ marginTop: '0.65rem', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
                       <div>
                         <label style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.2rem' }}>
-                          Select Class (auto-loads enrolled students)
+                          {t('bulkSms.selectClassAutoLoad', 'Select Class (auto-loads enrolled students)')}
                         </label>
                         <select
                           value={selectedClass}
@@ -2976,7 +2978,7 @@ export default function BulkSMSPage() {
                             const count = schoolContacts.filter(x => x.role === 'student' && (x.className === c.name || x.classId === c.id)).length;
                             return (
                               <option key={c.id} value={c.name}>
-                                {c.name} ({formatNumber(count)} students)
+                                {c.name} ({formatNumber(count)})
                               </option>
                             );
                           })}
@@ -2984,7 +2986,7 @@ export default function BulkSMSPage() {
                       </div>
                       <div>
                         <label style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.2rem' }}>
-                          Section
+                          {t('bulkSms.sectionLabel', 'Section')}
                         </label>
                         <select
                           value={selectedSection}
@@ -2992,7 +2994,7 @@ export default function BulkSMSPage() {
                           style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
                         >
                           {['All Sections', 'Boys', 'Girls', 'Section A', 'Section B'].map(s => (
-                            <option key={s} value={s}>{s}</option>
+                            <option key={s} value={s}>{s === 'All Sections' ? t('bulkSms.allSections', 'All Sections') : s}</option>
                           ))}
                         </select>
                       </div>
@@ -3011,7 +3013,7 @@ export default function BulkSMSPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                         <Users size={15} style={{ color: '#4f46e5' }} />
                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                          Selected Participants ({formatNumber(selectedContacts.length)})
+                          {t('bulkSms.selectedParticipants', 'Selected Participants')} ({formatNumber(selectedContacts.length)})
                         </span>
                         {contactsLoading && <RefreshCw size={12} className="animate-spin" style={{ color: '#4f46e5' }} />}
                       </div>
@@ -3031,7 +3033,7 @@ export default function BulkSMSPage() {
                             fontWeight: 600
                           }}
                         >
-                          Select All ({formatNumber(filteredDirectoryContacts.length)})
+                          {t('bulkSms.selectAll', 'Select All')} ({formatNumber(filteredDirectoryContacts.length)})
                         </button>
                         <button
                           type="button"
@@ -3048,7 +3050,7 @@ export default function BulkSMSPage() {
                             fontWeight: 600
                           }}
                         >
-                          Clear
+                          {t('bulkSms.clear', 'Clear')}
                         </button>
                         <button
                           type="button"
@@ -3067,7 +3069,7 @@ export default function BulkSMSPage() {
                             gap: '0.25rem'
                           }}
                         >
-                          <span>{showContactDirectory ? 'Hide Picker' : 'Choose Multiple Users'}</span>
+                          <span>{showContactDirectory ? t('bulkSms.hidePicker', 'Hide Picker') : t('bulkSms.chooseMultiple', 'Choose Multiple Users')}</span>
                           <ChevronDown size={12} style={{ transform: showContactDirectory ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </button>
                       </div>
@@ -3117,7 +3119,7 @@ export default function BulkSMSPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveContact(c.id)}
-                              title="Remove"
+                              title={t('common.delete', 'Remove')}
                               style={{
                                 background: 'none',
                                 border: 'none',
@@ -3143,13 +3145,13 @@ export default function BulkSMSPage() {
                             display: 'inline-flex',
                             alignItems: 'center'
                           }}>
-                            +{formatNumber(selectedContacts.length - 30)} more selected
+                            +{formatNumber(selectedContacts.length - 30)} {t('bulkSms.moreSelected', 'more selected')}
                           </span>
                         )}
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.76rem', color: 'var(--muted-foreground)', padding: '0.4rem 0' }}>
-                        No specific users selected. Pick users below or type phone numbers into the box.
+                        {t('bulkSms.noUsersSelected', 'No specific users selected. Pick users below or type phone numbers into the box.')}
                       </div>
                     )}
 
@@ -3174,7 +3176,7 @@ export default function BulkSMSPage() {
                             <Search size={13} style={{ color: 'var(--muted-foreground)', marginRight: '0.35rem' }} />
                             <input
                               type="text"
-                              placeholder="Search by name, phone, or class..."
+                              placeholder={t('bulkSms.searchDirectoryPlaceholder', 'Search by name, phone, or class...')}
                               value={contactSearchQuery}
                               onChange={e => setContactSearchQuery(e.target.value)}
                               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.78rem', color: 'var(--foreground)' }}
@@ -3186,7 +3188,7 @@ export default function BulkSMSPage() {
                             )}
                           </div>
                           <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
-                            {formatNumber(filteredDirectoryContacts.length)} users
+                            {formatNumber(filteredDirectoryContacts.length)} {t('bulkSms.usersCount', 'users')}
                           </span>
                         </div>
 
@@ -3200,7 +3202,7 @@ export default function BulkSMSPage() {
                         }}>
                           {filteredDirectoryContacts.length === 0 ? (
                             <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
-                              No users match search query.
+                              {t('bulkSms.noUsersMatch', 'No users match search query.')}
                             </div>
                           ) : (
                             filteredDirectoryContacts.map(c => {
@@ -3253,15 +3255,15 @@ export default function BulkSMSPage() {
                   <div style={{ marginTop: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        Recipient Mobile Number(s) <span style={{ color: '#ef4444' }}>*</span>
+                        {t('bulkSms.recipientNumbersLabel', 'Recipient Mobile Number(s)')} <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <span style={{ fontSize: '0.72rem', color: parsedRecipientsList.length > 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
-                        {formatNumber(parsedRecipientsList.length)} valid number{parsedRecipientsList.length === 1 ? '' : 's'} detected
+                        {formatNumber(parsedRecipientsList.length)} {t('bulkSms.validNumbersDetected', 'valid numbers detected')}
                       </span>
                     </div>
                     <textarea
                       rows={2}
-                      placeholder="e.g. 01740719204, 01586335334 (separate by comma or newline)"
+                      placeholder={t('bulkSms.recipientNumbersPlaceholder', 'e.g. 01740719204, 01586335334 (separate by comma or newline)')}
                       value={recipientNumbers}
                       onChange={e => setRecipientNumbers(e.target.value)}
                       style={{
@@ -3280,7 +3282,7 @@ export default function BulkSMSPage() {
                       required
                     />
                     <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>Quick add:</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>{t('bulkSms.quickAdd', 'Quick add:')}</span>
                       {['01740719204', '01586335334'].map(sample => (
                         <button
                           key={sample}
@@ -3312,7 +3314,7 @@ export default function BulkSMSPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                      {t('bulkSms.senderMaskingLabel') || 'Sender Masking / ID'}
+                      {t('bulkSms.senderMaskingLabel', 'Sender Masking / ID')}
                     </label>
                     <select
                       value={senderId}
@@ -3323,9 +3325,9 @@ export default function BulkSMSPage() {
                       }}
                       style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.85rem' }}
                     >
-                      <option value="8809639228875">8809639228875 (Verified Non-Masking)</option>
-                      <option value="SCHOOLCARE">SCHOOLCARE (Masked)</option>
-                      <option value="EDUALERT">EDUALERT (Emergency)</option>
+                      <option value="8809639228875">8809639228875 ({t('bulkSms.verifiedNonMasking', 'Verified Non-Masking')})</option>
+                      <option value="SCHOOLCARE">SCHOOLCARE ({t('bulkSms.masked', 'Masked')})</option>
+                      <option value="EDUALERT">EDUALERT ({t('bulkSms.emergency', 'Emergency')})</option>
                     </select>
                   </div>
 
@@ -3648,31 +3650,31 @@ export default function BulkSMSPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.targetGroup') || 'Audience'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.targetGroup', 'Audience')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {selectedLog.targetAudience}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colRecipients') || 'Recipients'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colRecipients', 'Recipients')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '0.15rem' }}>
-                    {formatNumber(selectedLog.recipientCount)} {t('bulkSms.contacts') || 'Contacts'} ({formatNumber(selectedLog.smsParts)} {t('bulkSms.smsPerRecipient') || 'SMS/recp'})
+                    {formatNumber(selectedLog.recipientCount)} {t('bulkSms.contacts', 'Contacts')} ({formatNumber(selectedLog.smsParts)} {t('bulkSms.smsPerRecipient', 'SMS/recp')})
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.creditsDeducted') || 'Credits Deducted'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.creditsDeducted', 'Credits Deducted')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4f46e5', marginTop: '0.15rem' }}>
-                    {formatNumber(selectedLog.creditsDeducted)} {t('bulkSms.credits') || 'Credits'}
+                    {formatNumber(selectedLog.creditsDeducted)} {t('bulkSms.credits', 'Credits')}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Status & Response</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colStatus', 'Status')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: selectedLog.status.toUpperCase() === 'FAILED' ? '#dc2626' : '#16a34a', marginTop: '0.15rem' }}>
-                    {selectedLog.status} {selectedLog.responseCode ? `(${selectedLog.responseCode})` : ''}
+                    {getLogStatusLabel(selectedLog.status)} {selectedLog.responseCode ? `(${selectedLog.responseCode})` : ''}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Batch / Message ID</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.colBatchMsgId', 'Batch / Msg ID')}</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', marginTop: '0.15rem' }}>
                     {selectedLog.batchId ? `#${selectedLog.batchId}` : '—'} {selectedLog.messageId ? `· ${selectedLog.messageId}` : ''}
                   </div>
@@ -3681,7 +3683,7 @@ export default function BulkSMSPage() {
 
               {selectedLog.recipients && selectedLog.recipients.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>Recipient Numbers</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.recipientNumbersLabel', 'Recipient Mobile Number(s)')}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
                     {selectedLog.recipients.map((num, i) => (
                       <span key={i} style={{ fontSize: '0.75rem', fontFamily: 'monospace', padding: '0.15rem 0.5rem', background: 'var(--muted)', borderRadius: '4px', color: 'var(--foreground)' }}>
@@ -3693,7 +3695,7 @@ export default function BulkSMSPage() {
               )}
 
               <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentDateTime') || 'Sent Date & Time'}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.sentDateTime', 'Sent Date & Time')}</div>
                 <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--foreground)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
                   <Calendar size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                   <span style={{ whiteSpace: 'nowrap' }}>{formatSingleLineDate(selectedLog.createdAt)}</span>
@@ -3702,7 +3704,7 @@ export default function BulkSMSPage() {
 
               {selectedLog.message && (
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.broadcastMessage') || 'Broadcast Message'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{t('bulkSms.broadcastMessage', 'Broadcast Message')}</div>
                   <div style={{ fontSize: '0.84rem', color: 'var(--foreground)', marginTop: '0.2rem', padding: '0.75rem', background: 'var(--muted)', borderRadius: '0.5rem', lineHeight: 1.45 }}>
                     {selectedLog.message}
                   </div>
@@ -3735,7 +3737,7 @@ export default function BulkSMSPage() {
                   }}
                 >
                   <Download size={15} />
-                  <span>{t('bulkSms.downloadReportPDF') || 'Download Report (PDF)'}</span>
+                  <span>{t('bulkSms.downloadReportPDF', 'Download Report (PDF)')}</span>
                 </button>
 
                 <button
@@ -3743,7 +3745,7 @@ export default function BulkSMSPage() {
                   onClick={() => setDetailsModalOpen(false)}
                   style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: 'none', background: '#4f46e5', color: '#ffffff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer' }}
                 >
-                  {t('common.close') || 'Close'}
+                  {t('common.close', 'Close')}
                 </button>
               </div>
             </div>
@@ -3797,14 +3799,14 @@ export default function BulkSMSPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
-                    {t('bulkSms.rechargeTitle') || 'Recharge SMS Credits'}
+                    {t('bulkSms.rechargeTitle', 'Recharge SMS Credits')}
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.15rem' }}>
                     <span style={{ fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
-                      Current Balance:
+                      {t('bulkSms.currentBalance', 'Current Balance:')}
                     </span>
                     <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#16a34a' }}>
-                      {formatNumber(quotaData?.balance ?? creditsBalance)} Credits
+                      {formatNumber(quotaData?.balance ?? creditsBalance)} {t('bulkSms.credits', 'Credits')}
                     </span>
                   </div>
                 </div>
@@ -3888,10 +3890,10 @@ export default function BulkSMSPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <label style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Select SMS Package ({packages.length})
+                    {t('bulkSms.selectPackage', 'Select SMS Package')} ({formatNumber(packages.length)})
                   </label>
                   <span style={{ fontSize: '0.74rem', color: 'var(--muted-foreground)' }}>
-                    Instant provisioning via gateway
+                    {t('bulkSms.instantProvisioning', 'Instant provisioning via gateway')}
                   </span>
                 </div>
 
@@ -3939,7 +3941,7 @@ export default function BulkSMSPage() {
                         cursor: 'pointer'
                       }}
                     >
-                      Retry Loading Packages
+                      {t('bulkSms.retryConnection', 'Retry Loading Packages')}
                     </button>
                   </div>
                 )}
@@ -4001,7 +4003,7 @@ export default function BulkSMSPage() {
                                   color: '#ffffff',
                                   fontWeight: 700
                                 }}>
-                                  ★ Popular
+                                  ★ {t('bulkSms.popular', 'Popular')}
                                 </span>
                               )}
                             </div>
@@ -4009,7 +4011,7 @@ export default function BulkSMSPage() {
                               {pkg.description || `${formatNumber(pkg.smsCount)} SMS bundle`}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: '#6366f1', fontWeight: 600, marginTop: '0.2rem' }}>
-                              ৳ {formatNumber(pkg.perSmsRate)} / SMS
+                              ৳ {formatNumber(pkg.perSmsRate)} {t('bulkSms.perSmsCost', '/ SMS')}
                             </div>
                           </div>
                         </div>
@@ -4019,7 +4021,7 @@ export default function BulkSMSPage() {
                             ৳ {formatNumber(pkg.price)}
                           </div>
                           <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                            {formatNumber(pkg.smsCount)} <span style={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>Credits</span>
+                            {formatNumber(pkg.smsCount)} <span style={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>{t('bulkSms.credits', 'Credits')}</span>
                           </div>
                         </div>
                       </div>
@@ -4040,22 +4042,22 @@ export default function BulkSMSPage() {
                   gap: '0.95rem'
                 }}>
                   <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    Payment & Checkout Details
+                    {t('bulkSms.checkoutDetails', 'Payment & Checkout Details')}
                   </div>
 
                   {/* Payment Method Selector */}
                   <div>
                     <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.4rem' }}>
-                      Payment Method
+                      {t('bulkSms.paymentMethod', 'Payment Method')}
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
                       {(['WALLET', 'BKASH', 'NAGAD', 'BANK_TRANSFER'] as const).map(pm => {
                         const isPmSelected = buyPaymentMethod === pm;
                         const labels = {
-                          WALLET: 'Wallet',
-                          BKASH: 'bKash',
-                          NAGAD: 'Nagad',
-                          BANK_TRANSFER: 'Bank'
+                          WALLET: t('bulkSms.pmWallet', 'Wallet'),
+                          BKASH: t('bulkSms.pmBkash', 'bKash'),
+                          NAGAD: t('bulkSms.pmNagad', 'Nagad'),
+                          BANK_TRANSFER: t('bulkSms.pmBank', 'Bank')
                         };
 
                         return (
@@ -4102,7 +4104,7 @@ export default function BulkSMSPage() {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                        Transaction ID / Reference
+                        {t('bulkSms.txnIdLabel', 'Transaction ID / Reference')}
                       </label>
                       <button
                         type="button"
@@ -4112,7 +4114,7 @@ export default function BulkSMSPage() {
                         }}
                         style={{ background: 'none', border: 'none', padding: 0, color: '#4f46e5', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Auto-generate
+                        {t('bulkSms.autoGenerate', 'Auto-generate')}
                       </button>
                     </div>
                     <input
@@ -4139,7 +4141,7 @@ export default function BulkSMSPage() {
                   {/* Notes Input */}
                   <div>
                     <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                      Notes / Remarks
+                      {t('bulkSms.notesLabel', 'Notes / Remarks')}
                     </label>
                     <input
                       type="text"
@@ -4173,17 +4175,17 @@ export default function BulkSMSPage() {
                     fontSize: '0.8rem'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--muted-foreground)' }}>Package:</span>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{t('bulkSms.package', 'Package:')}</span>
                       <strong style={{ color: 'var(--foreground)' }}>{selectedPackage.name} (+{formatNumber(selectedPackage.smsCount)} SMS)</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--muted-foreground)' }}>Amount Payable:</span>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{t('bulkSms.amountPayable', 'Amount Payable:')}</span>
                       <strong style={{ color: '#16a34a', fontSize: '0.9rem' }}>৳ {formatNumber(selectedPackage.price)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
-                      <span style={{ color: 'var(--muted-foreground)' }}>Balance After Recharge:</span>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{t('bulkSms.balanceAfter', 'Balance After Recharge:')}</span>
                       <strong style={{ color: '#4f46e5' }}>
-                        {formatNumber((quotaData?.balance ?? creditsBalance) + selectedPackage.smsCount)} Credits
+                        {formatNumber((quotaData?.balance ?? creditsBalance) + selectedPackage.smsCount)} {t('bulkSms.credits', 'Credits')}
                       </strong>
                     </div>
                   </div>
@@ -4224,7 +4226,7 @@ export default function BulkSMSPage() {
                   cursor: isBuying ? 'not-allowed' : 'pointer'
                 }}
               >
-                {t('common.cancel') || 'Cancel'}
+                {t('common.cancel', 'Cancel')}
               </button>
 
               <button
@@ -4250,15 +4252,15 @@ export default function BulkSMSPage() {
                 {isBuying ? (
                   <>
                     <RefreshCw size={15} className="animate-spin" />
-                    <span>Processing Purchase...</span>
+                    <span>{t('bulkSms.processingPurchase', 'Processing Purchase...')}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 size={16} />
                     <span>
                       {selectedPackage
-                        ? `Buy for ৳${formatNumber(selectedPackage.price)}`
-                        : 'Select a Package'}
+                        ? `${t('bulkSms.buyFor', 'Buy for ৳')}${formatNumber(selectedPackage.price)}`
+                        : t('bulkSms.selectAPackage', 'Select a Package')}
                     </span>
                   </>
                 )}
