@@ -15,7 +15,7 @@ import { getPdfTools } from '@/lib/pdf';
 
 const API_BASE_URL = 'https://smart-school-backend-production.up.railway.app';
 const DEFAULT_FALLBACK_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc5NDY2NDIzMiwiZXhwIjoxNzk0NzUwNjMyfQ.A4UUzOYiHC3F_UsgUlgFkDJ7qcLSS_4cB5QlSeNvbHk';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYTBjM2ZmZi1hZTU5LTQ2YTMtYTAzNy0xOWZhNjgwMDNjNmIiLCJyb2xlIjoiYWRtaW4iLCJzY2hvb2xJZCI6IjI5ZjA1ZWRiLThlMGItNDM0Yy1hNDcxLWFhNzc2MzA4YTFjMSIsImNsYXNzSWRzIjpbXSwic2VjdGlvbklkcyI6W10sImlhdCI6MTc5NDcxNzY5NSwiZXhwIjoxNzk0ODA0MDk1fQ.tRKon7aVOCH0dmUD76M-MhvieFqWrMzo3djs4YWTwPE';
 
 const getApiToken = () => {
   if (typeof window !== 'undefined') {
@@ -28,6 +28,19 @@ const getApiToken = () => {
   }
   return DEFAULT_FALLBACK_TOKEN;
 };
+
+interface SmsQuotaPackage {
+  id: string;
+  name: string;
+  smsCount: number;
+  price: number;
+  perSmsRate: number;
+  description?: string;
+  isActive: boolean;
+  isPopular?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface SmsQuotaTransaction {
   id: string;
@@ -228,6 +241,20 @@ export default function BulkSMSPage() {
   const [txPage, setTxPage] = useState(1);
   const [txLimit, setTxLimit] = useState(10);
 
+  // SMS Packages & Buy State (from /sms/quota/packages and /sms/quota/buy)
+  const [packages, setPackages] = useState<SmsQuotaPackage[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState<boolean>(false);
+  const [packagesError, setPackagesError] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<SmsQuotaPackage | null>(null);
+
+  // Buy Form State
+  const [buyPaymentMethod, setBuyPaymentMethod] = useState<'WALLET' | 'BKASH' | 'NAGAD' | 'BANK_TRANSFER'>('WALLET');
+  const [buyTransactionId, setBuyTransactionId] = useState<string>('BKASH-TXN-98472910');
+  const [buyNotes, setBuyNotes] = useState<string>('Paid via bKash Merchant');
+  const [isBuying, setIsBuying] = useState<boolean>(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const [buySuccessMessage, setBuySuccessMessage] = useState<string | null>(null);
+
   // Helper for Bengali number conversion
   const formatNumber = (num: number | string) => {
     if (num === null || num === undefined || num === '') return '';
@@ -296,6 +323,132 @@ export default function BulkSMSPage() {
   useEffect(() => {
     fetchQuotaStatus();
   }, [fetchQuotaStatus]);
+
+  // Fetch SMS packages from GET /sms/quota/packages
+  const fetchPackages = useCallback(async () => {
+    setPackagesLoading(true);
+    setPackagesError(null);
+    try {
+      const token = getApiToken();
+      const res = await fetch(`${API_BASE_URL}/sms/quota/packages`, {
+        method: 'GET',
+        headers: {
+          accept: '*/*',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to load SMS packages (${res.status} ${res.statusText})`);
+      }
+
+      const json = await res.json();
+      if (json && Array.isArray(json.data)) {
+        setPackages(json.data);
+        setSelectedPackage(prev => {
+          if (prev) {
+            const found = json.data.find((p: SmsQuotaPackage) => p.id === prev.id);
+            if (found) return found;
+          }
+          return json.data.find((p: SmsQuotaPackage) => p.isPopular) || json.data[0] || null;
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching SMS packages:', err);
+      setPackagesError(err?.message || 'Failed to load available SMS packages');
+    } finally {
+      setPackagesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPackages();
+  }, [fetchPackages]);
+
+  // Handle Buy Package via POST /sms/quota/buy
+  const handleBuyPackage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedPackage) {
+      setBuyError('Please select an SMS package to purchase.');
+      return;
+    }
+
+    setBuyError(null);
+    setIsBuying(true);
+    setBuySuccessMessage(null);
+
+    const generatedTxnId =
+      buyTransactionId.trim() ||
+      `${buyPaymentMethod}-TXN-${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+    try {
+      const token = getApiToken();
+      const payload = {
+        packageId: selectedPackage.id,
+        paymentMethod: buyPaymentMethod,
+        transactionId: generatedTxnId,
+        notes: buyNotes.trim() || `Purchased ${selectedPackage.name}`,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/sms/quota/buy`, {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || (json && json.statusCode && json.statusCode >= 400)) {
+        throw new Error(json?.message || `Purchase failed (${res.status} ${res.statusText})`);
+      }
+
+      const resData = json?.data;
+      const successMsg =
+        json?.data?.message ||
+        `Successfully purchased ${formatNumber(selectedPackage.smsCount)} SMS credits!`;
+
+      // Update quota state immediately
+      if (resData?.quota) {
+        setQuotaData(prev =>
+          prev
+            ? {
+                ...prev,
+                balance: resData.quota.balance,
+                totalPurchased: resData.quota.totalPurchased,
+                totalUsed: resData.quota.totalUsed,
+                isLowBalance:
+                  resData.quota.balance <= (prev.lowBalanceThreshold || 50),
+                updatedAt: resData.quota.updatedAt,
+              }
+            : null
+        );
+        setCreditsBalance(resData.quota.balance);
+      } else {
+        setCreditsBalance(prev => prev + selectedPackage.smsCount);
+      }
+
+      setBuySuccessMessage(successMsg);
+      setBannerMessage(successMsg);
+
+      // Re-fetch live quota status and transactions
+      fetchQuotaStatus();
+
+      // Close modal after brief delay
+      setTimeout(() => {
+        setIsRechargeModalOpen(false);
+        setBuySuccessMessage(null);
+      }, 1600);
+    } catch (err: any) {
+      console.error('Error buying SMS package:', err);
+      setBuyError(err?.message || 'Failed to complete SMS quota purchase');
+    } finally {
+      setIsBuying(false);
+    }
+  };
 
   const handleCopySchoolId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -3206,18 +3359,18 @@ export default function BulkSMSPage() {
         </div>
       )}
 
-      {/* ── Modal: Recharge Credits ──────────────────────────────── */}
+      {/* ── Modal: Recharge Credits & Purchase Packages (GET /sms/quota/packages & POST /sms/quota/buy) ── */}
       {isRechargeModalOpen && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0, 0, 0, 0.55)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(5px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 100,
-          padding: '1.5rem',
+          padding: '1.25rem',
         }}>
           <div
             className="glass-card animate-fade-in"
@@ -3226,91 +3379,500 @@ export default function BulkSMSPage() {
               border: '1px solid var(--border)',
               borderRadius: '1.25rem',
               width: '100%',
-              maxWidth: '480px',
-              padding: '1.75rem',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              maxWidth: '560px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
               display: 'flex',
               flexDirection: 'column'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CreditCard size={20} />
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              background: 'var(--card)',
+              zIndex: 2
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CreditCard size={22} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--foreground)' }}>
                     {t('bulkSms.rechargeTitle') || 'Recharge SMS Credits'}
                   </h3>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
-                    {t('bulkSms.rechargeSubtitle') || 'Choose a package to recharge instantly'}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.15rem' }}>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
+                      Current Balance:
+                    </span>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#16a34a' }}>
+                      {formatNumber(quotaData?.balance ?? creditsBalance)} Credits
+                    </span>
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsRechargeModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.25rem' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {[
-                { credits: 5000, price: 1750, perSmsRate: '0.35', popular: false },
-                { credits: 15000, price: 4800, perSmsRate: '0.32', popular: true },
-                { credits: 30000, price: 9000, perSmsRate: '0.30', popular: false },
-                { credits: 60000, price: 16800, perSmsRate: '0.28', popular: false },
-              ].map(pkg => (
-                <div
-                  key={pkg.credits}
-                  onClick={() => handleRechargeCredits(pkg.credits)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={fetchPackages}
+                  disabled={packagesLoading}
+                  title="Reload Packages"
                   style={{
-                    padding: '1rem',
-                    borderRadius: '0.75rem',
-                    border: pkg.popular ? '2px solid #4f46e5' : '1px solid var(--border)',
-                    background: pkg.popular ? 'rgba(79, 70, 229, 0.05)' : 'var(--background)',
+                    background: 'none',
+                    border: '1px solid var(--border)',
+                    borderRadius: '0.5rem',
+                    padding: '0.35rem',
+                    color: 'var(--muted-foreground)',
+                    cursor: packagesLoading ? 'not-allowed' : 'pointer',
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
+                    justifyContent: 'center'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#4f46e5')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = pkg.popular ? '#4f46e5' : 'var(--border)')}
                 >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                        {formatNumber(pkg.credits)} {t('bulkSms.credits') || 'Credits'}
-                      </span>
-                      {pkg.popular && (
-                        <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '99px', background: '#4f46e5', color: 'white', fontWeight: 700 }}>
-                          {t('bulkSms.bestValue') || 'Best Value'}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>
-                      ৳ {formatNumber(pkg.perSmsRate)} {t('bulkSms.perSmsCost') || '/ SMS'}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#16a34a' }}>
-                    ৳ {formatNumber(pkg.price)}
-                  </div>
-                </div>
-              ))}
+                  <RefreshCw size={14} className={packagesLoading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRechargeModalOpen(false);
+                    setBuyError(null);
+                    setBuySuccessMessage(null);
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.35rem', borderRadius: '0.5rem' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              {/* Alert: Buy Error */}
+              {buyError && (
+                <div style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: '0.75rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#b91c1c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 600
+                }}>
+                  <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                  <span>{buyError}</span>
+                </div>
+              )}
+
+              {/* Alert: Buy Success */}
+              {buySuccessMessage && (
+                <div style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: '0.75rem',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  color: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 600
+                }}>
+                  <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+                  <span>{buySuccessMessage}</span>
+                </div>
+              )}
+
+              {/* Package Selection Section */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    Select SMS Package ({packages.length})
+                  </label>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--muted-foreground)' }}>
+                    Instant provisioning via gateway
+                  </span>
+                </div>
+
+                {/* Loading Skeletons */}
+                {packagesLoading && packages.length === 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    {[1, 2, 3].map(i => (
+                      <div
+                        key={i}
+                        style={{
+                          height: '74px',
+                          borderRadius: '0.85rem',
+                          background: 'var(--muted)',
+                          opacity: 0.6,
+                          animation: 'pulse 1.5s infinite ease-in-out'
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Error Banner */}
+                {packagesError && packages.length === 0 && (
+                  <div style={{
+                    padding: '1rem',
+                    borderRadius: '0.85rem',
+                    border: '1px dashed rgba(239, 68, 68, 0.4)',
+                    background: 'rgba(239, 68, 68, 0.05)',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ margin: '0 0 0.65rem', fontSize: '0.84rem', color: '#b91c1c' }}>
+                      {packagesError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={fetchPackages}
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '0.55rem',
+                        border: '1px solid #ef4444',
+                        background: '#ffffff',
+                        color: '#b91c1c',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Retry Loading Packages
+                    </button>
+                  </div>
+                )}
+
+                {/* Available Packages List (Fetched from GET /sms/quota/packages) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {packages.map(pkg => {
+                    const isSelected = selectedPackage?.id === pkg.id;
+
+                    return (
+                      <div
+                        key={pkg.id}
+                        onClick={() => {
+                          setSelectedPackage(pkg);
+                          setBuyError(null);
+                        }}
+                        style={{
+                          padding: '0.9rem 1rem',
+                          borderRadius: '0.85rem',
+                          border: isSelected ? '2px solid #4f46e5' : '1px solid var(--border)',
+                          background: isSelected ? 'rgba(79, 70, 229, 0.04)' : 'var(--background)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 2px 8px rgba(79, 70, 229, 0.12)' : 'none'
+                        }}
+                        onMouseEnter={e => {
+                          if (!isSelected) e.currentTarget.style.borderColor = 'var(--foreground)';
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) e.currentTarget.style.borderColor = 'var(--border)';
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                          {/* Radio Selector */}
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            border: isSelected ? '5px solid #4f46e5' : '2px solid var(--muted-foreground)',
+                            background: '#ffffff',
+                            flexShrink: 0,
+                            transition: 'all 0.15s'
+                          }} />
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                                {pkg.name}
+                              </span>
+                              {pkg.isPopular && (
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  padding: '0.1rem 0.5rem',
+                                  borderRadius: '999px',
+                                  background: '#4f46e5',
+                                  color: '#ffffff',
+                                  fontWeight: 700
+                                }}>
+                                  ★ Popular
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>
+                              {pkg.description || `${formatNumber(pkg.smsCount)} SMS bundle`}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#6366f1', fontWeight: 600, marginTop: '0.2rem' }}>
+                              ৳ {formatNumber(pkg.perSmsRate)} / SMS
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '0.75rem' }}>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16a34a' }}>
+                            ৳ {formatNumber(pkg.price)}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                            {formatNumber(pkg.smsCount)} <span style={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>Credits</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 2: Payment Details & Checkout Section */}
+              {selectedPackage && (
+                <div style={{
+                  padding: '1.15rem',
+                  borderRadius: '0.9rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--muted)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.95rem'
+                }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    Payment & Checkout Details
+                  </div>
+
+                  {/* Payment Method Selector */}
+                  <div>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.4rem' }}>
+                      Payment Method
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                      {(['WALLET', 'BKASH', 'NAGAD', 'BANK_TRANSFER'] as const).map(pm => {
+                        const isPmSelected = buyPaymentMethod === pm;
+                        const labels = {
+                          WALLET: 'Wallet',
+                          BKASH: 'bKash',
+                          NAGAD: 'Nagad',
+                          BANK_TRANSFER: 'Bank'
+                        };
+
+                        return (
+                          <button
+                            key={pm}
+                            type="button"
+                            onClick={() => {
+                              setBuyPaymentMethod(pm);
+                              if (pm === 'BKASH') {
+                                setBuyTransactionId('BKASH-TXN-98472910');
+                                setBuyNotes('Paid via bKash Merchant');
+                              } else if (pm === 'NAGAD') {
+                                setBuyTransactionId('NAGAD-TXN-73629184');
+                                setBuyNotes('Paid via Nagad Gateway');
+                              } else if (pm === 'WALLET') {
+                                setBuyTransactionId('WALLET-TXN-54819203');
+                                setBuyNotes('Deducted from school wallet');
+                              } else {
+                                setBuyTransactionId('BANK-DEP-39182745');
+                                setBuyNotes('Direct bank deposit reference');
+                              }
+                            }}
+                            style={{
+                              padding: '0.5rem 0.25rem',
+                              borderRadius: '0.55rem',
+                              border: isPmSelected ? '1px solid #4f46e5' : '1px solid var(--border)',
+                              background: isPmSelected ? '#4f46e5' : 'var(--background)',
+                              color: isPmSelected ? '#ffffff' : 'var(--foreground)',
+                              fontSize: '0.78rem',
+                              fontWeight: isPmSelected ? 700 : 500,
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {labels[pm]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Transaction ID Input */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                        Transaction ID / Reference
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rand = Math.floor(10000000 + Math.random() * 90000000);
+                          setBuyTransactionId(`${buyPaymentMethod}-TXN-${rand}`);
+                        }}
+                        style={{ background: 'none', border: 'none', padding: 0, color: '#4f46e5', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Auto-generate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. BKASH-TXN-98472910"
+                      value={buyTransactionId}
+                      onChange={e => setBuyTransactionId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 0.75rem',
+                        borderRadius: '0.55rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.84rem',
+                        fontFamily: 'monospace',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Notes Input */}
+                  <div>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.35rem' }}>
+                      Notes / Remarks
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Paid via bKash Merchant"
+                      value={buyNotes}
+                      onChange={e => setBuyNotes(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 0.75rem',
+                        borderRadius: '0.55rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--background)',
+                        color: 'var(--foreground)',
+                        fontSize: '0.84rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Order Summary Box */}
+                  <div style={{
+                    padding: '0.85rem',
+                    borderRadius: '0.65rem',
+                    background: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.4rem',
+                    fontSize: '0.8rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--muted-foreground)' }}>Package:</span>
+                      <strong style={{ color: 'var(--foreground)' }}>{selectedPackage.name} (+{formatNumber(selectedPackage.smsCount)} SMS)</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--muted-foreground)' }}>Amount Payable:</span>
+                      <strong style={{ color: '#16a34a', fontSize: '0.9rem' }}>৳ {formatNumber(selectedPackage.price)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                      <span style={{ color: 'var(--muted-foreground)' }}>Balance After Recharge:</span>
+                      <strong style={{ color: '#4f46e5' }}>
+                        {formatNumber((quotaData?.balance ?? creditsBalance) + selectedPackage.smsCount)} Credits
+                      </strong>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div style={{
+              padding: '1.15rem 1.5rem',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              bottom: 0,
+              background: 'var(--card)',
+              zIndex: 2
+            }}>
               <button
                 type="button"
-                onClick={() => setIsRechargeModalOpen(false)}
-                style={{ padding: '0.6rem 1.25rem', borderRadius: '0.65rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+                onClick={() => {
+                  setIsRechargeModalOpen(false);
+                  setBuyError(null);
+                  setBuySuccessMessage(null);
+                }}
+                disabled={isBuying}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  borderRadius: '0.65rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: isBuying ? 'not-allowed' : 'pointer'
+                }}
               >
                 {t('common.cancel') || 'Cancel'}
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleBuyPackage()}
+                disabled={isBuying || !selectedPackage}
+                style={{
+                  padding: '0.65rem 1.45rem',
+                  borderRadius: '0.65rem',
+                  border: 'none',
+                  background: !selectedPackage ? 'var(--muted)' : 'linear-gradient(135deg, #16a34a, #15803d)',
+                  color: !selectedPackage ? 'var(--muted-foreground)' : '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: isBuying || !selectedPackage ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: selectedPackage && !isBuying ? '0 4px 15px rgba(22, 163, 74, 0.3)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {isBuying ? (
+                  <>
+                    <RefreshCw size={15} className="animate-spin" />
+                    <span>Processing Purchase...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>
+                      {selectedPackage
+                        ? `Buy for ৳${formatNumber(selectedPackage.price)}`
+                        : 'Select a Package'}
+                    </span>
+                  </>
+                )}
+              </button>
             </div>
+
           </div>
         </div>
       )}
