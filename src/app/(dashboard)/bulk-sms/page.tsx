@@ -69,6 +69,17 @@ interface SmsQuotaStatusData {
   updatedAt: string;
 }
 
+interface SchoolContact {
+  id: string;
+  name: string;
+  role: 'student' | 'teacher' | 'staff' | 'admin' | string;
+  phone: string;
+  className?: string;
+  classId?: string;
+  classIds?: string[];
+  rollNumber?: string | null;
+}
+
 // Live SMS log item from GET /sms/logs
 interface SmsLogItem {
   id: string;
@@ -470,7 +481,7 @@ export default function BulkSMSPage() {
   // Compose State
   const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'teachers' | 'custom'>('custom');
   const [recipientNumbers, setRecipientNumbers] = useState('01740719204');
-  const [selectedClass, setSelectedClass] = useState('Class 9');
+  const [selectedClass, setSelectedClass] = useState('Nursery');
   const [selectedSection, setSelectedSection] = useState('All Sections');
   const [senderId, setSenderId] = useState('8809639228875');
   const [isMasked, setIsMasked] = useState(false);
@@ -483,11 +494,222 @@ export default function BulkSMSPage() {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
+  // School Contacts directory state (for Compose target selection)
+  const [schoolContacts, setSchoolContacts] = useState<SchoolContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [showContactDirectory, setShowContactDirectory] = useState(false);
+
   // Notification Banner
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
   // Copy template indicator
   const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null);
+
+  // Fetch school contacts from /admin/users
+  const fetchSchoolContacts = useCallback(async () => {
+    setContactsLoading(true);
+    try {
+      const token = getApiToken();
+      const res = await fetch(`${API_BASE_URL}/admin/users?page=1&limit=250`, {
+        method: 'GET',
+        headers: { accept: '*/*', Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const list = json?.data?.data || json?.data?.items || json?.data?.users || [];
+        const mapped: SchoolContact[] = list.map((u: any) => {
+          const rawPhone = (u.phone || u.guardianPhone || '').trim();
+          const cleanP = rawPhone.replace(/[^0-9+]/g, '');
+          const primaryClass = u.classes?.[0];
+          const classIds = Array.isArray(u.classIds) ? u.classIds : (u.classes?.map((c: any) => c.id) || []);
+          return {
+            id: u.id,
+            name: u.name || 'Unnamed',
+            role: u.role || 'student',
+            phone: cleanP,
+            className: primaryClass?.name || u.class?.name || (u.classes?.map((c: any) => c.name).join(', ') || ''),
+            classId: primaryClass?.id || u.classId || '',
+            classIds: classIds,
+            rollNumber: u.rollNumber || null
+          };
+        }).filter((c: SchoolContact) => c.phone && c.phone.length >= 8);
+        setSchoolContacts(mapped);
+
+        // Pre-select nursery class default if present
+        const hasNursery = mapped.some(c => c.className?.toLowerCase().includes('nursery'));
+        if (hasNursery) {
+          setSelectedClass('Nursery');
+        } else if (mapped.length > 0 && mapped[0].className) {
+          setSelectedClass(mapped[0].className);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching contacts for bulk SMS:', err);
+    } finally {
+      setContactsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchoolContacts();
+  }, [fetchSchoolContacts]);
+
+  // Extract available classes dynamically from school contacts
+  const availableClasses = useMemo(() => {
+    const map = new Map<string, string>();
+    schoolContacts.forEach(c => {
+      if (c.className && c.classId) {
+        map.set(c.classId, c.className);
+      } else if (c.className) {
+        map.set(c.className, c.className);
+      }
+    });
+    const arr = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    if (arr.length > 0) return arr;
+    return [
+      { id: 'Nursery', name: 'Nursery' },
+      { id: 'Play', name: 'Play' },
+      { id: 'Five', name: 'Five' },
+      { id: 'Hifz', name: 'Hifz' },
+      { id: 'Nurani', name: 'Nurani' }
+    ];
+  }, [schoolContacts]);
+
+  // Contacts counts per audience
+  const allParentsCount = useMemo(() => {
+    const count = schoolContacts.filter(x => x.role === 'student').length;
+    return count > 0 ? count : 108;
+  }, [schoolContacts]);
+
+  const classCount = useMemo(() => {
+    const count = schoolContacts.filter(x => 
+      x.role === 'student' && (
+        x.className === selectedClass || 
+        x.classId === selectedClass ||
+        (x.className && selectedClass && x.className.toLowerCase() === selectedClass.toLowerCase()) ||
+        (x.classIds && x.classIds.includes(selectedClass))
+      )
+    ).length;
+    return count > 0 ? count : (availableClasses.length > 0 ? 15 : 120);
+  }, [schoolContacts, selectedClass, availableClasses]);
+
+  const staffCount = useMemo(() => {
+    const count = schoolContacts.filter(x => x.role !== 'student').length;
+    return count > 0 ? count : 13;
+  }, [schoolContacts]);
+
+  // Handler to set automatically phone numbers when selecting an audience option
+  const applyAudienceSelection = useCallback((aud: 'all' | 'class' | 'teachers' | 'custom', customClassVal?: string) => {
+    setTargetAudience(aud);
+    let matched: SchoolContact[] = [];
+
+    if (aud === 'all') {
+      matched = schoolContacts.filter(c => c.role === 'student' && c.phone);
+    } else if (aud === 'class') {
+      const cls = customClassVal !== undefined ? customClassVal : selectedClass;
+      matched = schoolContacts.filter(c => 
+        c.role === 'student' && c.phone && (
+          c.classId === cls || 
+          c.className === cls ||
+          (c.className && cls && c.className.toLowerCase() === cls.toLowerCase()) ||
+          (c.classIds && c.classIds.includes(cls))
+        )
+      );
+      if (matched.length === 0 && schoolContacts.some(c => c.role === 'student')) {
+        const firstStudent = schoolContacts.find(c => c.role === 'student');
+        if (firstStudent?.className) {
+          setSelectedClass(firstStudent.className);
+          matched = schoolContacts.filter(c => c.role === 'student' && c.className === firstStudent.className);
+        }
+      }
+    } else if (aud === 'teachers') {
+      matched = schoolContacts.filter(c => c.role !== 'student' && c.phone);
+    } else if (aud === 'custom') {
+      matched = schoolContacts.filter(c => selectedContactIds.includes(c.id));
+      if (matched.length === 0 && !recipientNumbers.trim()) {
+        setRecipientNumbers('01740719204');
+        return;
+      }
+    }
+
+    const ids = matched.map(c => c.id);
+    setSelectedContactIds(ids);
+
+    const phones = Array.from(new Set(matched.map(c => c.phone).filter(Boolean)));
+    if (phones.length > 0) {
+      setRecipientNumbers(phones.join(', '));
+    }
+  }, [schoolContacts, selectedClass, selectedContactIds, recipientNumbers]);
+
+  const selectedContacts = useMemo(() => {
+    return schoolContacts.filter(c => selectedContactIds.includes(c.id));
+  }, [schoolContacts, selectedContactIds]);
+
+  const filteredDirectoryContacts = useMemo(() => {
+    let pool = schoolContacts;
+    if (targetAudience === 'all') {
+      pool = schoolContacts.filter(c => c.role === 'student');
+    } else if (targetAudience === 'class') {
+      pool = schoolContacts.filter(c => 
+        c.role === 'student' && (
+          c.classId === selectedClass ||
+          c.className === selectedClass ||
+          (c.className && selectedClass && c.className.toLowerCase() === selectedClass.toLowerCase()) ||
+          (c.classIds && c.classIds.includes(selectedClass))
+        )
+      );
+    } else if (targetAudience === 'teachers') {
+      pool = schoolContacts.filter(c => c.role !== 'student');
+    }
+
+    if (!contactSearchQuery.trim()) return pool;
+    const q = contactSearchQuery.toLowerCase();
+    return pool.filter(c => 
+      c.name.toLowerCase().includes(q) ||
+      c.phone.includes(q) ||
+      (c.className && c.className.toLowerCase().includes(q)) ||
+      (c.rollNumber && c.rollNumber.includes(q))
+    );
+  }, [schoolContacts, targetAudience, selectedClass, contactSearchQuery]);
+
+  const handleToggleContact = (contact: SchoolContact) => {
+    const isAlreadySelected = selectedContactIds.includes(contact.id);
+    let newIds: string[];
+    if (isAlreadySelected) {
+      newIds = selectedContactIds.filter(id => id !== contact.id);
+    } else {
+      newIds = [...selectedContactIds, contact.id];
+    }
+    setSelectedContactIds(newIds);
+
+    const activeSelected = schoolContacts.filter(c => newIds.includes(c.id));
+    const phones = Array.from(new Set(activeSelected.map(c => c.phone).filter(Boolean)));
+    setRecipientNumbers(phones.join(', '));
+  };
+
+  const handleRemoveContact = (contactId: string) => {
+    const newIds = selectedContactIds.filter(id => id !== contactId);
+    setSelectedContactIds(newIds);
+    const activeSelected = schoolContacts.filter(c => newIds.includes(c.id));
+    const phones = Array.from(new Set(activeSelected.map(c => c.phone).filter(Boolean)));
+    setRecipientNumbers(phones.join(', '));
+  };
+
+  const handleSelectAllVisible = () => {
+    const visibleIds = filteredDirectoryContacts.map(c => c.id);
+    const newIds = Array.from(new Set([...selectedContactIds, ...visibleIds]));
+    setSelectedContactIds(newIds);
+    const activeSelected = schoolContacts.filter(c => newIds.includes(c.id));
+    const phones = Array.from(new Set(activeSelected.map(c => c.phone).filter(Boolean)));
+    setRecipientNumbers(phones.join(', '));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedContactIds([]);
+    setRecipientNumbers('');
+  };
 
   // Calculations for Compose
   const charLength = message.length;
@@ -2692,22 +2914,27 @@ export default function BulkSMSPage() {
 
                 {/* Target Audience Tabs */}
                 <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', display: 'block', marginBottom: '0.35rem' }}>
-                    {t('bulkSms.targetAudienceLabel') || 'Target Audience'} <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      {t('bulkSms.targetAudienceLabel') || 'Target Audience'} <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>
+                      Select audience to auto-populate phone numbers
+                    </span>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                     {[
-                      { id: 'all', label: t('bulkSms.audAllParents') || 'All Parents', count: formatNumber(1350), icon: Users },
-                      { id: 'class', label: t('bulkSms.audClassOption') || 'Class', count: formatNumber(120), icon: GraduationCap },
-                      { id: 'teachers', label: t('bulkSms.audStaffOption') || 'Staff', count: formatNumber(68), icon: UserCheck },
-                      { id: 'custom', label: t('bulkSms.audCustomOption') || 'Custom', count: formatNumber(45), icon: Smartphone },
+                      { id: 'all', label: t('bulkSms.audAllParents') || 'All Parents', count: formatNumber(allParentsCount), icon: Users },
+                      { id: 'class', label: t('bulkSms.audClassOption') || 'Class', count: formatNumber(classCount), icon: GraduationCap },
+                      { id: 'teachers', label: t('bulkSms.audStaffOption') || 'Staff', count: formatNumber(staffCount), icon: UserCheck },
+                      { id: 'custom', label: t('bulkSms.audCustomOption') || 'Custom', count: formatNumber(selectedContactIds.length || parsedRecipientsList.length), icon: Smartphone },
                     ].map(aud => {
                       const isSelected = targetAudience === aud.id;
                       return (
                         <button
                           key={aud.id}
                           type="button"
-                          onClick={() => setTargetAudience(aud.id as 'all' | 'class' | 'teachers' | 'custom')}
+                          onClick={() => applyAudienceSelection(aud.id as 'all' | 'class' | 'teachers' | 'custom')}
                           style={{
                             padding: '0.65rem 0.4rem',
                             borderRadius: '0.65rem',
@@ -2719,7 +2946,8 @@ export default function BulkSMSPage() {
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '0.2rem'
+                            gap: '0.2rem',
+                            transition: 'all 0.15s'
                           }}
                         >
                           <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{aud.label}</span>
@@ -2731,36 +2959,304 @@ export default function BulkSMSPage() {
 
                   {/* Sub-selector for Class */}
                   {targetAudience === 'class' && (
-                    <div style={{ marginTop: '0.65rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                      <select
-                        value={selectedClass}
-                        onChange={e => setSelectedClass(e.target.value)}
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
-                      >
-                        {['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'HSC 1st Year', 'HSC 2nd Year'].map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={selectedSection}
-                        onChange={e => setSelectedSection(e.target.value)}
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
-                      >
-                        {['All Sections', 'Section A (Padma)', 'Section B (Meghna)', 'Section C (Jamuna)'].map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                    <div style={{ marginTop: '0.65rem', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.2rem' }}>
+                          Select Class (auto-loads enrolled students)
+                        </label>
+                        <select
+                          value={selectedClass}
+                          onChange={e => {
+                            setSelectedClass(e.target.value);
+                            applyAudienceSelection('class', e.target.value);
+                          }}
+                          style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
+                        >
+                          {availableClasses.map(c => {
+                            const count = schoolContacts.filter(x => x.role === 'student' && (x.className === c.name || x.classId === c.id)).length;
+                            return (
+                              <option key={c.id} value={c.name}>
+                                {c.name} ({formatNumber(count)} students)
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: '0.2rem' }}>
+                          Section
+                        </label>
+                        <select
+                          value={selectedSection}
+                          onChange={e => setSelectedSection(e.target.value)}
+                          style={{ width: '100%', padding: '0.55rem', borderRadius: '0.55rem', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.84rem' }}
+                        >
+                          {['All Sections', 'Boys', 'Girls', 'Section A', 'Section B'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   )}
 
-                  {/* Recipient Mobile Numbers Input */}
+                  {/* ── Selected Participants View (Bottom of Target Audience) ── */}
+                  <div style={{
+                    marginTop: '0.85rem',
+                    padding: '0.85rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--background)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <Users size={15} style={{ color: '#4f46e5' }} />
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                          Selected Participants ({formatNumber(selectedContacts.length)})
+                        </span>
+                        {contactsLoading && <RefreshCw size={12} className="animate-spin" style={{ color: '#4f46e5' }} />}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          onClick={handleSelectAllVisible}
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '0.45rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--card)',
+                            color: 'var(--foreground)',
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
+                        >
+                          Select All ({formatNumber(filteredDirectoryContacts.length)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeselectAll}
+                          disabled={selectedContactIds.length === 0}
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '0.45rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--card)',
+                            color: selectedContactIds.length === 0 ? 'var(--muted-foreground)' : '#ef4444',
+                            cursor: selectedContactIds.length === 0 ? 'not-allowed' : 'pointer',
+                            fontWeight: 600
+                          }}
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowContactDirectory(!showContactDirectory)}
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: '0.45rem',
+                            border: '1px solid #c7d2fe',
+                            background: showContactDirectory ? '#4f46e5' : '#eef2ff',
+                            color: showContactDirectory ? '#ffffff' : '#4f46e5',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}
+                        >
+                          <span>{showContactDirectory ? 'Hide Picker' : 'Choose Multiple Users'}</span>
+                          <ChevronDown size={12} style={{ transform: showContactDirectory ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Selected Participant Chips */}
+                    {selectedContacts.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.35rem',
+                        maxHeight: '130px',
+                        overflowY: 'auto',
+                        padding: '0.25rem 0'
+                      }}>
+                        {selectedContacts.slice(0, 30).map(c => (
+                          <div
+                            key={c.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '999px',
+                              background: 'var(--card)',
+                              border: '1px solid var(--border)',
+                              fontSize: '0.73rem',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            <span style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: '#e0e7ff',
+                              color: '#4338ca',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              {c.name ? c.name.charAt(0).toUpperCase() : 'U'}
+                            </span>
+                            <span style={{ fontWeight: 600 }}>{c.name}</span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>({c.phone})</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveContact(c.id)}
+                              title="Remove"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                color: 'var(--muted-foreground)',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        {selectedContacts.length > 30 && (
+                          <span style={{
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '999px',
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}>
+                            +{formatNumber(selectedContacts.length - 30)} more selected
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.76rem', color: 'var(--muted-foreground)', padding: '0.4rem 0' }}>
+                        No specific users selected. Pick users below or type phone numbers into the box.
+                      </div>
+                    )}
+
+                    {/* ── Choose Multiple Users Directory (Collapsible/Interactive) ── */}
+                    {showContactDirectory && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px dashed var(--border)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            flex: 1,
+                            border: '1px solid var(--border)',
+                            borderRadius: '0.5rem',
+                            padding: '0 0.6rem',
+                            height: '32px',
+                            background: 'var(--card)'
+                          }}>
+                            <Search size={13} style={{ color: 'var(--muted-foreground)', marginRight: '0.35rem' }} />
+                            <input
+                              type="text"
+                              placeholder="Search by name, phone, or class..."
+                              value={contactSearchQuery}
+                              onChange={e => setContactSearchQuery(e.target.value)}
+                              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.78rem', color: 'var(--foreground)' }}
+                            />
+                            {contactSearchQuery && (
+                              <button type="button" onClick={() => setContactSearchQuery('')} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--muted-foreground)' }}>
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                            {formatNumber(filteredDirectoryContacts.length)} users
+                          </span>
+                        </div>
+
+                        {/* Directory Checklist */}
+                        <div style={{
+                          maxHeight: '160px',
+                          overflowY: 'auto',
+                          border: '1px solid var(--border)',
+                          borderRadius: '0.55rem',
+                          background: 'var(--card)'
+                        }}>
+                          {filteredDirectoryContacts.length === 0 ? (
+                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.76rem', color: 'var(--muted-foreground)' }}>
+                              No users match search query.
+                            </div>
+                          ) : (
+                            filteredDirectoryContacts.map(c => {
+                              const isChecked = selectedContactIds.includes(c.id);
+                              return (
+                                <div
+                                  key={c.id}
+                                  onClick={() => handleToggleContact(c)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '0.4rem 0.65rem',
+                                    borderBottom: '1px solid var(--border)',
+                                    cursor: 'pointer',
+                                    background: isChecked ? 'rgba(79, 70, 229, 0.05)' : 'transparent',
+                                    fontSize: '0.78rem',
+                                    transition: 'background 0.1s'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {}}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontWeight: isChecked ? 700 : 500, color: 'var(--foreground)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {c.name}
+                                      </div>
+                                      <div style={{ fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
+                                        {c.className ? `${c.className}${c.rollNumber ? ` • Roll: ${c.rollNumber}` : ''}` : c.role}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', fontFamily: 'monospace', color: isChecked ? '#4f46e5' : 'var(--foreground)', fontWeight: isChecked ? 700 : 400, marginLeft: '0.5rem', flexShrink: 0 }}>
+                                    {c.phone}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recipient Mobile Numbers Input (Synced with selection) */}
                   <div style={{ marginTop: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)' }}>
                         Recipient Mobile Number(s) <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <span style={{ fontSize: '0.72rem', color: parsedRecipientsList.length > 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
-                        {parsedRecipientsList.length} valid number{parsedRecipientsList.length === 1 ? '' : 's'} detected
+                        {formatNumber(parsedRecipientsList.length)} valid number{parsedRecipientsList.length === 1 ? '' : 's'} detected
                       </span>
                     </div>
                     <textarea
