@@ -6,17 +6,16 @@ import { useRouter } from 'next/navigation';
 import {
   Eye, EyeOff, GraduationCap, Users, BookOpen, Award,
   ShieldCheck, TrendingUp, Clock, ArrowRight, CheckCircle2,
-  Sparkles, Sun, Moon
+  Sparkles
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
 
+import { ThemeToggle } from '@/components/theme-toggle';
 import { useLanguage } from '@/components/language-provider';
 import { LanguageToggle } from '@/components/language-toggle';
 import { decodeJwt, fetchCurrentUserProfile, getCachedUserRole, clearAuthSession } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
   const { t } = useLanguage();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -164,19 +163,9 @@ export default function LoginPage() {
           <li><Link href="/#about">About</Link></li>
         </ul>
 
-        <div className="login-v2-nav-actions" style={{ display: 'flex', alignItems: 'center' }}>
+        <div className="login-v2-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <LanguageToggle />
-          {mounted && (
-            <button
-              className="icon-btn glass-card"
-              style={{ margin: '0 8px', width: '36px', height: '36px' }}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle Theme"
-            >
-              <Sun size={18} className="sun-icon" />
-              <Moon size={18} className="moon-icon" />
-            </button>
-          )}
+          <ThemeToggle />
           <Link href="/login" className="login-v2-nav-ghost">{t('nav.signIn')}</Link>
           <Link href="/register" className="login-v2-nav-cta">
             {t('nav.getStarted')} <ArrowRight size={14} />
@@ -227,7 +216,7 @@ export default function LoginPage() {
             {features.map((f, i) => (
               <div key={i} className="login-v2-feature-item">
                 <CheckCircle2 size={15} className="login-v2-check" />
-                <span style={{ color: '#cbd5e1' }}>{f.text}</span>
+                <span className="login-v2-feature-text">{f.text}</span>
               </div>
             ))}
           </div>
@@ -283,6 +272,11 @@ export default function LoginPage() {
                 <ShieldCheck size={11} />
                 <span>256-bit SSL</span>
               </div>
+            </div>
+
+            <div className="login-v2-portal-scope">
+              <span className="login-v2-scope-dot" />
+              <span>Administrator & Superadmin Portal</span>
             </div>
 
             <h2 className="login-v2-card-title">{t('auth.login.welcome')}</h2>

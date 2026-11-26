@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import {
   Eye, EyeOff, GraduationCap, ArrowRight, ArrowLeft,
   ShieldCheck, CheckCircle2, User, Mail, Phone, Lock,
-  Sparkles, Building2, BadgeCheck, Zap, Sun, Moon
+  Sparkles, Building2, BadgeCheck, Zap, Briefcase, ChevronDown
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
 
+import { ThemeToggle } from '@/components/theme-toggle';
 import { useLanguage } from '@/components/language-provider';
 import { LanguageToggle } from '@/components/language-toggle';
 
@@ -24,7 +24,6 @@ type FormData = {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
   const { t } = useLanguage();
   const [step, setStep] = useState(1); // 1 = personal info, 2 = security
   const [formData, setFormData] = useState<FormData>({
@@ -62,7 +61,7 @@ export default function RegisterPage() {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
-      setError('Please fill in all fields.');
+      setError('Please fill in all required fields.');
       return;
     }
     setError('');
@@ -72,6 +71,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.password) { setError('Please enter a password.'); return; }
+    if (formData.password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
     setLoading(true);
     setError('');
 
@@ -128,8 +128,6 @@ export default function RegisterPage() {
     { icon: <Building2 size={14} />, text: t('auth.reg.perk4') },
   ];
 
-  const steps = [t('auth.reg.step1.title'), t('auth.reg.step2.title')];
-
   return (
     <div className="reg-root">
 
@@ -144,24 +142,26 @@ export default function RegisterPage() {
       {/* ── Navbar ── */}
       <nav className="reg-nav">
         <Link href="/" className="reg-brand">
-          <div className="reg-brand-icon"><img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+          <div className="reg-brand-icon">
+            <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <span>SchoolCare</span>
         </Link>
-        <div className="reg-nav-actions" style={{ display: 'flex', alignItems: 'center' }}>
+
+        <ul className="reg-nav-links">
+          <li><Link href="/">Home</Link></li>
+          <li><Link href="/#features">Features</Link></li>
+          <li><Link href="/#pricing">Pricing</Link></li>
+          <li><Link href="/#about">About</Link></li>
+        </ul>
+
+        <div className="reg-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <LanguageToggle />
-          {mounted && (
-            <button
-              className="icon-btn glass-card"
-              style={{ margin: '0 16px', width: '36px', height: '36px' }}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle Theme"
-            >
-              <Sun size={18} className="sun-icon" />
-              <Moon size={18} className="moon-icon" />
-            </button>
-          )}
+          <ThemeToggle />
           <span className="reg-nav-hint">{t('auth.reg.already')}</span>
-          <Link href="/login" className="reg-nav-login">{t('auth.reg.signin')} <ArrowRight size={13} /></Link>
+          <Link href="/login" className="reg-nav-login">
+            {t('auth.reg.signin')} <ArrowRight size={13} />
+          </Link>
         </div>
       </nav>
 
@@ -221,19 +221,29 @@ export default function RegisterPage() {
                 <div className="reg-feature-dot green" />
                 <div className="reg-feature-dot yellow" />
                 <div className="reg-feature-dot red" />
-                <span className="reg-feature-card-title">{t('auth.reg.feature.title')}</span>
+                <span className="reg-feature-card-title">Production ERP Modules Included</span>
               </div>
               <div className="reg-feature-rows">
                 {[
-                  { label: t('auth.reg.feature.1'), value: '97.4%', color: '#34d399' },
-                  { label: t('auth.reg.feature.2'), value: '14', color: '#818cf8' },
-                  { label: t('auth.reg.feature.3'), value: '2', color: '#fbbf24' },
+                  { label: 'Student Directory & Biometric Attendance', status: 'Active Sync', color: '#10b981' },
+                  { label: 'Academic Transcripts & GPA Grading', status: 'Automated', color: '#6366f1' },
+                  { label: 'Tuition Invoicing & Parent SMS Alerts', status: 'Instant SMS', color: '#f59e0b' },
+                  { label: 'Staff Records, Payroll & Leave Tracking', status: 'Multi-Role', color: '#ec4899' },
                 ].map((row, i) => (
                   <div key={i} className="reg-feature-row">
                     <span className="reg-feature-row-label">{row.label}</span>
-                    <span className="reg-feature-row-value" style={{ color: row.color }}>{row.value}</span>
+                    <span
+                      className="reg-feature-row-value"
+                      style={{ color: row.color, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <CheckCircle2 size={12} /> {row.status}
+                    </span>
                   </div>
                 ))}
+              </div>
+              <div className="reg-feature-card-footer">
+                <Building2 size={13} style={{ color: '#7c3aed' }} />
+                <span>Verified across Manor Lakes College, Talimul Quran Cadet & Whitney High</span>
               </div>
             </div>
           </div>
@@ -256,26 +266,9 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Step indicator */}
-            <div className="reg-stepper">
-              {steps.map((label, i) => {
-                const sNum = i + 1;
-                const isDone = step > sNum;
-                const isActive = step === sNum;
-                return (
-                  <React.Fragment key={i}>
-                    <div className={`reg-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
-                      <div className="reg-step-circle">
-                        {isDone ? <CheckCircle2 size={13} /> : sNum}
-                      </div>
-                      <span className="reg-step-label">{label}</span>
-                    </div>
-                    {i < steps.length - 1 && (
-                      <div className={`reg-step-line ${isDone ? 'done' : ''}`} />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+            <div className="reg-portal-scope">
+              <span className="reg-scope-dot" />
+              <span>Institution Administrator Onboarding</span>
             </div>
 
             <h2 className="reg-card-title">
@@ -284,6 +277,22 @@ export default function RegisterPage() {
             <p className="reg-card-subtitle">
               {step === 1 ? t('auth.reg.step1.sub') : t('auth.reg.step2.sub')}
             </p>
+
+            {/* Sleek Segmented Stepper */}
+            <div className="reg-stepper" aria-label="Registration Progress">
+              <div className={`reg-step-item ${step === 1 ? 'active' : 'done'}`}>
+                <div className="reg-step-bar-line" />
+                <span className="reg-step-text">1. Account Details</span>
+              </div>
+              <div className={`reg-step-item ${step === 2 ? 'active' : ''}`}>
+                <div className="reg-step-bar-line" />
+                <span className="reg-step-text">2. Account Security</span>
+              </div>
+              <div className="reg-step-item upcoming">
+                <div className="reg-step-bar-line" />
+                <span className="reg-step-text">3. School Setup</span>
+              </div>
+            </div>
 
             {/* Error */}
             {error && (
@@ -354,6 +363,43 @@ export default function RegisterPage() {
                   <div className="reg-field-line" />
                 </div>
 
+                {/* Designation / Role Selector */}
+                <div className={`reg-field reg-select-wrap ${isActiveField('designation') ? 'active' : ''}`}>
+                  <div className="reg-field-icon"><Briefcase size={15} /></div>
+                  <select
+                    id="designation"
+                    className="reg-select"
+                    value={formData.designation}
+                    onChange={handleChange}
+                    onFocus={() => setFocusState('designation', true)}
+                    onBlur={() => setFocusState('designation', false)}
+                    required
+                  >
+                    <option value="Principal">Principal / Head of School</option>
+                    <option value="Vice Principal">Vice Principal / Academic Head</option>
+                    <option value="Director">Director / Trustee / Chairman</option>
+                    <option value="Administrator">Campus Administrator / IT Lead</option>
+                    <option value="Teacher / Faculty">Senior Faculty Member</option>
+                  </select>
+                  <label
+                    htmlFor="designation"
+                    className="reg-float-label"
+                    style={{ top: '0.55rem', fontSize: '0.68rem', fontWeight: 600 }}
+                  >
+                    Administrative Role
+                  </label>
+                  <div className="reg-select-arrow">
+                    <ChevronDown size={14} />
+                  </div>
+                  <div className="reg-field-line" />
+                </div>
+
+                {/* Helper Note */}
+                <div className="reg-helper-note">
+                  <ShieldCheck size={14} />
+                  <span>You will be granted Primary Master Authority to manage institution settings and staff.</span>
+                </div>
+
                 <button id="reg-next-btn" type="submit" className="reg-submit">
                   <span>{t('auth.reg.continue')}</span>
                   <ArrowRight size={16} />
@@ -364,6 +410,16 @@ export default function RegisterPage() {
             {/* ── STEP 2: Password ── */}
             {step === 2 && (
               <form onSubmit={handleSubmit} className="reg-form" noValidate>
+
+                {/* Admin recap summary */}
+                <div className="reg-user-summary">
+                  <User size={13} />
+                  <span>{formData.name || 'Lead Admin'}</span>
+                  <span className="reg-user-summary-dot" />
+                  <span>{formData.designation}</span>
+                  <span className="reg-user-summary-dot" />
+                  <span style={{ opacity: 0.85 }}>{formData.email}</span>
+                </div>
 
                 {/* Password field */}
                 <div className={`reg-field ${isActiveField('password') ? 'active' : ''}`}>
@@ -431,7 +487,25 @@ export default function RegisterPage() {
               </form>
             )}
 
-            {/* Footer */}
+            {/* Trust Footer */}
+            <div className="reg-card-footer">
+              <div className="reg-footer-item">
+                <ShieldCheck size={12} />
+                <span>256-bit SSL</span>
+              </div>
+              <div className="reg-footer-sep" />
+              <div className="reg-footer-item">
+                <Zap size={12} />
+                <span>Instant Activation</span>
+              </div>
+              <div className="reg-footer-sep" />
+              <div className="reg-footer-item">
+                <CheckCircle2 size={12} />
+                <span>No Credit Card</span>
+              </div>
+            </div>
+
+            {/* Terms and Privacy Footer */}
             <p className="reg-terms">
               {t('auth.reg.terms1')}{' '}
               <Link href="/terms">{t('footer.terms')}</Link> {t('auth.reg.terms2')}{' '}
