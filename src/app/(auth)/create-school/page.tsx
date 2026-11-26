@@ -216,7 +216,7 @@ export default function CreateSchoolPage() {
       {/* ── Navbar ── */}
       <nav className="cs-nav">
         <Link href="/" className="cs-brand">
-          <div className="cs-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
+          <div className="cs-brand-icon"><img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
           <span>SchoolCare</span>
         </Link>
         <div className="cs-nav-right">
@@ -299,7 +299,7 @@ export default function CreateSchoolPage() {
             <div className="cs-card-header">
               <div className="cs-card-brand">
                 <div className="cs-card-brand-icon">
-                  <GraduationCap size={16} strokeWidth={2.2} />
+                  <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <span>SchoolCare</span>
               </div>

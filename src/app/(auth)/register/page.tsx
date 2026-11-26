@@ -144,7 +144,7 @@ export default function RegisterPage() {
       {/* ── Navbar ── */}
       <nav className="reg-nav">
         <Link href="/" className="reg-brand">
-          <div className="reg-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
+          <div className="reg-brand-icon"><img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
           <span>SchoolCare</span>
         </Link>
         <div className="reg-nav-actions" style={{ display: 'flex', alignItems: 'center' }}>
@@ -247,7 +247,7 @@ export default function RegisterPage() {
             <div className="reg-card-header">
               <div className="reg-card-brand">
                 <div className="reg-card-brand-icon">
-                  <GraduationCap size={16} strokeWidth={2.2} />
+                  <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <span>SchoolCare</span>
               </div>

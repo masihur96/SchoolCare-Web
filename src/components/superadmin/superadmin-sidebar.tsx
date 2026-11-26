@@ -164,16 +164,16 @@ export function SuperadminSidebar() {
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                overflow: 'hidden',
+                background: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff',
-                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.35)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
                 flexShrink: 0,
               }}
             >
-              <ShieldCheck size={22} />
+              <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             {!isCollapsed && (
               <div style={{ display: 'flex', flexDirection: 'column' }}>

@@ -165,7 +165,7 @@ export default function TermsPage() {
       {/* ── Navbar ── */}
       <nav className="legal-nav">
         <Link href="/" className="legal-brand">
-          <div className="legal-brand-icon"><GraduationCap size={18} strokeWidth={2.2} /></div>
+          <div className="legal-brand-icon"><img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
           <span>SchoolCare</span>
         </Link>
         <div className="legal-nav-links">

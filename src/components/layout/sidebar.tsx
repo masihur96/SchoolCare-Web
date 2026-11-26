@@ -127,7 +127,7 @@ export function Sidebar() {
         <div className="nd-sidebar-header">
           <div className="nd-logo-wrapper">
             <div className="nd-logo-icon">
-              <img src="/schoolcare-logo.jpg" alt="App Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+              <img src="/schoolcare-logo.jpg" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
             </div>
             {!isCollapsed && <h2 className="nd-logo-text">SchoolCare AI <span className="nd-erp">ERP</span></h2>}
           </div>
@@ -307,13 +307,14 @@ export function Sidebar() {
         .nd-logo-icon {
           width: 32px;
           height: 32px;
-          background: #1e40af;
+          background: #ffffff;
           border-radius: 8px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 10px rgba(30, 64, 175, 0.2);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          overflow: hidden;
         }
 
         .nd-logo-text {

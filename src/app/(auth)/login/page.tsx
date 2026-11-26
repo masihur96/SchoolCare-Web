@@ -152,7 +152,7 @@ export default function LoginPage() {
       <nav className="login-v2-nav">
         <Link href="/" className="login-v2-brand">
           <div className="login-v2-brand-icon">
-            <GraduationCap size={18} strokeWidth={2.2} />
+            <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <span>SchoolCare</span>
         </Link>
@@ -275,7 +275,7 @@ export default function LoginPage() {
             <div className="login-v2-card-header">
               <div className="login-v2-card-brand">
                 <div className="login-v2-card-brand-icon">
-                  <GraduationCap size={18} strokeWidth={2.2} />
+                  <img src="/logo.png" alt="SchoolCare Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <span>SchoolCare</span>
               </div>
